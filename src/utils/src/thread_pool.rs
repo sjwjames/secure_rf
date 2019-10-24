@@ -2,7 +2,7 @@ pub mod thread_pool {
     use std::sync::{mpsc, Mutex, Arc};
     use std::thread;
 
-    pub enum Message {
+    enum Message {
         NewJob(Job),
         Terminate,
     }
@@ -12,12 +12,12 @@ pub mod thread_pool {
         sender: mpsc::Sender<Message>,
     }
 
-    pub struct Worker {
+    struct Worker {
         id: usize,
         thread: Option<thread::JoinHandle<()>>,
     }
 
-    pub trait FnBox {
+    trait FnBox {
         fn call_box(self: Box<Self>);
     }
 
@@ -27,13 +27,13 @@ pub mod thread_pool {
         }
     }
 
-    pub type Job = Box<FnBox + Send + 'static>;
+    type Job = Box<FnBox + Send + 'static>;
 
 
     impl Worker {
-        pub fn new(id: usize, receiver: mpsc::Receiver<Arc<Mutex<mpsc::Receiver<Message>>>>) -> Worker {
+        fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
             let thread = thread::spawn(move || {
-                while let Ok(message) = receiver.lock().unwrap.recv() {
+                while let Ok(message) = receiver.lock().unwrap().recv() {
                     match message {
                         Message::NewJob(job) => {
                             println!("Worker {} got a job;executing.", id);
@@ -62,7 +62,7 @@ pub mod thread_pool {
             self.sender.send(Message::NewJob(job)).unwrap();
         }
 
-        pub fn new(size: usize) -> ThreadPool {
+        fn new(size: usize) -> ThreadPool {
             assert!(size > 0);
             let mut workers = Vec::with_capacity(size);
             let (sender, receiver) = mpsc::channel();
