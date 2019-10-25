@@ -1,8 +1,8 @@
 pub mod computing_party {
     use std::num::Wrapping;
     use std::net::{TcpStream, SocketAddr, TcpListener};
-    use utils::thread_pool::thread_pool::ThreadPool;
     use std::fs::File;
+    use crate::thread_pool::thread_pool::ThreadPool;
 
     //author Davis, email:daviscrailsback@gmail.com
     pub struct ComputingParty {
@@ -40,7 +40,7 @@ pub mod computing_party {
         pub instance_count: usize,
     }
 
-    pub fn initiate(settings_file: String) -> ComputingParty {
+    pub fn initialize_party_context(settings_file: String) -> ComputingParty {
         let mut settings = config::Config::default();
         settings
             .merge(config::File::with_name(&settings_file.as_str())).unwrap()

@@ -3,13 +3,13 @@ pub mod ti {
     extern crate rand;
 
     use rand::Rng;
-    use utils::constants::*;
     use std::time::SystemTime;
     use std::thread;
     use std::net::{TcpStream, TcpListener, SocketAddr};
     use std::io::{Read, Write};
     use std::num::Wrapping;
     use std::io;
+    use crate::constants::constants;
 
     pub struct TI {
         pub ti_ip: String,
