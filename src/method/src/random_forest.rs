@@ -1,11 +1,11 @@
 pub mod random_forest{
-    use crate::Method;
+    use crate::TrainingMethod;
 
     pub struct RandomForest{
 
     }
 
-    impl Method for RandomForest{
+    impl TrainingMethod for RandomForest{
         fn initiate(&self) {
             unimplemented!()
         }

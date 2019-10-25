@@ -1,6 +1,6 @@
 pub mod decision_tree;
 pub mod random_forest;
-pub trait Method{
+pub trait TrainingMethod{
     fn initiate(&self);
     fn train(&self);
 }

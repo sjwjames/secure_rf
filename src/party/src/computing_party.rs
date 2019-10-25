@@ -1,9 +1,9 @@
 pub mod computing_party {
     use std::num::Wrapping;
-    use crate::PartyLifeCycle;
     use std::net::{TcpStream, SocketAddr, TcpListener};
     use utils::thread_pool::thread_pool::ThreadPool;
-    // author:Davis
+
+    //author Davis, email:daviscrailsback@gmail.com
     pub struct ComputingParty {
         /* options */
         pub debug_output: bool,
@@ -17,6 +17,9 @@ pub mod computing_party {
         pub party0_port: u16,
         pub party1_ip: String,
         pub party1_port: u16,
+        pub in_stream: TcpStream,
+        pub o_stream: TcpStream,
+        pub ti_stream: TcpStream,
 
         /* mpc */
         pub asymmetric_bit: u8,
@@ -27,9 +30,8 @@ pub mod computing_party {
         pub output_path: String,
         pub x_matrix: Vec<Vec<Wrapping<u64>>>,
         pub y_matrix: Vec<Vec<Wrapping<u64>>>,
-        pub in_stream: TcpStream,
-        pub o_stream: TcpStream,
-        pub ti_stream: TcpStream,
+
+        /* thread */
         pub thread_pool: ThreadPool,
     }
 
@@ -246,7 +248,7 @@ pub mod computing_party {
             ti_stream,
             in_stream,
             o_stream,
-            thread_pool
+            thread_pool,
         }
     }
 

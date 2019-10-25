@@ -7,5 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+rand = "0.3.14"
+config = "0.9.3"
+csv = "1.1.1"
 utils = {"version"="0.1",path="../utils/"}
 communicator = {"version"="0.1",path="../communicator/"}
+method = {"version"="0.1",path="../method/"}

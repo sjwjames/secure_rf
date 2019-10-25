@@ -156,6 +156,10 @@ name = "party"
 version = "0.1.0"
 dependencies = [
  "communicator 0.1.0",
+ "config 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "csv 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "method 0.1.0",
+ "rand 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "utils 0.1.0",
 ]
 
@@ -206,12 +210,9 @@ name = "random_forest_rust"
 version = "0.1.0"
 dependencies = [
  "communicator 0.1.0",
- "config 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "csv 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "method 0.1.0",
  "party 0.1.0",
  "protocol 0.1.0",
- "rand 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "utils 0.1.0",
 ]
 

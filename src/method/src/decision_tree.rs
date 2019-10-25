@@ -1,11 +1,11 @@
 pub mod decision_tree{
-    use crate::Method;
+    use crate::TrainingMethod;
 
     pub struct DecisionTree{
 
     }
 
-    impl Method for DecisionTree{
+    impl TrainingMethod for DecisionTree{
         fn initiate(&self) {
 
         }
