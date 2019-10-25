@@ -32,6 +32,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "communicator"
 version = "0.1.0"
+dependencies = [
+ "utils 0.1.0",
+]
 
 [[package]]
 name = "config"
@@ -118,6 +121,10 @@ dependencies = [
 [[package]]
 name = "method"
 version = "0.1.0"
+dependencies = [
+ "communicator 0.1.0",
+ "utils 0.1.0",
+]
 
 [[package]]
 name = "nom"
@@ -147,10 +154,18 @@ dependencies = [
 [[package]]
 name = "party"
 version = "0.1.0"
+dependencies = [
+ "communicator 0.1.0",
+ "utils 0.1.0",
+]
 
 [[package]]
 name = "protocol"
 version = "0.1.0"
+dependencies = [
+ "communicator 0.1.0",
+ "utils 0.1.0",
+]
 
 [[package]]
 name = "rand"

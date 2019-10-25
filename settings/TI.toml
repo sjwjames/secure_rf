@@ -1,0 +1,23 @@
+#[role]
+
+ti = true
+
+#[network]
+
+ti_ip     = "127.0.0.1"
+ti_port0  = 4000
+ti_port1  = 8000
+
+#[BC-TCGA]
+
+iterations = 10
+add_shares_per_iter = 13368000
+xor_shares_per_iter = 7512
+
+#[GSE2034]
+
+#iterations = 223
+#add_shares_per_iter = 4526552
+#xor_shares_per_iter = 3620
+
+

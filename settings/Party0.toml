@@ -1,0 +1,48 @@
+#[role]
+
+ti = false 
+party_id = 0
+
+#[option]
+
+debug_output = true
+
+#[network]
+
+ti_ip     = "127.0.0.1"
+ti_port0  = 4000
+ti_port1  = 8000
+
+party0_ip   = "127.0.0.1"
+party0_port = 5000
+
+party1_ip   = "127.0.0.1"
+party1_port = 6000
+
+#[LOGISTIC REGRESSION] 
+
+decimal_precision = 10
+integer_precision = 15 
+learning_rate = 0.001
+
+#[BC-TCGA]
+
+x_input_path = "inputs/BC_TCGA_5_folds/1X_train_share0.csv"
+y_input_path = "inputs/BC_TCGA_5_folds/1y_train_share0.csv"
+output_path = "weights/BC_TCGA_5_folds/fold_1_weights.csv"
+attribute_count = 17814
+instance_count = 375
+iterations = 10
+add_shares_per_iter = 13368000
+xor_shares_per_iter = 7512
+
+#[GSE2034]
+
+#x_input_path = "inputs/GSE2034_5_folds/5X_train_share0.csv"
+#y_input_path = "inputs/GSE2034_5_folds/5y_train_share0.csv"
+#output_path = "weights/GSE2034_5_folds/fold_5_weights.csv"
+#attribute_count = 12634
+#instance_count = 179
+#iterations = 223
+#add_shares_per_iter = 4526552
+#xor_shares_per_iter = 3620

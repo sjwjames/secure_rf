@@ -1,3 +1,6 @@
+pub mod computing_party;
+pub mod ti;
+
 #[cfg(test)]
 mod tests {
     #[test]

@@ -62,7 +62,7 @@ pub mod thread_pool {
             self.sender.send(Message::NewJob(job)).unwrap();
         }
 
-        fn new(size: usize) -> ThreadPool {
+        pub fn new(size: usize) -> ThreadPool {
             assert!(size > 0);
             let mut workers = Vec::with_capacity(size);
             let (sender, receiver) = mpsc::channel();
