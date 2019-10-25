@@ -2,6 +2,7 @@ pub mod computing_party {
     use std::num::Wrapping;
     use std::net::{TcpStream, SocketAddr, TcpListener};
     use utils::thread_pool::thread_pool::ThreadPool;
+    use std::fs::File;
 
     //author Davis, email:daviscrailsback@gmail.com
     pub struct ComputingParty {
@@ -31,8 +32,12 @@ pub mod computing_party {
         pub x_matrix: Vec<Vec<Wrapping<u64>>>,
         pub y_matrix: Vec<Vec<Wrapping<u64>>>,
 
-        /* thread */
+        /* random forest */
         pub thread_pool: ThreadPool,
+        pub tree_count: usize,
+        pub batch_size: usize,
+        pub attribute_count: usize,
+        pub instance_count: usize,
     }
 
     pub fn initiate(settings_file: String) -> ComputingParty {
@@ -160,6 +165,33 @@ pub mod computing_party {
                 panic!("Encountered a problem while parsing thread_count: {:?}", error)
             }
         };
+        let tree_count = match settings.get_int("tree_count") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing tree_count: {:?}", error)
+            }
+        };
+
+        let batch_size = match settings.get_int("batch_size") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing batch_size: {:?}", error)
+            }
+        };
+
+        let attribute_count = match settings.get_int("attribute_count") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing attribute_count: {:?}", error)
+            }
+        };
+
+        let instance_count = match settings.get_int("instance_count") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing instance_count: {:?}", error)
+            }
+        };
 
         let x_matrix = load_u64_matrix(&x_input_path, instance_count as usize, false, (party_id as u64) << decimal_precision as u64);
         let y_matrix = load_u64_matrix(&y_input_path, instance_count as usize, false, (party_id as u64) << decimal_precision as u64);
@@ -249,8 +281,36 @@ pub mod computing_party {
             in_stream,
             o_stream,
             thread_pool,
+            tree_count,
+            batch_size,
+            instance_count,
+            attribute_count,
         }
     }
+
+    fn load_u64_matrix(file_path: &String, instances: usize, add_dummy: bool, one: u64) -> Vec<Vec<Wrapping<u64>>> {
+        let mut matrix: Vec<Vec<Wrapping<u64>>> = vec![Vec::new(); instances];
+
+        let file = File::open(file_path);
+        let mut rdr = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(file.unwrap());
+
+        let mut index = 0;
+        for result in rdr.deserialize() {
+            if index == instances {
+                break;
+            }
+
+            matrix[index] = result.unwrap();
+            if add_dummy {
+                matrix[index].push(Wrapping(one)); // TODO: Ensure this is enough
+            }
+            index += 1;
+        }
+        matrix
+    }
+
 
     fn try_connect(socket: &SocketAddr, prefix: &str) -> TcpStream {
         loop {

@@ -8,6 +8,10 @@ ti_ip     = "127.0.0.1"
 ti_port0  = 4000
 ti_port1  = 8000
 
+
+tree_count = 100
+batch_size = 20
+
 #[BC-TCGA]
 
 iterations = 10

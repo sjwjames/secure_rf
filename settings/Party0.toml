@@ -19,11 +19,15 @@ party0_port = 5000
 party1_ip   = "127.0.0.1"
 party1_port = 6000
 
-#[LOGISTIC REGRESSION] 
+#[LOGISTIC REGRESSION]
 
 decimal_precision = 10
 integer_precision = 15 
 learning_rate = 0.001
+
+#[RANDOM FOREST]
+tree_count = 100
+batch_size = 20
 
 #[BC-TCGA]
 

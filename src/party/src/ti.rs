@@ -30,7 +30,7 @@ pub mod ti {
         u8_buf: [u8; U8S_PER_TX],
     }
 
-    pub fn initialize_ti_context(settings_file: String) -> TiContext {
+    pub fn initialize_ti_context(settings_file: String) -> TI {
         let mut settings = config::Config::default();
         settings
             .merge(config::File::with_name(settings_file.as_str())).unwrap()
@@ -129,17 +129,15 @@ pub mod ti {
         };
         println!("{} accepted connection from {}", &s0_pfx, in_stream0.peer_addr().unwrap());
         println!("{} accepted connection from {}", &s1_pfx, in_stream1.peer_addr().unwrap());
-        println!("{} runtime context initialized -- work time = {:5} (ms)",
-                 &prefix, now.elapsed().unwrap().as_millis());
 
         let mut trees_left = ctx.tree_count;
         let mut batch_count = 0;
         while trees_left > 0 {
             let current_batch = if trees_left >= ctx.batch_size { ctx.batch_size } else { trees_left };
-            let mut batch_additive_triples0 =  Vec::new();
-            let mut batch_xor_triples0 =  Vec::new();
-            let mut batch_additive_triples1 =  Vec::new();
-            let mut batch_xor_triples1 =  Vec::new();
+            let mut batch_additive_triples0 = Vec::new();
+            let mut batch_xor_triples0 = Vec::new();
+            let mut batch_additive_triples1 = Vec::new();
+            let mut batch_xor_triples1 = Vec::new();
 
             println!("current batch:{}", batch_count);
 
@@ -149,27 +147,25 @@ pub mod ti {
                 let (add_triples0, add_triples1) = generate_triples(&ctx, true);
                 batch_additive_triples0.push(add_triples0);
                 batch_additive_triples1.push(add_triples1);
-                println!("additive shares                    complete -- work time = {:5} (ms)",
-                         &prefix, i, now.elapsed().unwrap().as_millis() );
+                println!("{} {} additive shares                    complete -- work time = {:5} (ms)",
+                         &prefix, i, now.elapsed().unwrap().as_millis());
 
                 print!("{} [{}] generating xor shares...           ", &prefix, i);
-                let now =  SystemTime::now();
+                let now = SystemTime::now();
                 let (xor_triples0, xor_triples1) = generate_triples(&ctx, false);
                 batch_xor_triples0.push(xor_triples0);
                 batch_xor_triples1.push(xor_triples1);
                 println!("xor shares                    complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis() );
-
+                         now.elapsed().unwrap().as_millis());
             }
 
-            println!("{} [{}] sending correlated randomness...   ", &s0_pfx, i);
+            let now = SystemTime::now();
+            println!("{} [{}] sending correlated randomness...   ", &s0_pfx, batch_count);
             let shares0 = (batch_additive_triples0, batch_xor_triples0);
             let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
             let sender_thread0 = thread::spawn(move || {
-
                 match get_confirmation(stream.try_clone()
                     .expect("server 0: failed to clone stream")) {
-
                     Ok(_) => return send_shares(0, stream.try_clone()
                         .expect("server 0: failed to clone stream"),
                                                 shares0),
@@ -177,14 +173,12 @@ pub mod ti {
                 };
             });
 
-            println!("{} [{}] sending correlated randomness...   ", &s1_pfx, i);
+            println!("{} [{}] sending correlated randomness...   ", &s1_pfx, batch_count);
             let shares1 = (batch_additive_triples1, batch_xor_triples1);
             let stream = in_stream1.try_clone().expect("server 1: failed to clone stream");
             let sender_thread1 = thread::spawn(move || {
-
                 match get_confirmation(stream.try_clone()
                     .expect("server 1: failed to clone stream")) {
-
                     Ok(_) => return send_shares(1, stream.try_clone()
                         .expect("server 1: failed to clone stream"),
                                                 shares1),
@@ -193,25 +187,136 @@ pub mod ti {
             });
 
             match sender_thread0.join() {
-
                 Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-                                  &s0_pfx, i, now.elapsed().unwrap().as_millis()),
+                                  &s0_pfx, batch_count, now.elapsed().unwrap().as_millis()),
                 Err(_) => panic!("main: failed to join sender 0"),
             };//.expect("main: failed to rejoin server 0");
 
             match sender_thread1.join() {
                 Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-                                  &s1_pfx, i, now.elapsed().unwrap().as_millis()),
+                                  &s1_pfx, batch_count, now.elapsed().unwrap().as_millis()),
                 Err(_) => panic!("main: failed to join sender 1"),
             };//.expect("main: failed to rejoin server 0");
 
 
             trees_left -= ctx.batch_size;
-            batch_count+=1;
+            batch_count += 1;
         }
     }
 
-    fn generate_triples(ctx: &init::TiContext, additive: bool) -> (Vec<(u64, u64, u64)>, Vec<(u64, u64, u64)>) {
+    fn send_shares(handle: usize,
+                   mut stream: TcpStream,
+                   mut shares: (Vec<Vec<(u64, u64, u64)>>, Vec<Vec<(u64, u64, u64)>>)) -> io::Result<()> {
+        stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+        stream.set_write_timeout(None).expect("set_write_timeout call failed");
+        stream.set_read_timeout(None).expect("set_read_timeout call failed");
+
+        //println!("server {}: sending additive shares", handle);
+
+        //////////////////////// SEND ADDITIVES ////////////////////////
+        let batch_size = shares.0.len();
+        for batch_index in 0..batch_size {
+            let current_share = &mut shares.0[batch_index];
+            let mut remainder = current_share.len();
+
+            while remainder >= TI_BATCH_SIZE {
+                let mut tx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+
+                for i in 0..TI_BATCH_SIZE {
+                    let (u, v, w) = current_share.pop().unwrap();
+
+                    unsafe {
+                        tx_buf.u64_buf[3 * i] = u;
+                        tx_buf.u64_buf[3 * i + 1] = v;
+                        tx_buf.u64_buf[3 * i + 2] = w;
+                    }
+                }
+                let mut bytes_written = 0;
+                while bytes_written < U8S_PER_TX {
+                    let current_bytes = unsafe {
+                        stream.write(&tx_buf.u8_buf[bytes_written..])
+                    };
+                    bytes_written += current_bytes.unwrap();
+                }
+                remainder -= TI_BATCH_SIZE;
+            }
+
+            let mut tx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+
+            for i in 0..remainder {
+                let (u, v, w) = current_share.pop().unwrap();
+
+                unsafe {
+                    tx_buf.u64_buf[3 * i] = u;
+                    tx_buf.u64_buf[3 * i + 1] = v;
+                    tx_buf.u64_buf[3 * i + 2] = w;
+                }
+            }
+            let mut bytes_written = 0;
+            while bytes_written < U8S_PER_TX {
+                let current_bytes = unsafe {
+                    stream.write(&tx_buf.u8_buf[bytes_written..])
+                };
+                bytes_written += current_bytes.unwrap();
+            }
+        }
+
+        //println!("server {}: additive shares sent. sending xor shares", handle);
+
+        /////////////////////////// SEND XOR SHARES //////////////////////////
+        for batch_index in 0..batch_size {
+            let mut current_share = &mut shares.1[batch_size];
+            let mut remainder = current_share.len();
+            while remainder >= TI_BATCH_SIZE {
+                let mut tx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+
+                for i in 0..TI_BATCH_SIZE {
+                    let (u, v, w) = current_share.pop().unwrap();
+
+                    unsafe {
+                        tx_buf.u64_buf[3 * i] = u;
+                        tx_buf.u64_buf[3 * i + 1] = v;
+                        tx_buf.u64_buf[3 * i + 2] = w;
+                    }
+                }
+                let mut bytes_written = 0;
+                while bytes_written < U8S_PER_TX {
+                    let current_bytes = unsafe {
+                        stream.write(&tx_buf.u8_buf[bytes_written..])
+                    };
+                    bytes_written += current_bytes.unwrap();
+                }
+                remainder -= TI_BATCH_SIZE;
+            }
+
+            let mut tx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+
+            for i in 0..remainder {
+                let (u, v, w) = current_share.pop().unwrap();
+
+                unsafe {
+                    tx_buf.u64_buf[3 * i] = u;
+                    tx_buf.u64_buf[3 * i + 1] = v;
+                    tx_buf.u64_buf[3 * i + 2] = w;
+                }
+            }
+            let mut bytes_written = 0;
+
+            while bytes_written < U8S_PER_TX {
+                let current_bytes = unsafe {
+                    stream.write(&tx_buf.u8_buf[bytes_written..])
+                };
+                bytes_written += current_bytes.unwrap();
+            }
+        }
+
+
+        //println!("server {}: xor shares sent", handle);
+
+        Ok(())
+    }
+
+    fn generate_triples(ctx: &TI, additive: bool) -> (Vec<(u64, u64, u64)>, Vec<(u64, u64, u64)>) {
         let triple_count = if additive { ctx.add_shares_per_iter } else { ctx.xor_shares_per_iter };
 
         let shares =
