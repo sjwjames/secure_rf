@@ -5,6 +5,7 @@ pub mod computing_party {
     use crate::thread_pool::thread_pool::ThreadPool;
     use std::io::{Write, Read};
     use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX};
+    use num_bigint::{BigUint, BigInt};
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -39,6 +40,8 @@ pub mod computing_party {
         pub x_matrix: Vec<Vec<Wrapping<u64>>>,
         pub y_matrix: Vec<Vec<Wrapping<u64>>>,
 
+        /* DT training*/
+
         /* random forest */
         pub thread_count: usize,
         pub tree_count: usize,
@@ -48,6 +51,10 @@ pub mod computing_party {
 
         pub corr_rand: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
         pub corr_rand_xor: Vec<(u64, u64, u64)>,
+        pub big_int_ti_shares:Vec<(BigInt, BigInt, BigInt)>,
+        pub equality_ti_shares:Vec<BigInt>,
+
+
     }
 
     impl Clone for ComputingParty {
@@ -78,6 +85,8 @@ pub mod computing_party {
                 instance_count: self.instance_count,
                 corr_rand: Vec::new(),
                 corr_rand_xor: Vec::new(),
+                big_int_ti_shares: vec![],
+                equality_ti_shares: vec![]
             }
         }
     }
@@ -362,6 +371,8 @@ pub mod computing_party {
             attribute_count,
             corr_rand: Vec::new(),
             corr_rand_xor: Vec::new(),
+            big_int_ti_shares: vec![],
+            equality_ti_shares: vec![]
         }
     }
 
