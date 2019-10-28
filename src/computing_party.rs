@@ -3,9 +3,9 @@ pub mod computing_party {
     use std::net::{TcpStream, SocketAddr, TcpListener};
     use std::fs::File;
     use crate::thread_pool::thread_pool::ThreadPool;
-    use std::io::{Write, Read};
+    use std::io::{Write, Read, BufReader, BufRead};
     use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX};
-    use num_bigint::{BigUint, BigInt};
+    use num_bigint::{BigUint, BigInt, ToBigInt};
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -41,19 +41,36 @@ pub mod computing_party {
         pub y_matrix: Vec<Vec<Wrapping<u64>>>,
 
         /* DT training*/
+        pub max_depth: usize,
+        pub alpha: BigInt,
+        pub epsilon: f64,
+        pub cutoff_transaction_set_size: usize,
+        pub attr_value_count: usize,
+        pub class_value_count: usize,
+        pub attribute_count: usize,
+        pub instance_count: usize,
+        pub attr_values: Vec<Vec<Vec<u64>>>,
+        pub class_values: Vec<Vec<Vec<u64>>>,
+        pub attr_values_big_integer: Vec<Vec<Vec<BigUint>>>,
+        pub class_values_big_integer: Vec<Vec<Vec<BigUint>>>,
+        pub subset_transaction_bit_vector: Vec<u8>,
+        pub attribute_bit_vector: Vec<u8>,
+
+        pub prime: BigUint,
+        pub dataset_size_prime: u64,
+        pub dataset_size_bit_length: u64,
+        pub bit_length: u64,
+        pub big_int_ti_index: u64,
 
         /* random forest */
         pub thread_count: usize,
         pub tree_count: usize,
         pub batch_size: usize,
-        pub attribute_count: usize,
-        pub instance_count: usize,
 
         pub corr_rand: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
         pub corr_rand_xor: Vec<(u64, u64, u64)>,
-        pub big_int_ti_shares:Vec<(BigInt, BigInt, BigInt)>,
-        pub equality_ti_shares:Vec<BigInt>,
-
+        pub big_int_ti_shares: Vec<(BigInt, BigInt, BigInt)>,
+        pub equality_ti_shares: Vec<BigInt>,
 
     }
 
@@ -78,6 +95,23 @@ pub mod computing_party {
                 output_path: self.output_path.clone(),
                 x_matrix: self.x_matrix.clone(),
                 y_matrix: self.y_matrix.clone(),
+                max_depth: self.max_depth,
+                alpha: self.alpha.clone(),
+                epsilon: self.epsilon.clone(),
+                cutoff_transaction_set_size: self.cutoff_transaction_set_size,
+                attr_value_count: self.attr_value_count,
+                class_value_count: self.class_value_count,
+                attr_values: self.attr_values.clone(),
+                class_values: self.class_values.clone(),
+                attr_values_big_integer: self.attr_values_big_integer.clone(),
+                class_values_big_integer: self.class_values_big_integer.clone(),
+                subset_transaction_bit_vector: self.subset_transaction_bit_vector.clone(),
+                attribute_bit_vector: self.attribute_bit_vector.clone(),
+                prime: self.prime.clone(),
+                dataset_size_prime: self.dataset_size_prime,
+                dataset_size_bit_length: self.dataset_size_bit_length,
+                bit_length: self.bit_length,
+                big_int_ti_index: self.big_int_ti_index,
                 thread_count: self.thread_count,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
@@ -86,9 +120,45 @@ pub mod computing_party {
                 corr_rand: Vec::new(),
                 corr_rand_xor: Vec::new(),
                 big_int_ti_shares: vec![],
-                equality_ti_shares: vec![]
+                equality_ti_shares: vec![],
             }
         }
+    }
+
+    fn load_dt_training_file(file_path: &String) -> (usize, usize, usize, usize, Vec<Vec<u8>>) {
+        let mut one_hot_encoding: Vec<Vec<u8>> = Vec::new();
+        let file = File::open(file_path).expect("input file not found");
+        let reader = BufReader::new(file);
+        let mut count = 0;
+        let mut class_value_count = 0;
+        let mut attr_value_count = 0;
+        let mut attr_count = 0;
+        let mut instance_count = 0;
+        for line in reader.lines() {
+            let line = line.unwrap();
+            match count {
+                0 => {
+                    class_value_count = line.parse().unwrap();
+                }
+                1 => {
+                    attr_count = line.parse().unwrap();
+                }
+                2 => {
+                    attr_value_count = line.parse().unwrap();
+                }
+                3 => {
+                    instance_count = line.parse().unwrap();
+                }
+                _ => {
+                    let item: Vec<&str> = line.split(",").collect();
+                    let item = item.into_iter().map(|x|{x.parse().unwrap()}).rev().collect();
+                    one_hot_encoding.push(item);
+                }
+            }
+            count += 1;
+        }
+
+        (class_value_count, attr_count, attr_value_count, instance_count, one_hot_encoding)
     }
 
     fn load_u64_matrix(file_path: &String, instances: usize, add_dummy: bool, one: u64) -> Vec<Vec<Wrapping<u64>>> {
@@ -277,6 +347,32 @@ pub mod computing_party {
             }
         };
 
+        let max_depth = match settings.get_int("max_depth") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing max_depth: {:?}", error)
+            }
+        };
+
+        let alpha = match settings.get_int("alpha") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing alpha: {:?}", error)
+            }
+        };
+        let alpha = alpha.to_bigint().unwrap();
+
+
+        let epsilon = match settings.get_float("epsilon") {
+            Ok(num) => num as f64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing epsilon: {:?}", error)
+            }
+        };
+
+        let cutoff_transaction_set_size = (epsilon * instance_count as f64) as usize;
+        let (class_value_count, attr_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
+
 
         let x_matrix = load_u64_matrix(&x_input_path, instance_count as usize, false, (party_id as u64) << decimal_precision as u64);
         let y_matrix = load_u64_matrix(&y_input_path, instance_count as usize, false, (party_id as u64) << decimal_precision as u64);
@@ -361,6 +457,11 @@ pub mod computing_party {
             output_path,
             x_matrix,
             y_matrix,
+            max_depth,
+            alpha,
+            epsilon,
+            cutoff_transaction_set_size,
+            attr_value_count,
             ti_stream,
             in_stream,
             o_stream,
@@ -368,11 +469,24 @@ pub mod computing_party {
             tree_count,
             batch_size,
             instance_count,
+            attr_values: vec![],
+            class_values: vec![],
+            attr_values_big_integer: vec![],
+            class_values_big_integer: vec![],
+            subset_transaction_bit_vector: vec![],
+            attribute_bit_vector: vec![],
+            prime: Default::default(),
+            dataset_size_prime: 0,
+            dataset_size_bit_length: 0,
+            bit_length: 0,
             attribute_count,
             corr_rand: Vec::new(),
             corr_rand_xor: Vec::new(),
             big_int_ti_shares: vec![],
-            equality_ti_shares: vec![]
+            equality_ti_shares: vec![],
+
+            class_value_count: 0,
+            big_int_ti_index: 0,
         }
     }
 

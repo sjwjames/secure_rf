@@ -1,4 +1,5 @@
 extern crate random_forest_rust;
+
 use std::time::SystemTime;
 use std::env;
 use random_forest_rust::ti::ti::{TI, initialize_ti_context, run_ti_module};
@@ -34,4 +35,5 @@ fn main() {
         }
     };
     println!("{} total runtime = {:9} (ms)", &prefix, now.elapsed().unwrap().as_millis());
+
 }
