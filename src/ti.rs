@@ -15,6 +15,8 @@ pub mod ti {
     use std::sync::{Arc, Mutex};
     use num::bigint::{BigUint, ToBigUint, RandBigInt};
     use num::integer::*;
+    use self::num::{One, Zero};
+    use std::ops::Add;
 
     pub struct TI {
         pub ti_ip: String,
@@ -468,5 +470,20 @@ pub mod ti {
         let v1 = (v - &v0).mod_floor(prime);
         let w1 = (w - &v0).mod_floor(prime);
         ((u0, v0, w0), (u1, v1, w1))
+    }
+
+    fn new_equality_bigint_shares(rng: &mut rand::ThreadRng, prime: &BigUint, bigint_bit_size: usize, equality_count: usize) -> (Vec<BigUint>, Vec<BigUint>) {
+        let mut share0 = Vec::new();
+        let mut share1 = Vec::new();
+        for i in 0..equality_count {
+            let r = rng.gen_biguint(bigint_bit_size) + BigUint::one();
+            let mut rsum = BigUint::zero();
+            let r0 = rng.gen_biguint(bigint_bit_size);
+            rsum = rsum + &r0;
+            let r1 = BigUint::mod_floor(&(&r - &rsum), prime);
+            share0.push(r0);
+            share1.push(r1);
+        }
+        (share0, share1)
     }
 }
