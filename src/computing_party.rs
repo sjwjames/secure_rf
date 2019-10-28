@@ -5,7 +5,8 @@ pub mod computing_party {
     use crate::thread_pool::thread_pool::ThreadPool;
     use std::io::{Write, Read, BufReader, BufRead};
     use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX};
-    use num_bigint::{BigUint, BigInt, ToBigInt};
+    use num_bigint::{BigUint, BigInt, ToBigInt, ToBigUint};
+    use crate::decision_tree::decision_tree::{DecisionTreeData, DecisionTreeTraining};
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -37,30 +38,12 @@ pub mod computing_party {
 
         /* input output */
         pub output_path: String,
-        pub x_matrix: Vec<Vec<Wrapping<u64>>>,
-        pub y_matrix: Vec<Vec<Wrapping<u64>>>,
+
+        /* DT training Data*/
+        pub dt_data: DecisionTreeData,
 
         /* DT training*/
-        pub max_depth: usize,
-        pub alpha: BigInt,
-        pub epsilon: f64,
-        pub cutoff_transaction_set_size: usize,
-        pub attr_value_count: usize,
-        pub class_value_count: usize,
-        pub attribute_count: usize,
-        pub instance_count: usize,
-        pub attr_values: Vec<Vec<Vec<u64>>>,
-        pub class_values: Vec<Vec<Vec<u64>>>,
-        pub attr_values_big_integer: Vec<Vec<Vec<BigUint>>>,
-        pub class_values_big_integer: Vec<Vec<Vec<BigUint>>>,
-        pub subset_transaction_bit_vector: Vec<u8>,
-        pub attribute_bit_vector: Vec<u8>,
-
-        pub prime: BigUint,
-        pub dataset_size_prime: u64,
-        pub dataset_size_bit_length: u64,
-        pub bit_length: u64,
-        pub big_int_ti_index: u64,
+        pub dt_training: DecisionTreeTraining,
 
         /* random forest */
         pub thread_count: usize,
@@ -93,30 +76,14 @@ pub mod computing_party {
                 xor_shares_per_iter: self.xor_shares_per_iter,
                 add_shares_per_iter: self.add_shares_per_iter,
                 output_path: self.output_path.clone(),
-                x_matrix: self.x_matrix.clone(),
-                y_matrix: self.y_matrix.clone(),
-                max_depth: self.max_depth,
-                alpha: self.alpha.clone(),
-                epsilon: self.epsilon.clone(),
-                cutoff_transaction_set_size: self.cutoff_transaction_set_size,
-                attr_value_count: self.attr_value_count,
-                class_value_count: self.class_value_count,
-                attr_values: self.attr_values.clone(),
-                class_values: self.class_values.clone(),
-                attr_values_big_integer: self.attr_values_big_integer.clone(),
-                class_values_big_integer: self.class_values_big_integer.clone(),
-                subset_transaction_bit_vector: self.subset_transaction_bit_vector.clone(),
-                attribute_bit_vector: self.attribute_bit_vector.clone(),
-                prime: self.prime.clone(),
-                dataset_size_prime: self.dataset_size_prime,
-                dataset_size_bit_length: self.dataset_size_bit_length,
-                bit_length: self.bit_length,
-                big_int_ti_index: self.big_int_ti_index,
+
+                dt_data: self.dt_data.clone(),
+                dt_training: self.dt_training.clone(),
+
                 thread_count: self.thread_count,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
-                attribute_count: self.attribute_count,
-                instance_count: self.instance_count,
+
                 corr_rand: Vec::new(),
                 corr_rand_xor: Vec::new(),
                 big_int_ti_shares: vec![],
@@ -151,7 +118,7 @@ pub mod computing_party {
                 }
                 _ => {
                     let item: Vec<&str> = line.split(",").collect();
-                    let item = item.into_iter().map(|x|{x.parse().unwrap()}).rev().collect();
+                    let item = item.into_iter().map(|x| { x.parse().unwrap() }).collect();
                     one_hot_encoding.push(item);
                 }
             }
@@ -193,6 +160,48 @@ pub mod computing_party {
             };
         }
     }
+
+    fn produce_dt_data(one_hot_encoding_data: Vec<Vec<u8>>, class_value_count: usize, attr_value_count: usize, attribute_count: usize, instance_count: usize, asymmetric_bit: u8) -> DecisionTreeData {
+        let mut attr_values = Vec::new();
+        let mut class_values = Vec::new();
+        let mut attr_values_big_integer = Vec::new();
+        let mut class_values_big_integer = Vec::new();
+        for i in 0..attribute_count {
+            let mut attr_data = Vec::new();
+            let mut attr_big_int_data = Vec::new();
+            for j in 0..attr_value_count {
+                let item_copied = one_hot_encoding_data[i * attr_value_count + j].clone();
+                let attr_data_item = item_copied.into_iter().map(|x| x as u64).collect();
+                let item_copied = one_hot_encoding_data[i * attr_value_count + j].clone();
+                let attr_big_int_item = item_copied.into_iter().map(|x| x.to_biguint().unwrap()).collect();
+                attr_data.push(attr_data_item);
+                attr_big_int_data.push(attr_big_int_item);
+            }
+            attr_values.push(attr_data);
+            attr_values_big_integer.push(attr_big_int_data);
+        }
+
+        for i in 0..class_value_count{
+            let item_copied = one_hot_encoding_data[attr_value_count*attribute_count+i].clone();
+            let class_data_item = item_copied.into_iter().map(|x| x as u64).collect();
+            class_values.push(class_data_item);
+            let item_copied = one_hot_encoding_data[attr_value_count*attribute_count+i].clone();
+            let item = item_copied.into_iter().map(|x| x.to_biguint().unwrap()).collect();
+            class_values_big_integer.push(item);
+        }
+
+        DecisionTreeData {
+            attr_value_count,
+            class_value_count,
+            attribute_count,
+            instance_count,
+            attr_values,
+            class_values,
+            attr_values_big_integer,
+            class_values_big_integer,
+        }
+    }
+
 
     pub fn initialize_party_context(settings_file: String) -> ComputingParty {
         let mut settings = config::Config::default();
@@ -333,19 +342,6 @@ pub mod computing_party {
             }
         };
 
-        let attribute_count = match settings.get_int("attribute_count") {
-            Ok(num) => num as usize,
-            Err(error) => {
-                panic!("Encountered a problem while parsing attribute_count: {:?}", error)
-            }
-        };
-
-        let instance_count = match settings.get_int("instance_count") {
-            Ok(num) => num as usize,
-            Err(error) => {
-                panic!("Encountered a problem while parsing instance_count: {:?}", error)
-            }
-        };
 
         let max_depth = match settings.get_int("max_depth") {
             Ok(num) => num as usize,
@@ -370,12 +366,40 @@ pub mod computing_party {
             }
         };
 
-        let cutoff_transaction_set_size = (epsilon * instance_count as f64) as usize;
-        let (class_value_count, attr_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
+        let prime = match settings.get_int("prime") {
+            Ok(num) => num as u128,
+            Err(error) => {
+                panic!("Encountered a problem while parsing prime: {:?}", error)
+            }
+        };
+
+        let prime = prime.to_biguint().unwrap();
+
+        let dataset_size_prime = match settings.get_int("dataset_size_prime") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing dataset_size_prime: {:?}", error)
+            }
+        };
+
+        let dataset_size_bit_length = match settings.get_int("dataset_size_bit_length") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing dataset_size_bit_length: {:?}", error)
+            }
+        };
+
+        let bit_length = match settings.get_int("bit_length") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing bit_length: {:?}", error)
+            }
+        };
 
 
-        let x_matrix = load_u64_matrix(&x_input_path, instance_count as usize, false, (party_id as u64) << decimal_precision as u64);
-        let y_matrix = load_u64_matrix(&y_input_path, instance_count as usize, false, (party_id as u64) << decimal_precision as u64);
+        let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
+
+
         let mut internal_addr; //= String::new();
         let mut external_addr; //= String::new();
         let mut ti_addr;       //= String::new();
@@ -441,6 +465,26 @@ pub mod computing_party {
         ti_stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
 
+        let dt_data = produce_dt_data(one_hot_encoding_matrix, class_value_count, attr_value_count, attribute_count, instance_count, party_id);
+
+
+        let subset_transaction_bit_vector = vec![party_id as u8; instance_count];
+        let cutoff_transaction_set_size = (epsilon * instance_count as f64) as usize;
+        let attribute_bit_vector = vec![1u8; attribute_count];
+        let dt_training = DecisionTreeTraining {
+            max_depth,
+            alpha,
+            epsilon,
+            cutoff_transaction_set_size,
+            subset_transaction_bit_vector,
+            attribute_bit_vector,
+            prime,
+            dataset_size_prime,
+            dataset_size_bit_length,
+            bit_length,
+            big_int_ti_index: 0,
+        };
+
         ComputingParty {
             debug_output,
             party_id,
@@ -455,38 +499,19 @@ pub mod computing_party {
             xor_shares_per_iter,
             add_shares_per_iter,
             output_path,
-            x_matrix,
-            y_matrix,
-            max_depth,
-            alpha,
-            epsilon,
-            cutoff_transaction_set_size,
-            attr_value_count,
             ti_stream,
             in_stream,
             o_stream,
             thread_count,
             tree_count,
             batch_size,
-            instance_count,
-            attr_values: vec![],
-            class_values: vec![],
-            attr_values_big_integer: vec![],
-            class_values_big_integer: vec![],
-            subset_transaction_bit_vector: vec![],
-            attribute_bit_vector: vec![],
-            prime: Default::default(),
-            dataset_size_prime: 0,
-            dataset_size_bit_length: 0,
-            bit_length: 0,
-            attribute_count,
+            dt_data,
+            dt_training,
             corr_rand: Vec::new(),
             corr_rand_xor: Vec::new(),
             big_int_ti_shares: vec![],
             equality_ti_shares: vec![],
 
-            class_value_count: 0,
-            big_int_ti_index: 0,
         }
     }
 
