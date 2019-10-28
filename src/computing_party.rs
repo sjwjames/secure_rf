@@ -3,6 +3,13 @@ pub mod computing_party {
     use std::net::{TcpStream, SocketAddr, TcpListener};
     use std::fs::File;
     use crate::thread_pool::thread_pool::ThreadPool;
+    use std::io::{Write, Read};
+    use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX};
+
+    union Xbuffer {
+        u64_buf: [u64; U64S_PER_TX],
+        u8_buf: [u8; U8S_PER_TX],
+    }
 
     //author Davis, email:daviscrailsback@gmail.com
     pub struct ComputingParty {
@@ -33,11 +40,79 @@ pub mod computing_party {
         pub y_matrix: Vec<Vec<Wrapping<u64>>>,
 
         /* random forest */
-        pub thread_pool: ThreadPool,
+        pub thread_count: usize,
         pub tree_count: usize,
         pub batch_size: usize,
         pub attribute_count: usize,
         pub instance_count: usize,
+
+        pub corr_rand: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
+        pub corr_rand_xor: Vec<(u64, u64, u64)>,
+    }
+
+    impl Clone for ComputingParty {
+        fn clone(&self) -> Self {
+            ComputingParty {
+                debug_output: self.debug_output,
+                party_id: self.party_id,
+                ti_ip: self.ti_ip.clone(),
+                ti_port0: self.ti_port0,
+                ti_port1: self.ti_port1,
+                party0_ip: self.party0_ip.clone(),
+                party0_port: self.party0_port,
+                party1_ip: self.party1_ip.clone(),
+                party1_port: self.party1_port,
+                in_stream: self.in_stream.try_clone().expect("failed to clone in_stream"),
+                o_stream: self.o_stream.try_clone().expect("failed to clone o_stream"),
+                ti_stream: self.ti_stream.try_clone().expect("failed to clone ti_stream"),
+                asymmetric_bit: self.asymmetric_bit,
+                xor_shares_per_iter: self.xor_shares_per_iter,
+                add_shares_per_iter: self.add_shares_per_iter,
+                output_path: self.output_path.clone(),
+                x_matrix: self.x_matrix.clone(),
+                y_matrix: self.y_matrix.clone(),
+                thread_count: self.thread_count,
+                tree_count: self.tree_count,
+                batch_size: self.batch_size,
+                attribute_count: self.attribute_count,
+                instance_count: self.instance_count,
+                corr_rand: Vec::new(),
+                corr_rand_xor: Vec::new(),
+            }
+        }
+    }
+
+    fn load_u64_matrix(file_path: &String, instances: usize, add_dummy: bool, one: u64) -> Vec<Vec<Wrapping<u64>>> {
+        let mut matrix: Vec<Vec<Wrapping<u64>>> = vec![Vec::new(); instances];
+
+        let file = File::open(file_path);
+        let mut rdr = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(file.unwrap());
+
+        let mut index = 0;
+        for result in rdr.deserialize() {
+            if index == instances {
+                break;
+            }
+
+            matrix[index] = result.unwrap();
+            if add_dummy {
+                matrix[index].push(Wrapping(one)); // TODO: Ensure this is enough
+            }
+            index += 1;
+        }
+        matrix
+    }
+
+
+    fn try_connect(socket: &SocketAddr, prefix: &str) -> TcpStream {
+        loop {
+            match TcpStream::connect(socket) {
+                Ok(stream) => return stream,
+                Err(_) => println!("{} connection refused by {}", prefix, socket),
+            };
+        }
     }
 
     pub fn initialize_party_context(settings_file: String) -> ComputingParty {
@@ -193,6 +268,7 @@ pub mod computing_party {
             }
         };
 
+
         let x_matrix = load_u64_matrix(&x_input_path, instance_count as usize, false, (party_id as u64) << decimal_precision as u64);
         let y_matrix = load_u64_matrix(&y_input_path, instance_count as usize, false, (party_id as u64) << decimal_precision as u64);
         let mut internal_addr; //= String::new();
@@ -259,7 +335,6 @@ pub mod computing_party {
         ti_stream.set_write_timeout(None).expect("set_write_timeout call failed");
         ti_stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
-        let thread_pool = ThreadPool::new(thread_count);
 
         ComputingParty {
             debug_output,
@@ -280,44 +355,198 @@ pub mod computing_party {
             ti_stream,
             in_stream,
             o_stream,
-            thread_pool,
+            thread_count,
             tree_count,
             batch_size,
             instance_count,
             attribute_count,
+            corr_rand: Vec::new(),
+            corr_rand_xor: Vec::new(),
         }
     }
 
-    fn load_u64_matrix(file_path: &String, instances: usize, add_dummy: bool, one: u64) -> Vec<Vec<Wrapping<u64>>> {
-        let mut matrix: Vec<Vec<Wrapping<u64>>> = vec![Vec::new(); instances];
+    pub fn get_formatted_address(party_id: u8, party0_ip: &str, party0_port: u16, party1_ip: &str, party1_port: u16) -> (String, String) {
+        let mut internal_addr; //= String::new();
+        let mut external_addr; //= String::new();
 
-        let file = File::open(file_path);
-        let mut rdr = csv::ReaderBuilder::new()
-            .has_headers(false)
-            .from_reader(file.unwrap());
-
-        let mut index = 0;
-        for result in rdr.deserialize() {
-            if index == instances {
-                break;
-            }
-
-            matrix[index] = result.unwrap();
-            if add_dummy {
-                matrix[index].push(Wrapping(one)); // TODO: Ensure this is enough
-            }
-            index += 1;
+        if party_id == 0 {
+            internal_addr = format!("{}:{}", &party0_ip, party0_port);
+            external_addr = format!("{}:{}", &party1_ip, party1_port);
+        } else {
+            internal_addr = format!("{}:{}", &party1_ip, party1_port);
+            external_addr = format!("{}:{}", &party0_ip, party0_port);
         }
-        matrix
+
+        (internal_addr, external_addr)
     }
 
+    pub fn try_setup_socket(internal_addr: &str, external_addr: &str) -> (TcpStream, TcpStream) {
+        let server_socket: SocketAddr = internal_addr
+            .parse()
+            .expect("unable to parse internal socket address");
 
-    fn try_connect(socket: &SocketAddr, prefix: &str) -> TcpStream {
-        loop {
-            match TcpStream::connect(socket) {
-                Ok(stream) => return stream,
-                Err(_) => println!("{} connection refused by {}", prefix, socket),
+        let client_socket: SocketAddr = external_addr
+            .parse()
+            .expect("unable to parse external socket address");
+
+        let listener = TcpListener::bind(&server_socket)
+            .expect("unable to establish Tcp Listener");
+
+
+        let s_pfx = "server:    ";
+        let c_pfx = "client:    ";
+
+        println!("{} listening on port {}", &s_pfx, &internal_addr);
+
+        let o_stream = try_connect(&client_socket, &c_pfx);
+
+        println!("{} successfully connected to server on port {}",
+                 &c_pfx, &external_addr);
+
+        let in_stream = match listener.accept() {
+            Ok((stream, _addr)) => stream,
+            Err(_) => panic!("failed to accept connection"),
+        };
+
+        o_stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+        o_stream.set_write_timeout(None).expect("set_write_timeout call failed");
+        o_stream.set_read_timeout(None).expect("set_read_timeout call failed");
+
+        in_stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+        in_stream.set_write_timeout(None).expect("set_write_timeout call failed");
+        in_stream.set_read_timeout(None).expect("set_read_timeout call failed");
+
+        (in_stream, o_stream)
+    }
+
+    pub fn ti_receive(mut stream: TcpStream, add_share_cnt: usize, xor_share_cnt: usize) ->
+    (Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>, Vec<(u64, u64, u64)>) {
+        stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+        stream.set_write_timeout(None).expect("set_write_timeout call failed");
+        stream.set_read_timeout(None).expect("set_read_timeout call failed");
+
+        let mut xor_shares: Vec<(u64, u64, u64)> = Vec::new();
+        let mut add_shares: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> = Vec::new();
+
+        //println!("sending ready msg to ti");
+
+        let mut recv_buf = [0u8; 11];
+        let msg = b"send shares";
+        let mut bytes_written = 0;
+        while bytes_written < msg.len() {
+            let current_bytes = stream.write(&msg[bytes_written..]);
+            bytes_written += current_bytes.unwrap();
+        }
+        //println!("ready msg sent. awaiting confimation");
+
+
+        let mut bytes_read = 0;
+        while bytes_read < recv_buf.len() {
+            let current_bytes = stream.read(&mut recv_buf[bytes_read..]).unwrap();
+            bytes_read += current_bytes;
+        }
+
+        assert_eq!(msg, &recv_buf);
+
+
+        //println!("got confirmation ; recving additive shares");
+
+        //////////////////////// SEND ADDITIVES ////////////////////////
+        let mut remainder = add_share_cnt;
+        while remainder >= TI_BATCH_SIZE {
+            let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+
+            let mut bytes_read = 0;
+            while bytes_read < U8S_PER_TX {
+                let current_bytes = unsafe {
+                    stream.read(&mut rx_buf.u8_buf[bytes_read..])
+                };
+                bytes_read += current_bytes.unwrap();
+            }
+
+            for i in 0..TI_BATCH_SIZE {
+                let u = unsafe { rx_buf.u64_buf[3 * i] };
+                let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
+                let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
+
+                //println!("recvd: ({:X},{:X},{:X})", u, v, w);
+                add_shares.push((Wrapping(u), Wrapping(v), Wrapping(w)));
+            }
+
+            remainder -= TI_BATCH_SIZE;
+        }
+
+        let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+
+        let mut bytes_read = 0;
+        while bytes_read < U8S_PER_TX {
+            let current_bytes = unsafe {
+                stream.read(&mut rx_buf.u8_buf[bytes_read..])
             };
+            bytes_read += current_bytes.unwrap();
         }
+
+        for i in 0..remainder {
+            let u = unsafe { rx_buf.u64_buf[3 * i] };
+            let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
+            let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
+
+            //println!("recvd: ({:X},{:X},{:X})", u, v, w);
+            add_shares.push((Wrapping(u), Wrapping(v), Wrapping(w)));
+        }
+
+        //println!("additive shares recv'd. recving xor shares");
+
+        ///////////////// RECV XOR SHARES
+
+        let mut remainder = xor_share_cnt;
+        while remainder >= TI_BATCH_SIZE {
+            let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+
+            let mut bytes_read = 0;
+            while bytes_read < U8S_PER_TX {
+                let current_bytes = unsafe {
+                    stream.read(&mut rx_buf.u8_buf[bytes_read..])
+                };
+                bytes_read += current_bytes.unwrap();
+            }
+
+            for i in 0..TI_BATCH_SIZE {
+                let u = unsafe { rx_buf.u64_buf[3 * i] };
+                let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
+                let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
+
+                //println!("recvd: ({:X},{:X},{:X})", u, v, w);
+                xor_shares.push((u, v, w));
+            }
+
+            remainder -= TI_BATCH_SIZE;
+        }
+
+        let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+
+        let mut bytes_read = 0;
+        while bytes_read < U8S_PER_TX {
+            let current_bytes = unsafe {
+                stream.read(&mut rx_buf.u8_buf[bytes_read..])
+            };
+            bytes_read += current_bytes.unwrap();
+        }
+
+        for i in 0..remainder {
+            let u = unsafe { rx_buf.u64_buf[3 * i] };
+            let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
+            let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
+
+            //println!("recvd: ({:X},{:X},{:X})", u, v, w);
+            xor_shares.push((u, v, w));
+        }
+
+        //println!("xor shares recv'd");
+
+        assert_eq!(add_share_cnt, add_shares.len());
+        assert_eq!(xor_share_cnt, xor_shares.len());
+
+        (add_shares, xor_shares)
     }
 }

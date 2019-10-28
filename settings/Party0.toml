@@ -26,14 +26,15 @@ integer_precision = 15
 learning_rate = 0.001
 
 #[RANDOM FOREST]
-tree_count = 100
+tree_count = 10
 batch_size = 20
+thread_count = 40
 
 #[BC-TCGA]
 
-x_input_path = "inputs/BC_TCGA_5_folds/1X_train_share0.csv"
-y_input_path = "inputs/BC_TCGA_5_folds/1y_train_share0.csv"
-output_path = "weights/BC_TCGA_5_folds/fold_1_weights.csv"
+x_input_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/inputs/BC_TCGA_5_folds/1X_train_share1.csv"
+y_input_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/inputs/BC_TCGA_5_folds/1y_train_share1.csv"
+output_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/weights/BC_TCGA_5_folds/fold_1_weights.csv"
 attribute_count = 17814
 instance_count = 375
 iterations = 10

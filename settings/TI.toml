@@ -9,7 +9,7 @@ ti_port0  = 4000
 ti_port1  = 8000
 
 
-tree_count = 100
+tree_count = 10
 batch_size = 20
 
 #[BC-TCGA]

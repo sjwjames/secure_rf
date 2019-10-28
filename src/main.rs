@@ -3,6 +3,7 @@ use std::time::SystemTime;
 use std::env;
 use random_forest_rust::ti::ti::{TI, initialize_ti_context, run_ti_module};
 use random_forest_rust::computing_party::computing_party::initialize_party_context;
+use random_forest_rust::random_forest::random_forest;
 
 fn main() {
     let prefix = "main:      ";
@@ -24,7 +25,7 @@ fn main() {
                 run_ti_module(&mut ti_context);
             } else {
                 let mut party_context = initialize_party_context(settings_file.clone());
-
+                random_forest::train(party_context);
             }
         }
         Err(error) => {

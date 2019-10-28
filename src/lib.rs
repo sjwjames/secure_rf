@@ -2,3 +2,5 @@ pub mod computing_party;
 pub mod ti;
 pub mod constants;
 pub mod thread_pool;
+pub mod random_forest;
+pub mod decision_tree;
