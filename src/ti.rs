@@ -1,6 +1,7 @@
 pub mod ti {
     //author Davis, email:daviscrailsback@gmail.com
     extern crate rand;
+    extern crate num;
 
     use rand::Rng;
     use std::time::SystemTime;
@@ -12,6 +13,8 @@ pub mod ti {
     use crate::constants::constants;
     use crate::thread_pool::thread_pool::ThreadPool;
     use std::sync::{Arc, Mutex};
+    use num::bigint::{BigUint, ToBigUint, RandBigInt};
+    use num::integer::*;
 
     pub struct TI {
         pub ti_ip: String,
@@ -21,6 +24,7 @@ pub mod ti {
         pub add_shares_per_iter: usize,
         pub tree_count: usize,
         pub batch_size: usize,
+        pub prime: BigUint,
     }
 
     const TI_BATCH_SIZE: usize = constants::TI_BATCH_SIZE;
@@ -42,6 +46,7 @@ pub mod ti {
                 add_shares_per_iter: self.add_shares_per_iter,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
+                prime: self.prime.clone(),
             }
         }
     }
@@ -100,6 +105,15 @@ pub mod ti {
             }
         };
 
+        let prime = match settings.get_int("prime") {
+            Ok(num) => num as u128,
+            Err(error) => {
+                panic!("Encountered a problem while parsing prime: {:?}", error)
+            }
+        };
+
+        let prime = prime.to_biguint().unwrap();
+
         TI {
             ti_ip,
             ti_port0,
@@ -108,6 +122,7 @@ pub mod ti {
             add_shares_per_iter,
             tree_count,
             batch_size,
+            prime,
         }
     }
 
@@ -439,6 +454,19 @@ pub mod ti {
         let v1 = (Wrapping(v) - Wrapping(v0)).0;
         let w1 = (Wrapping(w) - Wrapping(w0)).0;
 
+        ((u0, v0, w0), (u1, v1, w1))
+    }
+
+    fn new_bigint_add_triple(rng: &mut rand::ThreadRng, prime: &BigUint, bigint_bit_size: usize) -> ((BigUint, BigUint, BigUint), (BigUint, BigUint, BigUint)) {
+        let u: BigUint = rng.gen_biguint(bigint_bit_size);
+        let v: BigUint = rng.gen_biguint(bigint_bit_size);
+        let w = BigUint::mod_floor(&(&u * &v), prime);
+        let u0: BigUint = rng.gen_biguint(bigint_bit_size);
+        let v0: BigUint = rng.gen_biguint(bigint_bit_size);
+        let w0: BigUint = rng.gen_biguint(bigint_bit_size);
+        let u1 = (u - &u0).mod_floor(prime);
+        let v1 = (v - &v0).mod_floor(prime);
+        let w1 = (w - &v0).mod_floor(prime);
         ((u0, v0, w0), (u1, v1, w1))
     }
 }

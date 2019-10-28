@@ -1,12 +1,14 @@
 pub mod computing_party {
+    extern crate num;
+
     use std::num::Wrapping;
     use std::net::{TcpStream, SocketAddr, TcpListener};
     use std::fs::File;
     use crate::thread_pool::thread_pool::ThreadPool;
     use std::io::{Write, Read, BufReader, BufRead};
     use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX};
-    use num_bigint::{BigUint, BigInt, ToBigInt, ToBigUint};
     use crate::decision_tree::decision_tree::{DecisionTreeData, DecisionTreeTraining};
+    use num::bigint::{BigUint,BigInt,ToBigUint,ToBigInt};
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],

@@ -1,6 +1,6 @@
 pub mod decision_tree {
     use crate::computing_party::computing_party::ComputingParty;
-    use num_bigint::{BigInt, BigUint};
+    use num::bigint::{BigInt, BigUint};
     use std::io::Bytes;
 
     pub struct DecisionTreeData {
