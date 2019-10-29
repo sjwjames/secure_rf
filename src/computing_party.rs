@@ -53,7 +53,6 @@ pub mod computing_party {
         pub batch_size: usize,
 
         pub corr_rand: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
-        pub corr_rand_xor: Vec<(u64, u64, u64)>,
         pub big_int_ti_shares: Vec<(BigInt, BigInt, BigInt)>,
         pub equality_ti_shares: Vec<BigInt>,
 
@@ -87,7 +86,6 @@ pub mod computing_party {
                 batch_size: self.batch_size,
 
                 corr_rand: Vec::new(),
-                corr_rand_xor: Vec::new(),
                 big_int_ti_shares: vec![],
                 equality_ti_shares: vec![],
             }
@@ -510,7 +508,6 @@ pub mod computing_party {
             dt_data,
             dt_training,
             corr_rand: Vec::new(),
-            corr_rand_xor: Vec::new(),
             big_int_ti_shares: vec![],
             equality_ti_shares: vec![],
 

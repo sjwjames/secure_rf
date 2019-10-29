@@ -1,6 +1,7 @@
 pub mod constants {
     //author Davis, email:daviscrailsback@gmail.com
     use std::num::Wrapping;
+
     // never change
     pub const MULT_ELEMS: usize = 2;
     pub const SIZEOF_U64: usize = 8;
@@ -8,12 +9,15 @@ pub mod constants {
     // can tweak batch size to optimize batch multiplication for different machines
     pub const BATCH_SIZE: usize = 4096;
     // how many mults can be done in one tx
-    pub const REVEAL_BATCH_SIZE: usize = 2 * BATCH_SIZE; // how many reveals in one TX
+    pub const REVEAL_BATCH_SIZE: usize = 2 * BATCH_SIZE;
+    // how many reveals in one TX
 
     pub const BUF_SIZE: usize = BATCH_SIZE * MULT_ELEMS * SIZEOF_U64;
     pub const U64S_PER_TX: usize = 2 * BATCH_SIZE;
     pub const U8S_PER_TX: usize = 8 * U64S_PER_TX;
     pub const TI_BATCH_SIZE: usize = U64S_PER_TX / 3; // how many trplets in one tx
+
+    pub const BINARY_PRIME: usize = 2;
 
     /* Simulated correlated randomness for debugging without the trusted initializer */
     pub const CR_0: (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) =

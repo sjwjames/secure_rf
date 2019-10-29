@@ -17,16 +17,20 @@ pub mod ti {
     use num::integer::*;
     use self::num::{One, Zero};
     use std::ops::Add;
+    use crate::constants::constants::BINARY_PRIME;
 
     pub struct TI {
         pub ti_ip: String,
         pub ti_port0: u16,
         pub ti_port1: u16,
-        pub xor_shares_per_iter: usize,
-        pub add_shares_per_iter: usize,
+        pub add_shares_per_tree: usize,
+        pub add_shares_bigint_per_tree: usize,
+        pub equality_shares_per_tree: usize,
+        pub binary_shares_per_tree: usize,
         pub tree_count: usize,
         pub batch_size: usize,
-        pub prime: BigUint,
+        pub big_int_prime: BigUint,
+        pub prime: u64,
     }
 
     const TI_BATCH_SIZE: usize = constants::TI_BATCH_SIZE;
@@ -44,11 +48,14 @@ pub mod ti {
                 ti_ip: self.ti_ip.clone(),
                 ti_port0: self.ti_port0,
                 ti_port1: self.ti_port1,
-                xor_shares_per_iter: self.xor_shares_per_iter,
-                add_shares_per_iter: self.add_shares_per_iter,
+                add_shares_per_tree: self.add_shares_per_tree,
+                add_shares_bigint_per_tree: self.add_shares_bigint_per_tree,
+                equality_shares_per_tree: self.equality_shares_per_tree,
+                binary_shares_per_tree: self.equality_shares_per_tree,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
-                prime: self.prime.clone(),
+                big_int_prime: self.big_int_prime.clone(),
+                prime: self.prime,
             }
         }
     }
@@ -80,19 +87,35 @@ pub mod ti {
             }
         };
 
-        let xor_shares_per_iter = match settings.get_int("xor_shares_per_iter") {
+
+        let add_shares_per_tree = match settings.get_int("add_shares_per_tree") {
             Ok(num) => num as usize,
             Err(error) => {
-                panic!("Encountered a problem while parsing xor_shares_per_iter: {:?}", error)
+                panic!("Encountered a problem while parsing add_shares_per_tree: {:?}", error)
             }
         };
 
-        let add_shares_per_iter = match settings.get_int("add_shares_per_iter") {
+        let add_shares_bigint_per_tree = match settings.get_int("add_shares_bigint_per_tree") {
             Ok(num) => num as usize,
             Err(error) => {
-                panic!("Encountered a problem while parsing add_shares_per_iter: {:?}", error)
+                panic!("Encountered a problem while parsing add_shares_bigint_per_tree: {:?}", error)
             }
         };
+
+        let equality_shares_per_tree = match settings.get_int("equality_shares_per_tree") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing equality_shares_per_tree: {:?}", error)
+            }
+        };
+
+        let binary_shares_per_tree = match settings.get_int("binary_shares_per_tree") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing binary_shares_per_tree: {:?}", error)
+            }
+        };
+
         let tree_count = match settings.get_int("tree_count") {
             Ok(num) => num as usize,
             Err(error) => {
@@ -107,23 +130,35 @@ pub mod ti {
             }
         };
 
-        let prime = match settings.get_int("prime") {
+        let big_int_prime = match settings.get_int("big_int_prime") {
             Ok(num) => num as u128,
+            Err(error) => {
+                panic!("Encountered a problem while parsing big_int_prime: {:?}", error)
+            }
+        };
+
+
+        let big_int_prime = big_int_prime.to_biguint().unwrap();
+
+
+        let prime = match settings.get_int("prime") {
+            Ok(num) => num as u64,
             Err(error) => {
                 panic!("Encountered a problem while parsing prime: {:?}", error)
             }
         };
 
-        let prime = prime.to_biguint().unwrap();
-
         TI {
             ti_ip,
             ti_port0,
             ti_port1,
-            xor_shares_per_iter,
-            add_shares_per_iter,
+            add_shares_per_tree,
+            add_shares_bigint_per_tree,
+            equality_shares_per_tree,
+            binary_shares_per_tree,
             tree_count,
             batch_size,
+            big_int_prime,
             prime,
         }
     }
@@ -177,11 +212,13 @@ pub mod ti {
                 println!("{} [{}] additive shares                    complete -- work time = {:5} (ms)",
                          &prefix, i, now.elapsed().unwrap().as_millis());
 
-                print!("{} [{}] generating xor shares...           ", &prefix, i);
+
+                print!("{} [{}] generating additive big int shares...           ", &prefix, i);
                 let now = SystemTime::now();
-                let (xor_triples0, xor_triples1) = generate_triples(&ctx, false);
+                let (xor_triples0, xor_triples1) = new_bigint_add_triple(&ctx);
                 println!("complete -- work time = {:5} (ms)",
                          now.elapsed().unwrap().as_millis());
+
 
                 println!("{} [{}] sending correlated randomness...   ", &s0_pfx, i);
                 let shares0 = (add_triples0, xor_triples0);
@@ -429,6 +466,7 @@ pub mod ti {
         Ok(())
     }
 
+
     /* generate group of 64 Beaver triples over Z_2 */
     fn new_xor_triple(rng: &mut rand::ThreadRng) -> ((u64, u64, u64), (u64, u64, u64)) {
         let u: u64 = rng.gen();
@@ -459,31 +497,46 @@ pub mod ti {
         ((u0, v0, w0), (u1, v1, w1))
     }
 
-    fn new_bigint_add_triple(rng: &mut rand::ThreadRng, prime: &BigUint, bigint_bit_size: usize) -> ((BigUint, BigUint, BigUint), (BigUint, BigUint, BigUint)) {
+    fn new_bigint_add_triple(rng: &mut rand::ThreadRng, big_int_prime: &BigUint, bigint_bit_size: usize) -> ((BigUint, BigUint, BigUint), (BigUint, BigUint, BigUint)) {
         let u: BigUint = rng.gen_biguint(bigint_bit_size);
         let v: BigUint = rng.gen_biguint(bigint_bit_size);
-        let w = BigUint::mod_floor(&(&u * &v), prime);
+        let w = BigUint::mod_floor(&(&u * &v), big_int_prime);
         let u0: BigUint = rng.gen_biguint(bigint_bit_size);
         let v0: BigUint = rng.gen_biguint(bigint_bit_size);
         let w0: BigUint = rng.gen_biguint(bigint_bit_size);
-        let u1 = (u - &u0).mod_floor(prime);
-        let v1 = (v - &v0).mod_floor(prime);
-        let w1 = (w - &v0).mod_floor(prime);
+        let u1 = (u - &u0).mod_floor(big_int_prime);
+        let v1 = (v - &v0).mod_floor(big_int_prime);
+        let w1 = (w - &v0).mod_floor(big_int_prime);
         ((u0, v0, w0), (u1, v1, w1))
     }
 
-    fn new_equality_bigint_shares(rng: &mut rand::ThreadRng, prime: &BigUint, bigint_bit_size: usize, equality_count: usize) -> (Vec<BigUint>, Vec<BigUint>) {
-        let mut share0 = Vec::new();
-        let mut share1 = Vec::new();
-        for i in 0..equality_count {
-            let r = rng.gen_biguint(bigint_bit_size) + BigUint::one();
-            let mut rsum = BigUint::zero();
-            let r0 = rng.gen_biguint(bigint_bit_size);
-            rsum = rsum + &r0;
-            let r1 = BigUint::mod_floor(&(&r - &rsum), prime);
-            share0.push(r0);
-            share1.push(r1);
-        }
-        (share0, share1)
+    fn new_equality_bigint_shares(rng: &mut rand::ThreadRng, big_int_prime: &BigUint, bigint_bit_size: usize) -> (BigUint, BigUint) {
+        let r = rng.gen_biguint(bigint_bit_size) + BigUint::one();
+        let mut rsum = BigUint::zero();
+        let r0 = rng.gen_biguint(bigint_bit_size);
+        rsum = rsum + &r0;
+        let r1 = BigUint::mod_floor(&(&r - &rsum), big_int_prime);
+        (r0, r1)
+    }
+
+    fn new_binary_shares(rng: &mut rand::ThreadRng) -> ((u8, u8, u8), (u8, u8, u8)) {
+        let u: u8 = rng.gen(BINARY_PRIME);
+        let v: u8 = rng.gen(BINARY_PRIME);
+        let w: u8 = (Wrapping(u) * Wrapping(v)).0;
+        let mut usum = 0;
+        let mut vsum = 0;
+        let mut wsum = 0;
+        let u0: u8 = rng.gen(BINARY_PRIME);
+        let v0: u8 = rng.gen(BINARY_PRIME);
+        let w0: u8 = rng.gen(BINARY_PRIME);
+        usum += u0;
+        vsum += v0;
+        wsum += w0;
+
+        let u1 = mod_floor(u - usum, BINARY_PRIME as u8);
+        let v1 = mod_floor(v - vsum, BINARY_PRIME as u8);
+        let w1 = mod_floor(w - wsum, BINARY_PRIME as u8);
+
+        ((u0, v0, w0), (u1, v1, w1))
     }
 }
