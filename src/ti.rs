@@ -29,8 +29,10 @@ pub mod ti {
         pub binary_shares_per_tree: usize,
         pub tree_count: usize,
         pub batch_size: usize,
+        pub thread_count: usize,
         pub big_int_prime: BigUint,
         pub prime: u64,
+        pub bigint_bit_size: usize,
     }
 
     const TI_BATCH_SIZE: usize = constants::TI_BATCH_SIZE;
@@ -56,6 +58,8 @@ pub mod ti {
                 batch_size: self.batch_size,
                 big_int_prime: self.big_int_prime.clone(),
                 prime: self.prime,
+                thread_count: self.thread_count,
+                bigint_bit_size: self.bigint_bit_size,
             }
         }
     }
@@ -148,6 +152,20 @@ pub mod ti {
             }
         };
 
+        let thread_count = match settings.get_int("thread_count") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing thread_count: {:?}", error)
+            }
+        };
+
+        let bigint_bit_size = match settings.get_int("bigint_bit_size") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing bigint_bit_size: {:?}", error)
+            }
+        };
+
         TI {
             ti_ip,
             ti_port0,
@@ -160,6 +178,8 @@ pub mod ti {
             batch_size,
             big_int_prime,
             prime,
+            thread_count,
+            bigint_bit_size,
         }
     }
 
@@ -208,55 +228,67 @@ pub mod ti {
             for i in 0..current_batch {
                 println!("{} [{}] generating additive shares...      ", &prefix, i);
                 let now = SystemTime::now();
-                let (add_triples0, add_triples1) = generate_triples(&ctx, true);
+                let (add_triples0, add_triples1) = generate_additive_shares(&ctx);
                 println!("{} [{}] additive shares                    complete -- work time = {:5} (ms)",
                          &prefix, i, now.elapsed().unwrap().as_millis());
 
 
-                print!("{} [{}] generating additive big int shares...           ", &prefix, i);
+                print!("{} [{}] generating binary shares...           ", &prefix, i);
                 let now = SystemTime::now();
-                let (xor_triples0, xor_triples1) = new_bigint_add_triple(&ctx);
+                let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx);
+                println!("complete -- work time = {:5} (ms)",
+                         now.elapsed().unwrap().as_millis());
+
+                print!("{} [{}] generating equality bigint shares...           ", &prefix, i);
+                let now = SystemTime::now();
+                let (equality_bigint_share0, equality_bigint_share1) = generate_equality_bigint_shares(&ctx);
+                println!("complete -- work time = {:5} (ms)",
+                         now.elapsed().unwrap().as_millis());
+
+                print!("{} [{}] generating additive bigint shares...           ", &prefix, i);
+                let now = SystemTime::now();
+                let (additive_bigint_share0, additive_bigint_share1) = generate_additive_bigint_shares(&ctx);
                 println!("complete -- work time = {:5} (ms)",
                          now.elapsed().unwrap().as_millis());
 
 
-                println!("{} [{}] sending correlated randomness...   ", &s0_pfx, i);
-                let shares0 = (add_triples0, xor_triples0);
-                let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
-                let sender_thread0 = thread::spawn(move || {
-                    match get_confirmation(stream.try_clone()
-                        .expect("server 0: failed to clone stream")) {
-                        Ok(_) => return send_shares(0, stream.try_clone()
-                            .expect("server 0: failed to clone stream"),
-                                                    shares0),
-                        Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
-                    };
-                });
-
-                println!("{} [{}] sending correlated randomness...   ", &s1_pfx, i);
-                let shares1 = (add_triples1, xor_triples1);
-                let stream = in_stream1.try_clone().expect("server 1: failed to clone stream");
-                let sender_thread1 = thread::spawn(move || {
-                    match get_confirmation(stream.try_clone()
-                        .expect("server 1: failed to clone stream")) {
-                        Ok(_) => return send_shares(1, stream.try_clone()
-                            .expect("server 1: failed to clone stream"),
-                                                    shares1),
-                        Err(e) => return Err(e),//::("server 1: failed to recv confirmation"),
-                    };
-                });
-
-                match sender_thread0.join() {
-                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-                                      &s0_pfx, i, now.elapsed().unwrap().as_millis()),
-                    Err(_) => panic!("main: failed to join sender 0"),
-                };//.expect("main: failed to rejoin server 0");
-
-                match sender_thread1.join() {
-                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-                                      &s1_pfx, i, now.elapsed().unwrap().as_millis()),
-                    Err(_) => panic!("main: failed to join sender 1"),
-                };//.expect("main: failed to rejoin server 0");
+//                println!("{} [{}] sending correlated randomness...   ", &s0_pfx, i);
+//                let shares0 = (add_triples0, xor_triples0);
+//                let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
+//                let sender_thread0 = thread::spawn(move || {
+//                    match get_confirmation(stream.try_clone()
+//                        .expect("server 0: failed to clone stream")) {
+//                        Ok(_) => return send_shares(0, stream.try_clone()
+//                            .expect("server 0: failed to clone stream"),
+//                                                    shares0),
+//                        Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
+//                    };
+//                });
+//
+//                println!("{} [{}] sending correlated randomness...   ", &s1_pfx, i);
+//                let shares1 = (add_triples1, xor_triples1);
+//                let stream = in_stream1.try_clone().expect("server 1: failed to clone stream");
+//                let sender_thread1 = thread::spawn(move || {
+//                    match get_confirmation(stream.try_clone()
+//                        .expect("server 1: failed to clone stream")) {
+//                        Ok(_) => return send_shares(1, stream.try_clone()
+//                            .expect("server 1: failed to clone stream"),
+//                                                    shares1),
+//                        Err(e) => return Err(e),//::("server 1: failed to recv confirmation"),
+//                    };
+//                });
+//
+//                match sender_thread0.join() {
+//                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
+//                                      &s0_pfx, i, now.elapsed().unwrap().as_millis()),
+//                    Err(_) => panic!("main: failed to join sender 0"),
+//                };//.expect("main: failed to rejoin server 0");
+//
+//                match sender_thread1.join() {
+//                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
+//                                      &s1_pfx, i, now.elapsed().unwrap().as_millis()),
+//                    Err(_) => panic!("main: failed to join sender 1"),
+//                };//.expect("main: failed to rejoin server 0");
             }
 
             trees_remaining -= ctx.batch_size;
@@ -370,72 +402,100 @@ pub mod ti {
         Ok(())
     }
 
-    fn generate_triples(ctx: &TI, additive: bool) -> (Vec<(u64, u64, u64)>, Vec<(u64, u64, u64)>) {
-        let triple_count = if additive { ctx.add_shares_per_iter } else { ctx.xor_shares_per_iter };
 
-        let shares =
+    fn generate_binary_shares(ctx: &TI) -> (Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>) {
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut share0_arc = Arc::new(Mutex::new(Vec::new()));
+        let mut share1_arc = Arc::new(Mutex::new(Vec::new()));
 
-            if additive {
-                let triple_count0 = triple_count;
-                let first_half = thread::spawn(move || {
-                    let mut rng = rand::thread_rng();
-                    let mut shares = (Vec::new(), Vec::new());
-                    let to_idx = triple_count0 / 2;
-
-                    println!(" |--> worker thread 0: generating {} additive shares", to_idx);
-                    let now = SystemTime::now();
-                    for i in 0..to_idx {
-                        let (p0_share, p1_share) = new_add_triple(&mut rng);
-                        shares.0.push(p0_share);
-                        shares.1.push(p1_share);
-                    }
-                    println!(" |--> worker thread 0: complete -- work time {} (ms)",
-                             now.elapsed().unwrap().as_millis());
-
-                    shares
-                });
-
-                let triple_count1 = triple_count;
-                let second_half = thread::spawn(move || {
-                    let mut rng = rand::thread_rng();
-                    let mut shares = (Vec::new(), Vec::new());
-                    let to_idx = triple_count1 / 2 + (triple_count1 % 2);
-
-                    println!(" |--> worker thread 1: generating {} additive shares", to_idx);
-                    let now = SystemTime::now();
-                    for i in 0..to_idx {
-                        let (p0_share, p1_share) = new_add_triple(&mut rng);
-                        shares.0.push(p0_share);
-                        shares.1.push(p1_share);
-                    }
-                    println!(" |--> worker thread 1: complete -- work time {} (ms)",
-                             now.elapsed().unwrap().as_millis());
-
-                    shares
-                });
-
-                let mut first = first_half.join().unwrap();
-                let mut second = second_half.join().unwrap();
-
-                first.0.append(&mut second.0);
-                first.1.append(&mut second.1);
-
-                first
-            } else {
+        for _ in 0..ctx.thread_count {
+            let mut share0_arc_copy = Arc::clone(&share0_arc);
+            let mut share1_arc_copy = Arc::clone(&share1_arc);
+            let mut ctx = ctx.clone();
+            thread_pool.execute(move || {
                 let mut rng = rand::thread_rng();
-                let mut shares = (Vec::new(), Vec::new());
+                let (share0_item, share1_item) = new_binary_shares(&mut rng);
+                let mut share0_arc_copy = share0_arc_copy.lock().unwrap();
+                (*share0_arc_copy).push(share0_item);
 
-                for i in 0..triple_count {
-                    let (p0_share, p1_share) = new_xor_triple(&mut rng);
+                let mut share1_arc_copy = share1_arc_copy.lock().unwrap();
+                (*share1_arc_copy).push(share1_item);
+            })
+        }
 
-                    shares.0.push(p0_share);
-                    shares.1.push(p1_share);
-                }
-                shares
-            };
-
-        shares
+        let mut share0 = (*(share0_arc.lock().unwrap())).to_vec();
+        let mut share1 = (*(share1_arc.lock().unwrap())).to_vec();
+        (share0, share1)
     }
+
+    fn generate_additive_shares(ctx: &TI) -> (Vec<(u64, u64, u64)>, Vec<(u64, u64, u64)>) {
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut share0_arc = Arc::new(Mutex::new(Vec::new()));
+        let mut share1_arc = Arc::new(Mutex::new(Vec::new()));
+
+        for _ in 0..ctx.thread_count {
+            let mut share0_arc_copy = Arc::clone(&share0_arc);
+            let mut share1_arc_copy = Arc::clone(&share1_arc);
+            let mut ctx = ctx.clone();
+            thread_pool.execute(move || {
+                let mut rng = rand::thread_rng();
+                let (share0_item, share1_item) = new_add_triple(&mut rng);
+                let mut share0_arc_copy = share0_arc_copy.lock().unwrap();
+                (*share0_arc_copy).push(share0_item);
+
+                let mut share1_arc_copy = share1_arc_copy.lock().unwrap();
+                (*share1_arc_copy).push(share1_item);
+            })
+        }
+        let mut share0 = (*(share0_arc.lock().unwrap())).to_vec();
+        let mut share1 = (*(share1_arc.lock().unwrap())).to_vec();
+        (share0, share1)    }
+
+    fn generate_equality_bigint_shares(ctx: &TI) -> (Vec<BigUint>, Vec<BigUint>) {
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut share0_arc = Arc::new(Mutex::new(Vec::new()));
+        let mut share1_arc = Arc::new(Mutex::new(Vec::new()));
+
+        for _ in 0..ctx.thread_count {
+            let mut share0_arc_copy = Arc::clone(&share0_arc);
+            let mut share1_arc_copy = Arc::clone(&share1_arc);
+            let mut ctx = ctx.clone();
+            thread_pool.execute(move || {
+                let mut rng = rand::thread_rng();
+                let (share0_item, share1_item) = new_equality_bigint_shares(&mut rng, &ctx.big_int_prime, ctx.bigint_bit_size);
+                let mut share0_arc_copy = share0_arc_copy.lock().unwrap();
+                (*share0_arc_copy).push(share0_item);
+
+                let mut share1_arc_copy = share1_arc_copy.lock().unwrap();
+                (*share1_arc_copy).push(share1_item);
+            })
+        }
+        let mut share0 = (*(share0_arc.lock().unwrap())).to_vec();
+        let mut share1 = (*(share1_arc.lock().unwrap())).to_vec();
+        (share0, share1)    }
+
+    fn generate_additive_bigint_shares(ctx: &TI) -> (Vec<(BigUint, BigUint, BigUint)>, Vec<(BigUint, BigUint, BigUint)>) {
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut share0_arc = Arc::new(Mutex::new(Vec::new()));
+        let mut share1_arc = Arc::new(Mutex::new(Vec::new()));
+
+        for _ in 0..ctx.thread_count {
+            let mut share0_arc_copy = Arc::clone(&share0_arc);
+            let mut share1_arc_copy = Arc::clone(&share1_arc);
+            let mut ctx = ctx.clone();
+            thread_pool.execute(move || {
+                let mut rng = rand::thread_rng();
+                let (share0_item, share1_item) = new_bigint_add_triple(&mut rng, &ctx.big_int_prime, ctx.bigint_bit_size);
+                let mut share0_arc_copy = share0_arc_copy.lock().unwrap();
+                (*share0_arc_copy).push(share0_item);
+
+                let mut share1_arc_copy = share1_arc_copy.lock().unwrap();
+                (*share1_arc_copy).push(share1_item);
+            })
+        }
+        let mut share0 = (*(share0_arc.lock().unwrap())).to_vec();
+        let mut share1 = (*(share1_arc.lock().unwrap())).to_vec();
+        (share0, share1)    }
 
     fn get_confirmation(stream: TcpStream) -> io::Result<()> {
         stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
@@ -520,15 +580,15 @@ pub mod ti {
     }
 
     fn new_binary_shares(rng: &mut rand::ThreadRng) -> ((u8, u8, u8), (u8, u8, u8)) {
-        let u: u8 = rng.gen(BINARY_PRIME);
-        let v: u8 = rng.gen(BINARY_PRIME);
+        let u: u8 = rng.gen_range(0, BINARY_PRIME as u8);
+        let v: u8 = rng.gen_range(0, BINARY_PRIME as u8);
         let w: u8 = (Wrapping(u) * Wrapping(v)).0;
         let mut usum = 0;
         let mut vsum = 0;
         let mut wsum = 0;
-        let u0: u8 = rng.gen(BINARY_PRIME);
-        let v0: u8 = rng.gen(BINARY_PRIME);
-        let w0: u8 = rng.gen(BINARY_PRIME);
+        let u0: u8 = rng.gen_range(0, BINARY_PRIME as u8);
+        let v0: u8 = rng.gen_range(0, BINARY_PRIME as u8);
+        let w0: u8 = rng.gen_range(0, BINARY_PRIME as u8);
         usum += u0;
         vsum += v0;
         wsum += w0;
