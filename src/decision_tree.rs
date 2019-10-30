@@ -2,6 +2,7 @@ pub mod decision_tree {
     use crate::computing_party::computing_party::ComputingParty;
     use num::bigint::{BigInt, BigUint};
     use std::io::Bytes;
+    use serde::{Serialize, Serializer};
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -27,6 +28,18 @@ pub mod decision_tree {
         pub bit_length: u64,
         pub big_int_ti_index: u64,
     }
+
+    pub struct DecisionTreeShares{
+        pub additive_triples:Vec<(u64,u64,u64)>,
+        pub additive_bigint_triples:Vec<(BigUint,BigUint,BigUint)>,
+        pub binary_triples:Vec<(u8)>,
+        pub equality_shares:Vec<(BigUint)>
+    }
+
+
+
+
+
 
     impl Clone for DecisionTreeData {
         fn clone(&self) -> Self {
@@ -60,6 +73,7 @@ pub mod decision_tree {
             }
         }
     }
+
 
     pub fn train(mut ctx: ComputingParty) {}
 

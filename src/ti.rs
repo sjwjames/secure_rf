@@ -18,6 +18,7 @@ pub mod ti {
     use self::num::{One, Zero};
     use std::ops::Add;
     use crate::constants::constants::BINARY_PRIME;
+    use crate::decision_tree::decision_tree::DecisionTreeShares;
 
     pub struct TI {
         pub ti_ip: String,
@@ -63,6 +64,7 @@ pub mod ti {
             }
         }
     }
+
 
     pub fn initialize_ti_context(settings_file: String) -> TI {
         let mut settings = config::Config::default();
@@ -296,6 +298,43 @@ pub mod ti {
         }
     }
 
+    fn send_dt_shares(mut stream: TcpStream,mut shares:DecisionTreeShares)->io::Result<()>{
+        stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+        stream.set_write_timeout(None).expect("set_write_timeout call failed");
+        stream.set_read_timeout(None).expect("set_read_timeout call failed");
+        //////////////////////// SEND ADDITIVES ////////////////////////
+        let mut remainder = shares.additive_triples.len();
+        let mut additive_shares = shares.additive_triples;
+        while remainder >= TI_BATCH_SIZE {
+            let mut tx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+
+            for i in 0..TI_BATCH_SIZE {
+                let (u, v, w) = additive_shares.pop().unwrap();
+
+                unsafe {
+                    tx_buf.u64_buf[3 * i] = u;
+                    tx_buf.u64_buf[3 * i + 1] = v;
+                    tx_buf.u64_buf[3 * i + 2] = w;
+                }
+            }
+            let mut bytes_written = 0;
+            while bytes_written < U8S_PER_TX {
+                let current_bytes = unsafe {
+                    stream.write(&tx_buf.u8_buf[bytes_written..])
+                };
+                bytes_written += current_bytes.unwrap();
+            }
+
+            remainder -= TI_BATCH_SIZE;
+        }
+        //////////////////////// SEND ADDITIVES ////////////////////////
+
+
+
+
+        Ok(())
+    }
+
     fn send_shares(handle: usize,
                    mut stream: TcpStream,
                    mut shares: (Vec<(u64, u64, u64)>, Vec<(u64, u64, u64)>)) -> io::Result<()> {
@@ -472,7 +511,8 @@ pub mod ti {
         }
         let mut share0 = (*(share0_arc.lock().unwrap())).to_vec();
         let mut share1 = (*(share1_arc.lock().unwrap())).to_vec();
-        (share0, share1)    }
+        (share0, share1)
+    }
 
     fn generate_additive_bigint_shares(ctx: &TI) -> (Vec<(BigUint, BigUint, BigUint)>, Vec<(BigUint, BigUint, BigUint)>) {
         let thread_pool = ThreadPool::new(ctx.thread_count);
