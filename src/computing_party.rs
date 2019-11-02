@@ -8,7 +8,8 @@ pub mod computing_party {
     use std::io::{Write, Read, BufReader, BufRead};
     use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX};
     use crate::decision_tree::decision_tree::{DecisionTreeData, DecisionTreeTraining};
-    use num::bigint::{BigUint,BigInt,ToBigUint,ToBigInt};
+    use num::bigint::{BigUint, BigInt, ToBigUint, ToBigInt};
+    use std::str::FromStr;
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -35,8 +36,6 @@ pub mod computing_party {
 
         /* mpc */
         pub asymmetric_bit: u8,
-        pub xor_shares_per_iter: usize,
-        pub add_shares_per_iter: usize,
 
         /* input output */
         pub output_path: String,
@@ -51,10 +50,6 @@ pub mod computing_party {
         pub thread_count: usize,
         pub tree_count: usize,
         pub batch_size: usize,
-
-        pub corr_rand: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
-        pub big_int_ti_shares: Vec<(BigInt, BigInt, BigInt)>,
-        pub equality_ti_shares: Vec<BigInt>,
 
     }
 
@@ -74,8 +69,6 @@ pub mod computing_party {
                 o_stream: self.o_stream.try_clone().expect("failed to clone o_stream"),
                 ti_stream: self.ti_stream.try_clone().expect("failed to clone ti_stream"),
                 asymmetric_bit: self.asymmetric_bit,
-                xor_shares_per_iter: self.xor_shares_per_iter,
-                add_shares_per_iter: self.add_shares_per_iter,
                 output_path: self.output_path.clone(),
 
                 dt_data: self.dt_data.clone(),
@@ -85,9 +78,6 @@ pub mod computing_party {
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
 
-                corr_rand: Vec::new(),
-                big_int_ti_shares: vec![],
-                equality_ti_shares: vec![],
             }
         }
     }
@@ -181,11 +171,11 @@ pub mod computing_party {
             attr_values_big_integer.push(attr_big_int_data);
         }
 
-        for i in 0..class_value_count{
-            let item_copied = one_hot_encoding_data[attr_value_count*attribute_count+i].clone();
+        for i in 0..class_value_count {
+            let item_copied = one_hot_encoding_data[attr_value_count * attribute_count + i].clone();
             let class_data_item = item_copied.into_iter().map(|x| x as u64).collect();
             class_values.push(class_data_item);
-            let item_copied = one_hot_encoding_data[attr_value_count*attribute_count+i].clone();
+            let item_copied = one_hot_encoding_data[attr_value_count * attribute_count + i].clone();
             let item = item_copied.into_iter().map(|x| x.to_biguint().unwrap()).collect();
             class_values_big_integer.push(item);
         }
@@ -309,19 +299,6 @@ pub mod computing_party {
             }
         };
 
-        let xor_shares_per_iter = match settings.get_int("xor_shares_per_iter") {
-            Ok(num) => num as usize,
-            Err(error) => {
-                panic!("Encountered a problem while parsing xor_shares_per_iter: {:?}", error)
-            }
-        };
-
-        let add_shares_per_iter = match settings.get_int("add_shares_per_iter") {
-            Ok(num) => num as usize,
-            Err(error) => {
-                panic!("Encountered a problem while parsing add_shares_per_iter: {:?}", error)
-            }
-        };
         let thread_count = match settings.get_int("thread_count") {
             Ok(num) => num as usize,
             Err(error) => {
@@ -366,28 +343,16 @@ pub mod computing_party {
             }
         };
 
-        let prime = match settings.get_int("prime") {
-            Ok(num) => num as u128,
+
+        let prime = match settings.get_str("prime") {
+            Ok(num) => num as String,
             Err(error) => {
                 panic!("Encountered a problem while parsing prime: {:?}", error)
             }
         };
 
-        let prime = prime.to_biguint().unwrap();
+        let prime = BigUint::from_str(&prime).unwrap();
 
-        let dataset_size_prime = match settings.get_int("dataset_size_prime") {
-            Ok(num) => num as u64,
-            Err(error) => {
-                panic!("Encountered a problem while parsing dataset_size_prime: {:?}", error)
-            }
-        };
-
-        let dataset_size_bit_length = match settings.get_int("dataset_size_bit_length") {
-            Ok(num) => num as u64,
-            Err(error) => {
-                panic!("Encountered a problem while parsing dataset_size_bit_length: {:?}", error)
-            }
-        };
 
         let bit_length = match settings.get_int("bit_length") {
             Ok(num) => num as u64,
@@ -399,6 +364,9 @@ pub mod computing_party {
 
         let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
 
+        let dataset_size_prime = (instance_count as f64).log2().ceil() as u64;
+
+        let dataset_size_bit_length = (dataset_size_prime as f64).powf(2.0) as u64;
 
         let mut internal_addr; //= String::new();
         let mut external_addr; //= String::new();
@@ -496,8 +464,6 @@ pub mod computing_party {
             party1_ip,
             party1_port,
             asymmetric_bit: party_id,
-            xor_shares_per_iter,
-            add_shares_per_iter,
             output_path,
             ti_stream,
             in_stream,
@@ -507,9 +473,6 @@ pub mod computing_party {
             batch_size,
             dt_data,
             dt_training,
-            corr_rand: Vec::new(),
-            big_int_ti_shares: vec![],
-            equality_ti_shares: vec![],
 
         }
     }

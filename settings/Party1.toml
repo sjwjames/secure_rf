@@ -29,17 +29,24 @@ learning_rate = 0.001
 tree_count = 10
 batch_size = 20
 thread_count = 40
+attr_value_count = 10
+class_value_count = 2
+attribute_count = 30
+instance_count = 100
+max_depth = 1
+alpha = 8
+epsilon = 0.1
+prime = "47890485652059026823698344598447161988085597568237568"
+dataset_size_prime = 512
+big_int_ti_index = 0
+bit_length = 175
 
 #[BC-TCGA]
 
-x_input_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/inputs/BC_TCGA_5_folds/1X_train_share1.csv"
-y_input_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/inputs/BC_TCGA_5_folds/1y_train_share1.csv"
+x_input_path = "/Users/sjw/Projects/2019summer/idash2019/breast_cancer/shared_fold_1_train-0.csv"
+y_input_path = "/Users/sjw/Projects/2019summer/idash2019/breast_cancer/shared_fold_1_train-1.csv"
 output_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/weights/BC_TCGA_5_folds/fold_1_weights.csv"
-attribute_count = 17814
-instance_count = 375
-iterations = 10
-add_shares_per_iter = 13368000
-xor_shares_per_iter = 7512
+
 
 #[GSE2034]
 

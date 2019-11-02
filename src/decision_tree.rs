@@ -2,7 +2,7 @@ pub mod decision_tree {
     use crate::computing_party::computing_party::ComputingParty;
     use num::bigint::{BigInt, BigUint};
     use std::io::Bytes;
-    use serde::{Serialize, Serializer};
+    use serde::{Serialize,Deserialize, Serializer};
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -32,11 +32,18 @@ pub mod decision_tree {
     pub struct DecisionTreeShares{
         pub additive_triples:Vec<(u64,u64,u64)>,
         pub additive_bigint_triples:Vec<(BigUint,BigUint,BigUint)>,
-        pub binary_triples:Vec<(u8)>,
+        pub binary_triples:Vec<(u8,u8,u8)>,
         pub equality_shares:Vec<(BigUint)>
     }
 
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct DecisionTreeTIShareMessage{
+        pub additive_triples:String,
+        pub additive_bigint_triples:String,
+        pub binary_triples:String,
+        pub equality_shares:String
 
+    }
 
 
 
