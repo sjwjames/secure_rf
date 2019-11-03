@@ -46,8 +46,6 @@ pub mod decision_tree {
     }
 
 
-
-
     impl Clone for DecisionTreeData {
         fn clone(&self) -> Self {
             DecisionTreeData {
@@ -82,7 +80,10 @@ pub mod decision_tree {
     }
 
 
-    pub fn train(mut ctx: ComputingParty) {}
+
+    pub fn train(mut ctx: ComputingParty,shares:DecisionTreeShares) {
+
+    }
 
 
     fn find_common_class_index() {}

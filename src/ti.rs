@@ -7,8 +7,8 @@ pub mod ti {
     use rand::Rng;
     use std::time::SystemTime;
     use std::thread;
-    use std::net::{TcpStream, TcpListener, SocketAddr};
-    use std::io::{Read, Write};
+    use std::net::{TcpStream, TcpListener, SocketAddr, Shutdown};
+    use std::io::{Read, Write, BufWriter};
     use std::num::Wrapping;
     use std::io;
     use crate::constants::constants;
@@ -25,6 +25,7 @@ pub mod ti {
     use std::collections::HashMap;
     use std::hash::Hash;
     use std::borrow::Borrow;
+    use serde_json::error::Category::Eof;
 
     pub struct TI {
         pub ti_ip: String,
@@ -262,20 +263,19 @@ pub mod ti {
 //                });
 //
             for i in 0..current_batch_size {
-                println!("{} [{}] generating additive shares...      ", &prefix, batch_count);
+                print!("{} [{}] generating additive shares...      ", &prefix, i);
                 let now = SystemTime::now();
                 let (add_triples0, add_triples1) = generate_additive_shares(&ctx, &thread_pool);
-                println!("{} [{}] additive shares                    complete -- work time = {:5} (ms)",
-                         &prefix, batch_count, now.elapsed().unwrap().as_millis());
+                println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
 
 
-                print!("{} [{}] generating binary shares...           ", &prefix, ctx.thread_count);
+                print!("{} [{}] generating binary shares...           ", &prefix, i);
                 let now = SystemTime::now();
                 let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, &thread_pool);
                 println!("complete -- work time = {:5} (ms)",
                          now.elapsed().unwrap().as_millis());
 
-                print!("{} [{}] generating equality bigint shares...           ", &prefix, ctx.thread_count);
+                print!("{} [{}] generating equality bigint shares...           ", &prefix, i);
                 let now = SystemTime::now();
                 let (equality_bigint_share0, equality_bigint_share1) = generate_equality_bigint_shares(&ctx, &thread_pool);
                 println!("complete -- work time = {:5} (ms)",
@@ -299,62 +299,40 @@ pub mod ti {
                     equality_shares: equality_bigint_share1,
                 };
                 let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
-                thread_pool.execute(move || {
+                let sender_thread0 = thread::spawn(move || {
                     match get_confirmation(stream.try_clone()
                         .expect("server 0: failed to clone stream")) {
-                        Ok(_) => send_dt_shares(stream.try_clone().expect("server 0: failed to clone stream"), share0),
-                        Err(e) => Err(e),// panic!("server 0: failed to recv confirmation"),
+                        Ok(_) => return send_dt_shares(stream.try_clone()
+                                                           .expect("server 0: failed to clone stream"),
+                                                       share0),
+                        Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
                     };
                 });
+
                 let stream = in_stream1.try_clone().expect("server 0: failed to clone stream");
-                thread_pool.execute(move || {
+                let sender_thread1 = thread::spawn(move || {
                     match get_confirmation(stream.try_clone()
                         .expect("server 0: failed to clone stream")) {
-                        Ok(_) => send_dt_shares(stream.try_clone().expect("server 0: failed to clone stream"), share1),
-                        Err(e) => Err(e),// panic!("server 0: failed to recv confirmation"),
+                        Ok(_) => return send_dt_shares(stream.try_clone()
+                                                           .expect("server 0: failed to clone stream"),
+                                                       share1),
+                        Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
                     };
                 });
-                thread_pool.join();
+
+                match sender_thread0.join() {
+                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
+                                      &s0_pfx, i, now.elapsed().unwrap().as_millis()),
+                    Err(_) => panic!("main: failed to join sender 0"),
+                };//.expect("main: failed to rejoin server 0");
+
+                match sender_thread1.join() {
+                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
+                                      &s1_pfx, i, now.elapsed().unwrap().as_millis()),
+                    Err(_) => panic!("main: failed to join sender 1"),
+                };//.expect("main: failed to rejoin server 0");
             }
 
-
-//
-
-
-//
-//            let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
-//            let sender_thread0 = thread::spawn(move || {
-//                match get_confirmation(stream.try_clone()
-//                    .expect("server 0: failed to clone stream")) {
-//                    Ok(_) => return send_dt_shares(stream.try_clone()
-//                                                       .expect("server 0: failed to clone stream"),
-//                                                   share0),
-//                    Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
-//                };
-//            });
-//
-//            let stream = in_stream1.try_clone().expect("server 0: failed to clone stream");
-//            let sender_thread1 = thread::spawn(move || {
-//                match get_confirmation(stream.try_clone()
-//                    .expect("server 0: failed to clone stream")) {
-//                    Ok(_) => return send_dt_shares(stream.try_clone()
-//                                                       .expect("server 0: failed to clone stream"),
-//                                                   share1),
-//                    Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
-//                };
-//            });
-
-            //                match sender_thread0.join() {
-//                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-//                                      &s0_pfx, i, now.elapsed().unwrap().as_millis()),
-//                    Err(_) => panic!("main: failed to join sender 0"),
-//                };//.expect("main: failed to rejoin server 0");
-//
-//                match sender_thread1.join() {
-//                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-//                                      &s1_pfx, i, now.elapsed().unwrap().as_millis()),
-//                    Err(_) => panic!("main: failed to join sender 1"),
-//                };//.expect("main: failed to rejoin server 0");
 
             trees_remaining -= ctx.batch_size as isize;
             batch_count += 1;
@@ -408,9 +386,8 @@ pub mod ti {
             equality_shares: equality_bigint_str_vec.join(";"),
         };
 
-        stream.write(serde_json::to_string(&dt_share_message).unwrap().as_bytes());
-
-
+        let mut message_str = serde_json::to_string(&dt_share_message).unwrap()+"\n";
+        stream.write(message_str.as_bytes());
         Ok(())
     }
 
@@ -571,7 +548,6 @@ pub mod ti {
 
                 let mut share1_arc_copy = share1_arc_copy.lock().unwrap();
                 (*share1_arc_copy).insert(i, share1_item);
-                println!("thread {} finishes", i);
             })
         }
         thread_pool.join();

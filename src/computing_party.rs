@@ -1,13 +1,12 @@
 pub mod computing_party {
     extern crate num;
-
     use std::num::Wrapping;
     use std::net::{TcpStream, SocketAddr, TcpListener};
     use std::fs::File;
-    use crate::thread_pool::thread_pool::ThreadPool;
+    use std::string::ToString;
     use std::io::{Write, Read, BufReader, BufRead};
     use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX};
-    use crate::decision_tree::decision_tree::{DecisionTreeData, DecisionTreeTraining};
+    use crate::decision_tree::decision_tree::{DecisionTreeData, DecisionTreeTraining, DecisionTreeShares, DecisionTreeTIShareMessage};
     use num::bigint::{BigUint, BigInt, ToBigUint, ToBigInt};
     use std::str::FromStr;
 
@@ -531,16 +530,16 @@ pub mod computing_party {
         (in_stream, o_stream)
     }
 
-    pub fn ti_receive(mut stream: TcpStream, add_share_cnt: usize, xor_share_cnt: usize) ->
-    (Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>, Vec<(u64, u64, u64)>) {
+    pub fn ti_receive(mut stream: TcpStream) -> DecisionTreeShares {
         stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
         stream.set_write_timeout(None).expect("set_write_timeout call failed");
         stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
-        let mut xor_shares: Vec<(u64, u64, u64)> = Vec::new();
-        let mut add_shares: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> = Vec::new();
 
-        //println!("sending ready msg to ti");
+//        let mut xor_shares: Vec<(u64, u64, u64)> = Vec::new();
+//        let mut add_shares: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> = Vec::new();
+//
+        println!("sending ready msg to ti");
 
         let mut recv_buf = [0u8; 11];
         let msg = b"send shares";
@@ -549,9 +548,9 @@ pub mod computing_party {
             let current_bytes = stream.write(&msg[bytes_written..]);
             bytes_written += current_bytes.unwrap();
         }
-        //println!("ready msg sent. awaiting confimation");
-
-
+        println!("ready msg sent. awaiting confimation");
+//
+//
         let mut bytes_read = 0;
         while bytes_read < recv_buf.len() {
             let current_bytes = stream.read(&mut recv_buf[bytes_read..]).unwrap();
@@ -560,105 +559,152 @@ pub mod computing_party {
 
         assert_eq!(msg, &recv_buf);
 
+        let mut reader = BufReader::new(stream);
 
-        //println!("got confirmation ; recving additive shares");
 
-        //////////////////////// SEND ADDITIVES ////////////////////////
-        let mut remainder = add_share_cnt;
-        while remainder >= TI_BATCH_SIZE {
-            let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
-
-            let mut bytes_read = 0;
-            while bytes_read < U8S_PER_TX {
-                let current_bytes = unsafe {
-                    stream.read(&mut rx_buf.u8_buf[bytes_read..])
-                };
-                bytes_read += current_bytes.unwrap();
-            }
-
-            for i in 0..TI_BATCH_SIZE {
-                let u = unsafe { rx_buf.u64_buf[3 * i] };
-                let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
-                let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
-
-                //println!("recvd: ({:X},{:X},{:X})", u, v, w);
-                add_shares.push((Wrapping(u), Wrapping(v), Wrapping(w)));
-            }
-
-            remainder -= TI_BATCH_SIZE;
+        let mut share_message = String::new();
+        reader.read_line(&mut share_message).expect("fail to read share message str");
+        let ti_shares_message: DecisionTreeTIShareMessage = serde_json::from_str(&share_message).unwrap();
+        let additive_triple_str_vec: Vec<&str> = ti_shares_message.additive_triples.split(";").collect();
+        let mut additive_triples = Vec::new();
+        for item in additive_triple_str_vec {
+            additive_triples.push(serde_json::from_str(item).unwrap());
         }
 
-        let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
-
-        let mut bytes_read = 0;
-        while bytes_read < U8S_PER_TX {
-            let current_bytes = unsafe {
-                stream.read(&mut rx_buf.u8_buf[bytes_read..])
-            };
-            bytes_read += current_bytes.unwrap();
+        let mut additive_bigint_triples = Vec::new();
+        let additive_bigint_triple_str_vec: Vec<&str> = ti_shares_message.additive_bigint_triples.split(";").collect();
+        for item in additive_bigint_triple_str_vec {
+            let temp_str = &item[1..item.len()];
+            let str_vec: Vec<&str> = temp_str.split(",").collect();
+            additive_bigint_triples.push(
+                (
+                    BigUint::from_bytes_le(str_vec[0].as_bytes()),
+                    BigUint::from_bytes_le(str_vec[1].as_bytes()),
+                    BigUint::from_bytes_le(str_vec[2].as_bytes())
+                )
+            );
         }
 
-        for i in 0..remainder {
-            let u = unsafe { rx_buf.u64_buf[3 * i] };
-            let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
-            let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
-
-            //println!("recvd: ({:X},{:X},{:X})", u, v, w);
-            add_shares.push((Wrapping(u), Wrapping(v), Wrapping(w)));
+        let mut binary_triples = Vec::new();
+        let binary_triples_vec: Vec<&str> = ti_shares_message.binary_triples.split(";").collect();
+        for item in binary_triples_vec {
+            binary_triples.push(serde_json::from_str(item).unwrap());
         }
 
-        //println!("additive shares recv'd. recving xor shares");
-
-        ///////////////// RECV XOR SHARES
-
-        let mut remainder = xor_share_cnt;
-        while remainder >= TI_BATCH_SIZE {
-            let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
-
-            let mut bytes_read = 0;
-            while bytes_read < U8S_PER_TX {
-                let current_bytes = unsafe {
-                    stream.read(&mut rx_buf.u8_buf[bytes_read..])
-                };
-                bytes_read += current_bytes.unwrap();
-            }
-
-            for i in 0..TI_BATCH_SIZE {
-                let u = unsafe { rx_buf.u64_buf[3 * i] };
-                let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
-                let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
-
-                //println!("recvd: ({:X},{:X},{:X})", u, v, w);
-                xor_shares.push((u, v, w));
-            }
-
-            remainder -= TI_BATCH_SIZE;
+        let mut equality_shares = Vec::new();
+        let equality_share_vec: Vec<&str> = ti_shares_message.equality_shares.split(";").collect();
+        for item in equality_share_vec {
+            equality_shares.push(
+                BigUint::from_bytes_le(item.as_bytes())
+            );
         }
 
-        let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
-
-        let mut bytes_read = 0;
-        while bytes_read < U8S_PER_TX {
-            let current_bytes = unsafe {
-                stream.read(&mut rx_buf.u8_buf[bytes_read..])
-            };
-            bytes_read += current_bytes.unwrap();
+        DecisionTreeShares {
+            additive_triples,
+            additive_bigint_triples,
+            binary_triples,
+            equality_shares,
         }
-
-        for i in 0..remainder {
-            let u = unsafe { rx_buf.u64_buf[3 * i] };
-            let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
-            let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
-
-            //println!("recvd: ({:X},{:X},{:X})", u, v, w);
-            xor_shares.push((u, v, w));
-        }
-
-        //println!("xor shares recv'd");
-
-        assert_eq!(add_share_cnt, add_shares.len());
-        assert_eq!(xor_share_cnt, xor_shares.len());
-
-        (add_shares, xor_shares)
+//
+//
+//        //println!("got confirmation ; recving additive shares");
+//
+//        //////////////////////// SEND ADDITIVES ////////////////////////
+//        let mut remainder = add_share_cnt;
+//        while remainder >= TI_BATCH_SIZE {
+//            let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+//
+//            let mut bytes_read = 0;
+//            while bytes_read < U8S_PER_TX {
+//                let current_bytes = unsafe {
+//                    stream.read(&mut rx_buf.u8_buf[bytes_read..])
+//                };
+//                bytes_read += current_bytes.unwrap();
+//            }
+//
+//            for i in 0..TI_BATCH_SIZE {
+//                let u = unsafe { rx_buf.u64_buf[3 * i] };
+//                let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
+//                let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
+//
+//                //println!("recvd: ({:X},{:X},{:X})", u, v, w);
+//                add_shares.push((Wrapping(u), Wrapping(v), Wrapping(w)));
+//            }
+//
+//            remainder -= TI_BATCH_SIZE;
+//        }
+//
+//        let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+//
+//        let mut bytes_read = 0;
+//        while bytes_read < U8S_PER_TX {
+//            let current_bytes = unsafe {
+//                stream.read(&mut rx_buf.u8_buf[bytes_read..])
+//            };
+//            bytes_read += current_bytes.unwrap();
+//        }
+//
+//        for i in 0..remainder {
+//            let u = unsafe { rx_buf.u64_buf[3 * i] };
+//            let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
+//            let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
+//
+//            //println!("recvd: ({:X},{:X},{:X})", u, v, w);
+//            add_shares.push((Wrapping(u), Wrapping(v), Wrapping(w)));
+//        }
+//
+//        //println!("additive shares recv'd. recving xor shares");
+//
+//        ///////////////// RECV XOR SHARES
+//
+//        let mut remainder = xor_share_cnt;
+//        while remainder >= TI_BATCH_SIZE {
+//            let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+//
+//            let mut bytes_read = 0;
+//            while bytes_read < U8S_PER_TX {
+//                let current_bytes = unsafe {
+//                    stream.read(&mut rx_buf.u8_buf[bytes_read..])
+//                };
+//                bytes_read += current_bytes.unwrap();
+//            }
+//
+//            for i in 0..TI_BATCH_SIZE {
+//                let u = unsafe { rx_buf.u64_buf[3 * i] };
+//                let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
+//                let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
+//
+//                //println!("recvd: ({:X},{:X},{:X})", u, v, w);
+//                xor_shares.push((u, v, w));
+//            }
+//
+//            remainder -= TI_BATCH_SIZE;
+//        }
+//
+//        let mut rx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+//
+//        let mut bytes_read = 0;
+//        while bytes_read < U8S_PER_TX {
+//            let current_bytes = unsafe {
+//                stream.read(&mut rx_buf.u8_buf[bytes_read..])
+//            };
+//            bytes_read += current_bytes.unwrap();
+//        }
+//
+//        for i in 0..remainder {
+//            let u = unsafe { rx_buf.u64_buf[3 * i] };
+//            let v = unsafe { rx_buf.u64_buf[3 * i + 1] };
+//            let w = unsafe { rx_buf.u64_buf[3 * i + 2] };
+//
+//            //println!("recvd: ({:X},{:X},{:X})", u, v, w);
+//            xor_shares.push((u, v, w));
+//        }
+//
+//        //println!("xor shares recv'd");
+//
+//        assert_eq!(add_share_cnt, add_shares.len());
+//        assert_eq!(xor_share_cnt, xor_shares.len());
+//
+//        (add_shares, xor_shares)
     }
 }

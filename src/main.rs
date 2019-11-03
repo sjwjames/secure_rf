@@ -8,7 +8,6 @@ use random_forest_rust::computing_party::computing_party::initialize_party_conte
 use random_forest_rust::random_forest::random_forest;
 use num::BigUint;
 use std::net::{TcpListener, TcpStream, SocketAddr};
-use random_forest_rust::thread_pool::thread_pool::ThreadPool;
 use std::io::{Write, Read};
 use std::str;
 use serde::{Serialize, Deserialize, Serializer};
