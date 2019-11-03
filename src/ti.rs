@@ -12,16 +12,19 @@ pub mod ti {
     use std::num::Wrapping;
     use std::io;
     use crate::constants::constants;
-    use crate::thread_pool::thread_pool::ThreadPool;
-    use std::sync::{Arc, Mutex};
-    use num::bigint::{BigUint, ToBigUint, RandBigInt};
+    use std::sync::{Arc, Mutex, Barrier};
+    use num::bigint::{BigUint, ToBigUint, ToBigInt, RandBigInt};
     use num::integer::*;
-    use self::num::{One, Zero};
-    use std::ops::Add;
+    use self::num::{One, Zero, BigInt};
+    use std::ops::{Add, Sub};
     use crate::constants::constants::BINARY_PRIME;
     use crate::decision_tree::decision_tree::{DecisionTreeShares, DecisionTreeTIShareMessage};
     use serde::{Serialize, Deserialize, Serializer};
     use std::str::FromStr;
+    use threadpool::ThreadPool;
+    use std::collections::HashMap;
+    use std::hash::Hash;
+    use std::borrow::Borrow;
 
     pub struct TI {
         pub ti_ip: String,
@@ -223,74 +226,14 @@ pub mod ti {
         println!("{} accepted connection from {}", &s0_pfx, in_stream0.peer_addr().unwrap());
         println!("{} accepted connection from {}", &s1_pfx, in_stream1.peer_addr().unwrap());
 
-        let mut trees_remaining = ctx.tree_count;
+        let mut trees_remaining = ctx.tree_count as isize;
         let mut batch_count = 0;
-        let thread_pool = ThreadPool::new(ctx.batch_size);
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+
         while trees_remaining > 0 {
-            let current_batch = if trees_remaining >= ctx.batch_size { ctx.batch_size } else { trees_remaining };
+            let current_batch_size = if trees_remaining >= ctx.batch_size as isize { ctx.batch_size } else { trees_remaining as usize };
             println!("current batch:{}", batch_count);
 
-            for i in 0..current_batch {
-                println!("{} [{}] generating additive shares...      ", &prefix, i);
-                let now = SystemTime::now();
-                let (add_triples0, add_triples1) = generate_additive_shares(&ctx);
-                println!("{} [{}] additive shares                    complete -- work time = {:5} (ms)",
-                         &prefix, i, now.elapsed().unwrap().as_millis());
-
-
-                print!("{} [{}] generating binary shares...           ", &prefix, i);
-                let now = SystemTime::now();
-                let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-
-                print!("{} [{}] generating equality bigint shares...           ", &prefix, i);
-                let now = SystemTime::now();
-                let (equality_bigint_share0, equality_bigint_share1) = generate_equality_bigint_shares(&ctx);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-
-                print!("{} [{}] generating additive bigint shares...           ", &prefix, i);
-                let now = SystemTime::now();
-                let (additive_bigint_share0, additive_bigint_share1) = generate_additive_bigint_shares(&ctx);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-
-                let mut share0 = DecisionTreeShares {
-                    additive_triples: add_triples0,
-                    additive_bigint_triples: additive_bigint_share0,
-                    binary_triples: binary_triples0,
-                    equality_shares: equality_bigint_share0,
-                };
-
-                let mut share1 = DecisionTreeShares {
-                    additive_triples: add_triples1,
-                    additive_bigint_triples: additive_bigint_share1,
-                    binary_triples: binary_triples1,
-                    equality_shares: equality_bigint_share1,
-                };
-
-                let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
-                let sender_thread0 = thread::spawn(move || {
-                    match get_confirmation(stream.try_clone()
-                        .expect("server 0: failed to clone stream")) {
-                        Ok(_) => return send_dt_shares(stream.try_clone()
-                            .expect("server 0: failed to clone stream"),
-                                                    share0),
-                        Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
-                    };
-                });
-
-                let stream = in_stream1.try_clone().expect("server 0: failed to clone stream");
-                let sender_thread1 = thread::spawn(move || {
-                    match get_confirmation(stream.try_clone()
-                        .expect("server 0: failed to clone stream")) {
-                        Ok(_) => return send_dt_shares(stream.try_clone()
-                                                           .expect("server 0: failed to clone stream"),
-                                                       share1),
-                        Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
-                    };
-                });
 
 //                println!("{} [{}] sending correlated randomness...   ", &s0_pfx, i);
 //                let shares0 = (add_triples0, xor_triples0);
@@ -318,20 +261,102 @@ pub mod ti {
 //                    };
 //                });
 //
-                match sender_thread0.join() {
-                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-                                      &s0_pfx, i, now.elapsed().unwrap().as_millis()),
-                    Err(_) => panic!("main: failed to join sender 0"),
-                };//.expect("main: failed to rejoin server 0");
+            for i in 0..current_batch_size {
+                println!("{} [{}] generating additive shares...      ", &prefix, batch_count);
+                let now = SystemTime::now();
+                let (add_triples0, add_triples1) = generate_additive_shares(&ctx, &thread_pool);
+                println!("{} [{}] additive shares                    complete -- work time = {:5} (ms)",
+                         &prefix, batch_count, now.elapsed().unwrap().as_millis());
 
-                match sender_thread1.join() {
-                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-                                      &s1_pfx, i, now.elapsed().unwrap().as_millis()),
-                    Err(_) => panic!("main: failed to join sender 1"),
-                };//.expect("main: failed to rejoin server 0");
+
+                print!("{} [{}] generating binary shares...           ", &prefix, ctx.thread_count);
+                let now = SystemTime::now();
+                let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, &thread_pool);
+                println!("complete -- work time = {:5} (ms)",
+                         now.elapsed().unwrap().as_millis());
+
+                print!("{} [{}] generating equality bigint shares...           ", &prefix, ctx.thread_count);
+                let now = SystemTime::now();
+                let (equality_bigint_share0, equality_bigint_share1) = generate_equality_bigint_shares(&ctx, &thread_pool);
+                println!("complete -- work time = {:5} (ms)",
+                         now.elapsed().unwrap().as_millis());
+                print!("{} [{}] generating additive bigint shares...           ", &prefix, i);
+                let now = SystemTime::now();
+                let (additive_bigint_share0, additive_bigint_share1) = generate_additive_bigint_shares(&ctx, &thread_pool);
+                println!("complete -- work time = {:5} (ms)",
+                         now.elapsed().unwrap().as_millis());
+                let mut share0 = DecisionTreeShares {
+                    additive_triples: add_triples0,
+                    additive_bigint_triples: additive_bigint_share0,
+                    binary_triples: binary_triples0,
+                    equality_shares: equality_bigint_share0,
+                };
+
+                let mut share1 = DecisionTreeShares {
+                    additive_triples: add_triples1,
+                    additive_bigint_triples: additive_bigint_share1,
+                    binary_triples: binary_triples1,
+                    equality_shares: equality_bigint_share1,
+                };
+                let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
+                thread_pool.execute(move || {
+                    match get_confirmation(stream.try_clone()
+                        .expect("server 0: failed to clone stream")) {
+                        Ok(_) => send_dt_shares(stream.try_clone().expect("server 0: failed to clone stream"), share0),
+                        Err(e) => Err(e),// panic!("server 0: failed to recv confirmation"),
+                    };
+                });
+                let stream = in_stream1.try_clone().expect("server 0: failed to clone stream");
+                thread_pool.execute(move || {
+                    match get_confirmation(stream.try_clone()
+                        .expect("server 0: failed to clone stream")) {
+                        Ok(_) => send_dt_shares(stream.try_clone().expect("server 0: failed to clone stream"), share1),
+                        Err(e) => Err(e),// panic!("server 0: failed to recv confirmation"),
+                    };
+                });
+                thread_pool.join();
             }
 
-            trees_remaining -= ctx.batch_size;
+
+//
+
+
+//
+//            let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
+//            let sender_thread0 = thread::spawn(move || {
+//                match get_confirmation(stream.try_clone()
+//                    .expect("server 0: failed to clone stream")) {
+//                    Ok(_) => return send_dt_shares(stream.try_clone()
+//                                                       .expect("server 0: failed to clone stream"),
+//                                                   share0),
+//                    Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
+//                };
+//            });
+//
+//            let stream = in_stream1.try_clone().expect("server 0: failed to clone stream");
+//            let sender_thread1 = thread::spawn(move || {
+//                match get_confirmation(stream.try_clone()
+//                    .expect("server 0: failed to clone stream")) {
+//                    Ok(_) => return send_dt_shares(stream.try_clone()
+//                                                       .expect("server 0: failed to clone stream"),
+//                                                   share1),
+//                    Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
+//                };
+//            });
+
+            //                match sender_thread0.join() {
+//                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
+//                                      &s0_pfx, i, now.elapsed().unwrap().as_millis()),
+//                    Err(_) => panic!("main: failed to join sender 0"),
+//                };//.expect("main: failed to rejoin server 0");
+//
+//                match sender_thread1.join() {
+//                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
+//                                      &s1_pfx, i, now.elapsed().unwrap().as_millis()),
+//                    Err(_) => panic!("main: failed to join sender 1"),
+//                };//.expect("main: failed to rejoin server 0");
+
+            trees_remaining -= ctx.batch_size as isize;
             batch_count += 1;
         }
     }
@@ -496,100 +521,138 @@ pub mod ti {
 //    }
 
 
-    fn generate_binary_shares(ctx: &TI) -> (Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>) {
-        let thread_pool = ThreadPool::new(ctx.thread_count);
-        let mut share0_arc = Arc::new(Mutex::new(Vec::new()));
-        let mut share1_arc = Arc::new(Mutex::new(Vec::new()));
+    fn generate_binary_shares(ctx: &TI, thread_pool: &ThreadPool) -> (Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>) {
+        let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
+        let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
-        for _ in 0..ctx.thread_count {
+        for i in 0..ctx.binary_shares_per_tree {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
+
             thread_pool.execute(move || {
                 let mut rng = rand::thread_rng();
                 let (share0_item, share1_item) = new_binary_shares(&mut rng);
                 let mut share0_arc_copy = share0_arc_copy.lock().unwrap();
-                (*share0_arc_copy).push(share0_item);
+                (*share0_arc_copy).insert(i, share0_item);
 
                 let mut share1_arc_copy = share1_arc_copy.lock().unwrap();
-                (*share1_arc_copy).push(share1_item);
+                (*share1_arc_copy).insert(i, share1_item);
             })
         }
+        thread_pool.join();
+        let mut share0_map = &(*(share0_arc.lock().unwrap())).clone();
+        let mut share1_map = &(*(share1_arc.lock().unwrap())).clone();
+        let mut share0 = Vec::new();
+        let mut share1 = Vec::new();
 
-        let mut share0 = (*(share0_arc.lock().unwrap())).to_vec();
-        let mut share1 = (*(share1_arc.lock().unwrap())).to_vec();
+        for i in 0..ctx.binary_shares_per_tree {
+            let share0_item = share0_map.get(&i).unwrap().clone();
+            share0.push((share0_item.0, share0_item.1, share0_item.2));
+            let share1_item = share0_map.get(&i).unwrap().clone();
+            share1.push((share1_item.0, share1_item.1, share1_item.2));
+        }
         (share0, share1)
     }
 
-    fn generate_additive_shares(ctx: &TI) -> (Vec<(u64, u64, u64)>, Vec<(u64, u64, u64)>) {
-        let thread_pool = ThreadPool::new(ctx.thread_count);
-        let mut share0_arc = Arc::new(Mutex::new(Vec::new()));
-        let mut share1_arc = Arc::new(Mutex::new(Vec::new()));
+    fn generate_additive_shares(ctx: &TI, thread_pool: &ThreadPool) -> (Vec<(u64, u64, u64)>, Vec<(u64, u64, u64)>) {
+        let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
+        let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
-        for _ in 0..ctx.thread_count {
+        for i in 0..ctx.add_shares_per_tree {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
             thread_pool.execute(move || {
                 let mut rng = rand::thread_rng();
-                let (share0_item, share1_item) = new_add_triple(&mut rng);
+                let (share0_item, share1_item) = new_add_triple(&mut rng, ctx.prime);
                 let mut share0_arc_copy = share0_arc_copy.lock().unwrap();
-                (*share0_arc_copy).push(share0_item);
+                (*share0_arc_copy).insert(i, share0_item);
 
                 let mut share1_arc_copy = share1_arc_copy.lock().unwrap();
-                (*share1_arc_copy).push(share1_item);
+                (*share1_arc_copy).insert(i, share1_item);
+                println!("thread {} finishes", i);
             })
         }
-        let mut share0 = (*(share0_arc.lock().unwrap())).to_vec();
-        let mut share1 = (*(share1_arc.lock().unwrap())).to_vec();
+        thread_pool.join();
+        let mut share0_map = &(*(share0_arc.lock().unwrap())).clone();
+        let mut share1_map = &(*(share1_arc.lock().unwrap())).clone();
+        let mut share0 = Vec::new();
+        let mut share1 = Vec::new();
+
+        for i in 0..ctx.add_shares_per_tree {
+            let share0_item = share0_map.get(&i).unwrap().clone();
+            share0.push((share0_item.0, share0_item.1, share0_item.2));
+            let share1_item = share0_map.get(&i).unwrap().clone();
+            share1.push((share1_item.0, share1_item.1, share1_item.2));
+        }
         (share0, share1)
     }
 
-    fn generate_equality_bigint_shares(ctx: &TI) -> (Vec<BigUint>, Vec<BigUint>) {
-        let thread_pool = ThreadPool::new(ctx.thread_count);
-        let mut share0_arc = Arc::new(Mutex::new(Vec::new()));
-        let mut share1_arc = Arc::new(Mutex::new(Vec::new()));
+    fn generate_equality_bigint_shares(ctx: &TI, thread_pool: &ThreadPool) -> (Vec<BigUint>, Vec<BigUint>) {
+        let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
+        let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
-        for _ in 0..ctx.thread_count {
+        for i in 0..ctx.equality_shares_per_tree {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
+
             thread_pool.execute(move || {
                 let mut rng = rand::thread_rng();
                 let (share0_item, share1_item) = new_equality_bigint_shares(&mut rng, &ctx.big_int_prime, ctx.bigint_bit_size);
                 let mut share0_arc_copy = share0_arc_copy.lock().unwrap();
-                (*share0_arc_copy).push(share0_item);
+                (*share0_arc_copy).insert(i, share0_item);
 
                 let mut share1_arc_copy = share1_arc_copy.lock().unwrap();
-                (*share1_arc_copy).push(share1_item);
+                (*share1_arc_copy).insert(i, share1_item);
             })
         }
-        let mut share0 = (*(share0_arc.lock().unwrap())).to_vec();
-        let mut share1 = (*(share1_arc.lock().unwrap())).to_vec();
+        thread_pool.join();
+        let mut share0 = Vec::new();
+        let mut share1 = Vec::new();
+        let share0_map = &(*(share0_arc.lock().unwrap()));
+        let share1_map = &(*(share1_arc.lock().unwrap()));
+        for i in 0..ctx.equality_shares_per_tree {
+            let mut share0_item = share0_map.get(&i).unwrap().clone();
+            share0.push(share0_item);
+            let mut share1_item = share1_map.get(&i).unwrap().clone();
+            share1.push(share1_item);
+        }
+
         (share0, share1)
     }
 
-    fn generate_additive_bigint_shares(ctx: &TI) -> (Vec<(BigUint, BigUint, BigUint)>, Vec<(BigUint, BigUint, BigUint)>) {
-        let thread_pool = ThreadPool::new(ctx.thread_count);
-        let mut share0_arc = Arc::new(Mutex::new(Vec::new()));
-        let mut share1_arc = Arc::new(Mutex::new(Vec::new()));
+    fn generate_additive_bigint_shares(ctx: &TI, thread_pool: &ThreadPool) -> (Vec<(BigUint, BigUint, BigUint)>, Vec<(BigUint, BigUint, BigUint)>) {
+        let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
+        let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
-        for _ in 0..ctx.thread_count {
+        for i in 0..ctx.add_shares_bigint_per_tree {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
+
             thread_pool.execute(move || {
                 let mut rng = rand::thread_rng();
                 let (share0_item, share1_item) = new_bigint_add_triple(&mut rng, &ctx.big_int_prime, ctx.bigint_bit_size);
                 let mut share0_arc_copy = share0_arc_copy.lock().unwrap();
-                (*share0_arc_copy).push(share0_item);
+                (*share0_arc_copy).insert(i, share0_item);
 
                 let mut share1_arc_copy = share1_arc_copy.lock().unwrap();
-                (*share1_arc_copy).push(share1_item);
+                (*share1_arc_copy).insert(i, share1_item);
             })
         }
-        let mut share0 = (*(share0_arc.lock().unwrap())).to_vec();
-        let mut share1 = (*(share1_arc.lock().unwrap())).to_vec();
+        thread_pool.join();
+        let share0_map = &(*(share0_arc.lock().unwrap()));
+        let share1_map = &(*(share1_arc.lock().unwrap()));
+        let mut share0 = Vec::new();
+        let mut share1 = Vec::new();
+        for i in 0..ctx.add_shares_bigint_per_tree {
+            let share0_item = (share0_map.get(&i).unwrap()).clone();
+            share0.push((share0_item.0, share0_item.1, share0_item.2));
+            let share1_item = (share1_map.get(&i).unwrap()).clone();
+            share1.push((share1_item.0, share1_item.1, share1_item.2));
+        }
         (share0, share1)
     }
 
@@ -639,16 +702,16 @@ pub mod ti {
     }
 
     /* generate Beaver triples over Z_2^64 */
-    fn new_add_triple(rng: &mut rand::ThreadRng) -> ((u64, u64, u64), (u64, u64, u64)) {
-        let u: u64 = rng.gen();
-        let v: u64 = rng.gen();
-        let w = (Wrapping(u) * Wrapping(v)).0;
-        let u0: u64 = rng.gen();
-        let v0: u64 = rng.gen();
-        let w0: u64 = rng.gen();
-        let u1 = (Wrapping(u) - Wrapping(u0)).0;
-        let v1 = (Wrapping(v) - Wrapping(v0)).0;
-        let w1 = (Wrapping(w) - Wrapping(w0)).0;
+    fn new_add_triple(rng: &mut rand::ThreadRng, prime: u64) -> ((u64, u64, u64), (u64, u64, u64)) {
+        let u: u64 = rng.gen_range(0, prime);
+        let v: u64 = rng.gen_range(0, prime);
+        let w = mod_floor((Wrapping(u) * Wrapping(v)).0, prime);
+        let u0: u64 = rng.gen_range(0, prime);
+        let v0: u64 = rng.gen_range(0, prime);
+        let w0: u64 = rng.gen_range(0, prime);
+        let u1 = mod_floor((Wrapping(u) - Wrapping(u0)).0, prime);
+        let v1 = mod_floor((Wrapping(v) - Wrapping(v0)).0, prime);
+        let w1 = mod_floor((Wrapping(w) - Wrapping(w0)).0, prime);
 
         ((u0, v0, w0), (u1, v1, w1))
     }
@@ -660,18 +723,19 @@ pub mod ti {
         let u0: BigUint = rng.gen_biguint(bigint_bit_size);
         let v0: BigUint = rng.gen_biguint(bigint_bit_size);
         let w0: BigUint = rng.gen_biguint(bigint_bit_size);
-        let u1 = (u - &u0).mod_floor(big_int_prime);
-        let v1 = (v - &v0).mod_floor(big_int_prime);
-        let w1 = (w - &v0).mod_floor(big_int_prime);
+        let u1 = (u.to_bigint().unwrap().sub(&(u0.to_bigint().unwrap())).mod_floor(&(big_int_prime.to_bigint().unwrap()))).to_biguint().unwrap();
+        let v1 = (v.to_bigint().unwrap().sub(&(v0.to_bigint().unwrap())).mod_floor(&(big_int_prime.to_bigint().unwrap()))).to_biguint().unwrap();
+        let w1 = (w.to_bigint().unwrap().sub(&(w0.to_bigint().unwrap())).mod_floor(&(big_int_prime.to_bigint().unwrap()))).to_biguint().unwrap();
         ((u0, v0, w0), (u1, v1, w1))
     }
 
     fn new_equality_bigint_shares(rng: &mut rand::ThreadRng, big_int_prime: &BigUint, bigint_bit_size: usize) -> (BigUint, BigUint) {
-        let r = rng.gen_biguint(bigint_bit_size) + BigUint::one();
+        let mut r = rng.gen_biguint(bigint_bit_size);
+        r = r + BigUint::one();
         let mut rsum = BigUint::zero();
         let r0 = rng.gen_biguint(bigint_bit_size);
         rsum = rsum + &r0;
-        let r1 = BigUint::mod_floor(&(&r - &rsum), big_int_prime);
+        let r1 = BigInt::mod_floor(&(r.to_bigint().unwrap() - rsum.to_bigint().unwrap()), &(big_int_prime.to_bigint().unwrap())).to_biguint().unwrap();
         (r0, r1)
     }
 
@@ -689,9 +753,9 @@ pub mod ti {
         vsum += v0;
         wsum += w0;
 
-        let u1 = mod_floor(u - usum, BINARY_PRIME as u8);
-        let v1 = mod_floor(v - vsum, BINARY_PRIME as u8);
-        let w1 = mod_floor(w - wsum, BINARY_PRIME as u8);
+        let u1 = mod_floor((Wrapping(u) - Wrapping(usum)).0, BINARY_PRIME as u8);
+        let v1 = mod_floor((Wrapping(v) - Wrapping(vsum)).0, BINARY_PRIME as u8);
+        let w1 = mod_floor((Wrapping(w) - Wrapping(wsum)).0, BINARY_PRIME as u8);
 
         ((u0, v0, w0), (u1, v1, w1))
     }

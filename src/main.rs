@@ -12,10 +12,15 @@ use random_forest_rust::thread_pool::thread_pool::ThreadPool;
 use std::io::{Write, Read};
 use std::str;
 use serde::{Serialize, Deserialize, Serializer};
+use num::integer::*;
 
 
 fn main() {
-    let prefix = "main:      ";
+    run();
+}
+
+fn run(){
+        let prefix = "main:      ";
 
     println!("{} runtime count starting...", &prefix);
     let now = SystemTime::now();

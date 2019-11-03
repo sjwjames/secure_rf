@@ -9,7 +9,7 @@ ti_port0  = 4000
 ti_port1  = 8000
 
 
-tree_count = 10
+tree_count = 100
 batch_size = 20
 thread_count = 40
 add_shares_per_tree = 100000
