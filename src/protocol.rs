@@ -12,9 +12,10 @@ pub mod protocol {
     use std::cmp::min;
     use num::integer::*;
     use num::bigint::{BigUint, ToBigUint, ToBigInt};
-    use num::Zero;
-    use crate::utils::utils::big_uint_subtract;
+    use num::{Zero, One};
+    use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone};
     use serde::{Serialize, Deserialize, Serializer};
+    use std::ops::{Add, Mul};
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -58,7 +59,42 @@ pub mod protocol {
         output
     }
 
-    pub fn or_xor_bigint() {}
+    pub fn or_xor_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty, constant_multiplier: &BigUint) -> Vec<BigUint> {
+        let bit_length = x_list.len();
+        let mut output = vec![BigUint::zero(); bit_length];
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut i = 0;
+        let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+        let mut batch_count = 0;
+        while i < bit_length {
+            let mut output_map = Arc::clone(&output_map);
+            let to_index = min(i + ctx.batch_size, bit_length);
+            let mut ctx_copied = ctx.clone();
+            let mut x_list = big_uint_vec_clone(x_list);
+            let mut y_list = big_uint_vec_clone(y_list);
+            thread_pool.execute(move || {
+                let mut batch_mul_result = batch_multiply_bigint(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
+                let mut output_map = output_map.lock().unwrap();
+                (*output_map).insert(batch_count, batch_mul_result);
+            });
+            i += ctx.batch_size;
+            batch_count += 1;
+        }
+        thread_pool.join();
+        let output_map = &(*(output_map.lock().unwrap()));
+        let mut global_index = 0;
+        let mut output = Vec::new();
+        for i in 0..batch_count {
+            let batch_result = output_map.get(&i).unwrap();
+            for item in batch_result.iter() {
+                let x_item = &x_list[global_index];
+                let y_item = &y_list[global_index];
+                output.push(mod_floor(big_uint_subtract(&(x_item.add(y_item)), &constant_multiplier.mul(item), &ctx.dt_training.big_int_prime), big_uint_clone(&ctx.dt_training.big_int_prime)));
+                global_index += 1;
+            }
+        }
+        output
+    }
 
     pub fn change_binary_to_decimal_field(binary_numbers: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
         let mut dummy_list = vec![Wrapping(0u64); binary_numbers.len()];
@@ -113,11 +149,13 @@ pub mod protocol {
 //        z_trunc_list.iter().sum()
 //    }
 
-    pub fn batch_multiply_bigint(x_list:&Vec<BigUint>,y_list:&Vec<BigUint>,ctx: &mut ComputingParty)-> Vec<BigUint> {
-        let mut result = vec![BigUint::zero();x_list.len()];
+    pub fn batch_multiply_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty) -> Vec<BigUint> {
+        let mut result = vec![BigUint::zero(); x_list.len()];
         let mut diff_list = Vec::new();
-        for i in 0..x_list.len(){
-            diff_list.push((big_uint_subtract(&x_list[i],&y_list[i],&ctx.dt_training.big_int_prime)));
+        let prime = big_uint_clone(&ctx.dt_training.big_int_prime);
+        for i in 0..x_list.len() {
+            diff_list.push((big_uint_subtract(&x_list[i], &ctx.dt_shares.additive_bigint_triples[i].0, &prime),
+                            big_uint_subtract(&y_list[i], &ctx.dt_shares.additive_bigint_triples[i].1, &prime)));
         }
         let mut in_stream = ctx.in_stream.try_clone()
             .expect("failed cloning tcp o_stream");
@@ -127,18 +165,47 @@ pub mod protocol {
 
         let mut diff_list_str_vec = Vec::new();
         for item in diff_list.iter() {
-            diff_list_str_vec.push(serde_json::to_string(&(item.to_bytes_le())).unwrap());
+            let mut tuple = Vec::new();
+            tuple.push(serde_json::to_string(&(item.0.to_bytes_le())).unwrap());
+            tuple.push(serde_json::to_string(&(item.1.to_bytes_le())).unwrap());
+            diff_list_str_vec.push(format!("({})", tuple.join(",")));
         }
-        o_stream.write((diff_list_str_vec.join(";")+"\n").as_bytes());
+        o_stream.write((diff_list_str_vec.join(";") + "\n").as_bytes());
 
         let mut reader = BufReader::new(in_stream);
         let mut diff_list_message = String::new();
         reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
 
-        let mut diff_list_str_vec:Vec<&str> = diff_list_message.split(";").collect();
+        let mut diff_list_str_vec: Vec<&str> = diff_list_message.split(";").collect();
         let mut diff_list = Vec::new();
-        for item in diff_list_str_vec.iter(){
-            diff_list.push(BigUint::from_bytes_le(serde_json::from_str(item).unwrap()));
+        for item in diff_list_str_vec {
+            let temp_str = &item[1..item.len()];
+            let str_vec: Vec<&str> = temp_str.split(",").collect();
+            diff_list.push(
+                (
+                    BigUint::from_bytes_le(str_vec[0].as_bytes()),
+                    BigUint::from_bytes_le(str_vec[1].as_bytes())
+                )
+            );
+        }
+        let batch_size = x_list.len();
+        let mut d_list = Vec::new();
+        let mut e_list = Vec::new();
+
+        for i in 0..batch_size {
+            d_list.push(diff_list[i].0.mod_floor(&prime));
+            e_list.push(diff_list[i].1.mod_floor(&prime));
+        }
+
+        let big_int_shares = &ctx.dt_shares.additive_bigint_triples;
+        let big_asymmetric_bit = if ctx.asymmetric_bit == 1 { BigUint::one() } else { BigUint::zero() };
+        for i in 0..batch_size {
+            let u = &big_int_shares[i].0;
+            let v = &big_int_shares[i].1;
+            let w = &big_int_shares[i].2;
+            let d = &big_uint_subtract(&x_list[i], u, &prime).mod_floor(&prime).add(&d_list[i]).mod_floor(&prime);
+            let e = &big_uint_subtract(&y_list[i], v, &prime).mod_floor(&prime).add(&e_list[i]).mod_floor(&prime);
+            result[i] = w.add(&d.mul(v)).add(&e.mul(u)).add(&(&d.mul(e)).mul(&big_asymmetric_bit)).mod_floor(&prime);
         }
 
         result

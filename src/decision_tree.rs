@@ -4,7 +4,7 @@ pub mod decision_tree {
     use std::io::Bytes;
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::big_uint_copy;
+    use crate::utils::utils::big_uint_clone;
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -73,7 +73,7 @@ pub mod decision_tree {
                 subset_transaction_bit_vector: self.subset_transaction_bit_vector.clone(),
                 attribute_bit_vector: self.attribute_bit_vector.clone(),
                 prime: self.prime,
-                big_int_prime: big_uint_copy(&self.big_int_prime),
+                big_int_prime: big_uint_clone(&self.big_int_prime),
                 dataset_size_prime: self.dataset_size_prime,
                 dataset_size_bit_length: self.dataset_size_bit_length,
                 bit_length: self.bit_length,

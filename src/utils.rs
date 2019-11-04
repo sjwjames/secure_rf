@@ -8,8 +8,16 @@ pub mod utils{
         result
     }
 
-    pub fn big_uint_copy(x:&BigUint)->BigUint{
+    pub fn big_uint_clone(x:&BigUint)->BigUint{
         let mut result = BigUint::from_bytes_le(&(x.to_bytes_le().clone()));
+        result
+    }
+
+    pub fn big_uint_vec_clone(list:&Vec<BigUint>)->Vec<BigUint>{
+        let mut result = Vec::new();
+        for item in list.iter(){
+            result.push(big_uint_clone(item));
+        }
         result
     }
 }
