@@ -12,7 +12,7 @@ pub mod protocol {
     use std::cmp::min;
     use num::integer::*;
     use num::bigint::{BigUint, ToBigUint, ToBigInt};
-    use num::{Zero, One};
+    use num::{Zero, One, FromPrimitive};
     use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone};
     use serde::{Serialize, Deserialize, Serializer};
     use std::ops::{Add, Mul};
@@ -110,12 +110,17 @@ pub mod protocol {
     pub fn change_binary_to_bigint_field(binary_numbers: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<BigUint> {
         let mut binary_num_bigint = Vec::new();
         for item in binary_numbers.iter() {
-            binary_num_bigint.push(item.to_biguint());
+            binary_num_bigint.push(item.to_biguint().unwrap());
         }
         let mut dummy_list = vec![BigUint::zero(); binary_numbers.len()];
 
-        let mut result = Vec::new();
-        result
+        let mut output = Vec::new();
+        if ctx.asymmetric_bit == 1 {
+            output = or_xor_bigint(&binary_num_bigint, &dummy_list, ctx, &BigUint::from_usize(2).unwrap());
+        } else {
+            output = or_xor_bigint(&dummy_list, &binary_num_bigint, ctx, &BigUint::from_usize(2).unwrap());
+        }
+        output
     }
 
     /* computed the dp modulo 2^64 of two vectors with pre/post truncation options */
