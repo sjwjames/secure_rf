@@ -19,7 +19,7 @@ pub mod protocol {
 
     pub fn or_xor(x_list: &Vec<Wrapping<u64>>,
                   y_list: &Vec<Wrapping<u64>>,
-                  ctx: &mut ComputingParty, constant_multiplier: u64,prime:u64) -> Vec<Wrapping<u64>> {
+                  ctx: &mut ComputingParty, constant_multiplier: u64) -> Vec<Wrapping<u64>> {
         let bit_length = x_list.len();
         let thread_pool = ThreadPool::new(ctx.thread_count);
         let mut i = 0;
@@ -47,14 +47,23 @@ pub mod protocol {
         for i in 0..batch_count{
             let batch_result=output_map.get(&i).unwrap();
             for item in batch_result.iter(){
-                output.push(Wrapping(mod_floor(x_list[global_index].0+y_list[global_index].0-(constant_multiplier*item.0),prime)));
+                output.push(Wrapping(mod_floor(x_list[global_index].0+y_list[global_index].0-(constant_multiplier*item.0),ctx.dt_training.dataset_size_prime)));
                 global_index+=1;
             }
         }
         output
     }
 
-//    pub fn change_binary_to_decimal_field() -> Vec<Wrapping<u64>> {}
+    pub fn change_binary_to_decimal_field(binary_numbers:&Vec<Wrapping<u64>>,ctx:&mut ComputingParty) -> Vec<Wrapping<u64>> {
+        let mut dummy_list = vec![Wrapping(0u64);binary_numbers.len()];
+        let mut output = Vec::new();
+        if ctx.asymmetric_bit==1 {
+            output = or_xor(binary_numbers,&dummy_list,ctx,2);
+        }else{
+            output = or_xor(&dummy_list,binary_numbers,ctx,2);
+        }
+        output
+    }
 
     /* computed the dp modulo 2^64 of two vectors with pre/post truncation options */
 //    pub fn dot_product(x_list: &Vec<Wrapping<u64>>,
