@@ -23,9 +23,6 @@ pub mod ti {
     use std::str::FromStr;
     use threadpool::ThreadPool;
     use std::collections::HashMap;
-    use std::hash::Hash;
-    use std::borrow::Borrow;
-    use serde_json::error::Category::Eof;
 
     pub struct TI {
         pub ti_ip: String,
@@ -37,6 +34,7 @@ pub mod ti {
         pub binary_shares_per_tree: usize,
         pub tree_count: usize,
         pub batch_size: usize,
+        pub tree_training_batch_size: usize,
         pub thread_count: usize,
         pub big_int_prime: BigUint,
         pub prime: u64,
@@ -64,6 +62,7 @@ pub mod ti {
                 binary_shares_per_tree: self.equality_shares_per_tree,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
+                tree_training_batch_size:self.tree_training_batch_size,
                 big_int_prime: self.big_int_prime.clone(),
                 prime: self.prime,
                 thread_count: self.thread_count,
@@ -143,6 +142,13 @@ pub mod ti {
             }
         };
 
+        let tree_training_batch_size = match settings.get_int("tree_training_batch_size") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing tree_training_batch_size: {:?}", error)
+            }
+        };
+
         let big_int_prime = match settings.get_str("big_int_prime") {
             Ok(num) => num as String,
             Err(error) => {
@@ -185,6 +191,7 @@ pub mod ti {
             binary_shares_per_tree,
             tree_count,
             batch_size,
+            tree_training_batch_size,
             big_int_prime,
             prime,
             thread_count,
@@ -232,7 +239,7 @@ pub mod ti {
         let thread_pool = ThreadPool::new(ctx.thread_count);
 
         while trees_remaining > 0 {
-            let current_batch_size = if trees_remaining >= ctx.batch_size as isize { ctx.batch_size } else { trees_remaining as usize };
+            let current_batch_size = if trees_remaining >= ctx.tree_training_batch_size as isize { ctx.tree_training_batch_size } else { trees_remaining as usize };
             println!("current batch:{}", batch_count);
 
 
@@ -334,7 +341,7 @@ pub mod ti {
             }
 
 
-            trees_remaining -= ctx.batch_size as isize;
+            trees_remaining -= ctx.tree_training_batch_size as isize;
             batch_count += 1;
         }
     }
@@ -386,7 +393,7 @@ pub mod ti {
             equality_shares: equality_bigint_str_vec.join(";"),
         };
 
-        let mut message_str = serde_json::to_string(&dt_share_message).unwrap()+"\n";
+        let mut message_str = serde_json::to_string(&dt_share_message).unwrap() + "\n";
         stream.write(message_str.as_bytes());
         Ok(())
     }
@@ -532,7 +539,7 @@ pub mod ti {
         (share0, share1)
     }
 
-    fn generate_additive_shares(ctx: &TI, thread_pool: &ThreadPool) -> (Vec<(u64, u64, u64)>, Vec<(u64, u64, u64)>) {
+    fn generate_additive_shares(ctx: &TI, thread_pool: &ThreadPool) -> (Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
@@ -558,9 +565,9 @@ pub mod ti {
 
         for i in 0..ctx.add_shares_per_tree {
             let share0_item = share0_map.get(&i).unwrap().clone();
-            share0.push((share0_item.0, share0_item.1, share0_item.2));
+            share0.push((Wrapping(share0_item.0), Wrapping(share0_item.1), Wrapping(share0_item.2)));
             let share1_item = share0_map.get(&i).unwrap().clone();
-            share1.push((share1_item.0, share1_item.1, share1_item.2));
+            share1.push((Wrapping(share1_item.0), Wrapping(share1_item.1), Wrapping(share1_item.2)));
         }
         (share0, share1)
     }

@@ -44,11 +44,13 @@ pub mod computing_party {
 
         /* DT training*/
         pub dt_training: DecisionTreeTraining,
+        pub dt_shares: DecisionTreeShares,
 
         /* random forest */
         pub thread_count: usize,
         pub tree_count: usize,
         pub batch_size: usize,
+        pub tree_training_batch_size: usize,
 
     }
 
@@ -72,11 +74,13 @@ pub mod computing_party {
 
                 dt_data: self.dt_data.clone(),
                 dt_training: self.dt_training.clone(),
+                dt_shares:self.dt_shares.clone(),
 
                 thread_count: self.thread_count,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
 
+                tree_training_batch_size: self.tree_training_batch_size
             }
         }
     }
@@ -318,6 +322,13 @@ pub mod computing_party {
             }
         };
 
+        let tree_training_batch_size = match settings.get_int("tree_training_batch_size") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing tree_training_batch_size: {:?}", error)
+            }
+        };
+
 
         let max_depth = match settings.get_int("max_depth") {
             Ok(num) => num as usize,
@@ -470,9 +481,15 @@ pub mod computing_party {
             thread_count,
             tree_count,
             batch_size,
+            tree_training_batch_size,
             dt_data,
             dt_training,
-
+            dt_shares: DecisionTreeShares {
+                additive_triples: vec![],
+                additive_bigint_triples: vec![],
+                binary_triples: vec![],
+                equality_shares: vec![]
+            }
         }
     }
 

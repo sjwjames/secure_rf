@@ -7,10 +7,8 @@ pub mod random_forest {
     pub struct RandomForest {}
 
     pub fn train(mut ctx: ComputingParty) {
-        let tree_count = ctx.tree_count;
-        let batch_size = ctx.batch_size;
         let thread_pool = ThreadPool::new(ctx.thread_count);
-        let mut remainder = tree_count;
+        let mut remainder = ctx.tree_count;
         let mut party0_port = Arc::new(Mutex::new(ctx.party0_port));
         let mut party1_port = Arc::new(Mutex::new(ctx.party1_port));
         while remainder > 0 {

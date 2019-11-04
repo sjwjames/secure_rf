@@ -10,7 +10,8 @@ ti_port1  = 8000
 
 
 tree_count = 100
-batch_size = 20
+batch_size = 176
+tree_training_batch_size = 20
 thread_count = 40
 add_shares_per_tree = 1000
 add_shares_bigint_per_tree = 1000

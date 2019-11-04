@@ -27,7 +27,8 @@ learning_rate = 0.001
 
 #[RANDOM FOREST]
 tree_count = 100
-batch_size = 20
+batch_size = 176
+tree_training_batch_size = 20
 thread_count = 40
 attr_value_count = 10
 class_value_count = 2
