@@ -11,8 +11,10 @@ pub mod decision_tree {
         pub class_value_count: usize,
         pub attribute_count: usize,
         pub instance_count: usize,
-        pub attr_values: Vec<Vec<Vec<u64>>>,
-        pub class_values: Vec<Vec<u64>>,
+        pub attr_values: Vec<Vec<Vec<Wrapping<u64>>>>,
+        pub class_values: Vec<Vec<Wrapping<u64>>>,
+        pub attr_values_bytes:Vec<Vec<Vec<u8>>>,
+        pub class_values_bytes: Vec<Vec<u8>>,
         pub attr_values_big_integer: Vec<Vec<Vec<BigUint>>>,
         pub class_values_big_integer: Vec<Vec<BigUint>>,
     }
@@ -57,6 +59,8 @@ pub mod decision_tree {
                 instance_count: self.instance_count,
                 attr_values: self.attr_values.clone(),
                 class_values: self.class_values.clone(),
+                attr_values_bytes: self.attr_values_bytes.clone(),
+                class_values_bytes: self.class_values_bytes.clone(),
                 attr_values_big_integer: self.attr_values_big_integer.clone(),
                 class_values_big_integer: self.class_values_big_integer.clone(),
             }

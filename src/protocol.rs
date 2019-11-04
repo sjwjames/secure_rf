@@ -96,13 +96,17 @@ pub mod protocol {
         output
     }
 
-    pub fn change_binary_to_decimal_field(binary_numbers: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+    pub fn change_binary_to_decimal_field(binary_numbers: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
         let mut dummy_list = vec![Wrapping(0u64); binary_numbers.len()];
         let mut output = Vec::new();
+        let mut binary_int_list = Vec::new();
+        for item in binary_numbers{
+            binary_int_list.push(Wrapping(*item as u64));
+        }
         if ctx.asymmetric_bit == 1 {
-            output = or_xor(binary_numbers, &dummy_list, ctx, 2);
+            output = or_xor(&binary_int_list, &dummy_list, ctx, 2);
         } else {
-            output = or_xor(&dummy_list, binary_numbers, ctx, 2);
+            output = or_xor(&dummy_list, &binary_int_list, ctx, 2);
         }
         output
     }

@@ -155,32 +155,20 @@ pub mod computing_party {
     }
 
     fn produce_dt_data(one_hot_encoding_data: Vec<Vec<u8>>, class_value_count: usize, attr_value_count: usize, attribute_count: usize, instance_count: usize, asymmetric_bit: u8) -> DecisionTreeData {
-        let mut attr_values = Vec::new();
-        let mut class_values = Vec::new();
-        let mut attr_values_big_integer = Vec::new();
-        let mut class_values_big_integer = Vec::new();
+        let mut attr_values_bytes = Vec::new();
+        let mut class_values_bytes = Vec::new();
         for i in 0..attribute_count {
             let mut attr_data = Vec::new();
-            let mut attr_big_int_data = Vec::new();
             for j in 0..attr_value_count {
                 let item_copied = one_hot_encoding_data[i * attr_value_count + j].clone();
-                let attr_data_item = item_copied.into_iter().map(|x| x as u64).collect();
-                let item_copied = one_hot_encoding_data[i * attr_value_count + j].clone();
-                let attr_big_int_item = item_copied.into_iter().map(|x| x.to_biguint().unwrap()).collect();
-                attr_data.push(attr_data_item);
-                attr_big_int_data.push(attr_big_int_item);
+                attr_data.push(item_copied);
             }
-            attr_values.push(attr_data);
-            attr_values_big_integer.push(attr_big_int_data);
+            attr_values_bytes.push(attr_data);
         }
 
         for i in 0..class_value_count {
             let item_copied = one_hot_encoding_data[attr_value_count * attribute_count + i].clone();
-            let class_data_item = item_copied.into_iter().map(|x| x as u64).collect();
-            class_values.push(class_data_item);
-            let item_copied = one_hot_encoding_data[attr_value_count * attribute_count + i].clone();
-            let item = item_copied.into_iter().map(|x| x.to_biguint().unwrap()).collect();
-            class_values_big_integer.push(item);
+            class_values_bytes.push(item_copied);
         }
 
         DecisionTreeData {
@@ -188,10 +176,12 @@ pub mod computing_party {
             class_value_count,
             attribute_count,
             instance_count,
-            attr_values,
-            class_values,
-            attr_values_big_integer,
-            class_values_big_integer,
+            attr_values: vec![],
+            class_values: vec![],
+            attr_values_bytes,
+            class_values_bytes,
+            attr_values_big_integer: vec![],
+            class_values_big_integer: vec![]
         }
     }
 
