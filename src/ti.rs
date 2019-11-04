@@ -23,6 +23,7 @@ pub mod ti {
     use std::str::FromStr;
     use threadpool::ThreadPool;
     use std::collections::HashMap;
+    use crate::utils::utils::big_uint_subtract;
 
     pub struct TI {
         pub ti_ip: String,
@@ -706,9 +707,9 @@ pub mod ti {
         let u0: BigUint = rng.gen_biguint(bigint_bit_size);
         let v0: BigUint = rng.gen_biguint(bigint_bit_size);
         let w0: BigUint = rng.gen_biguint(bigint_bit_size);
-        let u1 = (u.to_bigint().unwrap().sub(&(u0.to_bigint().unwrap())).mod_floor(&(big_int_prime.to_bigint().unwrap()))).to_biguint().unwrap();
-        let v1 = (v.to_bigint().unwrap().sub(&(v0.to_bigint().unwrap())).mod_floor(&(big_int_prime.to_bigint().unwrap()))).to_biguint().unwrap();
-        let w1 = (w.to_bigint().unwrap().sub(&(w0.to_bigint().unwrap())).mod_floor(&(big_int_prime.to_bigint().unwrap()))).to_biguint().unwrap();
+        let u1 = big_uint_subtract(&u,&u0,big_int_prime);
+        let v1 = big_uint_subtract(&v,&v0,big_int_prime);
+        let w1 = big_uint_subtract(&w,&w0,big_int_prime);
         ((u0, v0, w0), (u1, v1, w1))
     }
 

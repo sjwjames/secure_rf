@@ -5,12 +5,16 @@ pub mod protocol {
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
     use crate::constants::constants::{BATCH_SIZE, U8S_PER_TX, BUF_SIZE, U64S_PER_TX};
-    use std::io::{Read, Write};
+    use std::io::{Read, Write, BufReader, BufRead};
     use threadpool::ThreadPool;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
     use std::cmp::min;
     use num::integer::*;
+    use num::bigint::{BigUint, ToBigUint, ToBigInt};
+    use num::Zero;
+    use crate::utils::utils::big_uint_subtract;
+    use serde::{Serialize, Deserialize, Serializer};
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -44,29 +48,42 @@ pub mod protocol {
 
         let mut global_index = 0;
         let mut output = Vec::new();
-        for i in 0..batch_count{
-            let batch_result=output_map.get(&i).unwrap();
-            for item in batch_result.iter(){
-                output.push(Wrapping(mod_floor(x_list[global_index].0+y_list[global_index].0-(constant_multiplier*item.0),ctx.dt_training.dataset_size_prime)));
-                global_index+=1;
+        for i in 0..batch_count {
+            let batch_result = output_map.get(&i).unwrap();
+            for item in batch_result.iter() {
+                output.push(Wrapping(mod_floor(x_list[global_index].0 + y_list[global_index].0 - (constant_multiplier * item.0), ctx.dt_training.dataset_size_prime)));
+                global_index += 1;
             }
         }
         output
     }
 
-    pub fn change_binary_to_decimal_field(binary_numbers:&Vec<Wrapping<u64>>,ctx:&mut ComputingParty) -> Vec<Wrapping<u64>> {
-        let mut dummy_list = vec![Wrapping(0u64);binary_numbers.len()];
+    pub fn or_xor_bigint() {}
+
+    pub fn change_binary_to_decimal_field(binary_numbers: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+        let mut dummy_list = vec![Wrapping(0u64); binary_numbers.len()];
         let mut output = Vec::new();
-        if ctx.asymmetric_bit==1 {
-            output = or_xor(binary_numbers,&dummy_list,ctx,2);
-        }else{
-            output = or_xor(&dummy_list,binary_numbers,ctx,2);
+        if ctx.asymmetric_bit == 1 {
+            output = or_xor(binary_numbers, &dummy_list, ctx, 2);
+        } else {
+            output = or_xor(&dummy_list, binary_numbers, ctx, 2);
         }
         output
     }
 
+    pub fn change_binary_to_bigint_field(binary_numbers: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<BigUint> {
+        let mut binary_num_bigint = Vec::new();
+        for item in binary_numbers.iter() {
+            binary_num_bigint.push(item.to_biguint());
+        }
+        let mut dummy_list = vec![BigUint::zero(); binary_numbers.len()];
+
+        let mut result = Vec::new();
+        result
+    }
+
     /* computed the dp modulo 2^64 of two vectors with pre/post truncation options */
-//    pub fn dot_product(x_list: &Vec<Wrapping<u64>>,
+    //    pub fn dot_product(x_list: &Vec<Wrapping<u64>>,
 //                       y_list: &Vec<Wrapping<u64>>,
 //                       ctx: &mut ComputingParty,
 //                       decimal_precision: u32,
@@ -95,6 +112,37 @@ pub mod protocol {
 //        }
 //        z_trunc_list.iter().sum()
 //    }
+
+    pub fn batch_multiply_bigint(x_list:&Vec<BigUint>,y_list:&Vec<BigUint>,ctx: &mut ComputingParty)-> Vec<BigUint> {
+        let mut result = vec![BigUint::zero();x_list.len()];
+        let mut diff_list = Vec::new();
+        for i in 0..x_list.len(){
+            diff_list.push((big_uint_subtract(&x_list[i],&y_list[i],&ctx.dt_training.big_int_prime)));
+        }
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut diff_list_str_vec = Vec::new();
+        for item in diff_list.iter() {
+            diff_list_str_vec.push(serde_json::to_string(&(item.to_bytes_le())).unwrap());
+        }
+        o_stream.write((diff_list_str_vec.join(";")+"\n").as_bytes());
+
+        let mut reader = BufReader::new(in_stream);
+        let mut diff_list_message = String::new();
+        reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
+
+        let mut diff_list_str_vec:Vec<&str> = diff_list_message.split(";").collect();
+        let mut diff_list = Vec::new();
+        for item in diff_list_str_vec.iter(){
+            diff_list.push(BigUint::from_bytes_le(serde_json::from_str(item).unwrap()));
+        }
+
+        result
+    }
 
     /* computes entrywise product modulo 2^64 of two vectors */
     pub fn batch_multiply(x_list: &Vec<Wrapping<u64>>, y_list: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {

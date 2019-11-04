@@ -354,14 +354,23 @@ pub mod computing_party {
         };
 
 
-        let prime = match settings.get_str("prime") {
+        let big_int_prime = match settings.get_str("big_int_prime") {
             Ok(num) => num as String,
+            Err(error) => {
+                panic!("Encountered a problem while parsing big_int_prime: {:?}", error)
+            }
+        };
+
+
+        let big_int_prime = BigUint::from_str(&big_int_prime).unwrap();
+
+
+        let prime = match settings.get_int("prime") {
+            Ok(num) => num as u64,
             Err(error) => {
                 panic!("Encountered a problem while parsing prime: {:?}", error)
             }
         };
-
-        let prime = BigUint::from_str(&prime).unwrap();
 
 
         let bit_length = match settings.get_int("bit_length") {
@@ -457,6 +466,7 @@ pub mod computing_party {
             subset_transaction_bit_vector,
             attribute_bit_vector,
             prime,
+            big_int_prime,
             dataset_size_prime,
             dataset_size_bit_length,
             bit_length,
@@ -577,8 +587,6 @@ pub mod computing_party {
         assert_eq!(msg, &recv_buf);
 
         let mut reader = BufReader::new(stream);
-
-
         let mut share_message = String::new();
         reader.read_line(&mut share_message).expect("fail to read share message str");
         let ti_shares_message: DecisionTreeTIShareMessage = serde_json::from_str(&share_message).unwrap();
