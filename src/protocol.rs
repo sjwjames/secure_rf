@@ -9,7 +9,7 @@ pub mod protocol {
     use threadpool::ThreadPool;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
-    use std::cmp::min;
+    use std::cmp::{min, max};
     use num::integer::*;
     use num::bigint::{BigUint, ToBigUint, ToBigInt};
     use num::{Zero, One, FromPrimitive, abs};
@@ -417,7 +417,7 @@ pub mod protocol {
                 let mut output_map = output_map.lock().unwrap();
                 (*output_map).insert(batch_count, batch_mul_result);
             });
-            i += ctx.batch_size;
+            i = to_index;
             batch_count += 1;
         }
         thread_pool.join();
@@ -431,12 +431,12 @@ pub mod protocol {
             }
         }
 
-        for i  in 0..bit_length{
+        for i in 0..bit_length {
             //computeVariables
-            let e_result = multiplication_byte(y_shares[i],c_shares[i-1],ctx)+ctx.asymmetric_bit;
-            e_shares[i] = mod_floor(e_result,BINARY_PRIME as u8);
-            let x_result =  y_shares[i]+c_shares[i-1];
-            x_shares[i] = mod_floor(x_result,BINARY_PRIME as u8);
+            let e_result = multiplication_byte(y_shares[i], c_shares[i - 1], ctx) + ctx.asymmetric_bit;
+            e_shares[i] = mod_floor(e_result, BINARY_PRIME as u8);
+            let x_result = y_shares[i] + c_shares[i - 1];
+            x_shares[i] = mod_floor(x_result, BINARY_PRIME as u8);
         }
         x_shares
     }
@@ -514,5 +514,162 @@ pub mod protocol {
             output.push(result);
         }
         output
+    }
+
+    pub fn arg_max(bit_shares: Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
+        let number_count = bit_shares.len();
+        let mut bit_length = 0;
+        bit_shares.iter().map(|x| bit_length = max(bit_length, x.len()));
+        let mut w_intermediate = HashMap::new();
+        for i in 0..number_count {
+            w_intermediate.insert(i, Vec::new());
+        }
+        let mut result = Vec::new();
+        if number_count == 1 {
+            result.push(1 as u8);
+        } else {}
+        result
+    }
+
+    pub fn comparison(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> u8 {
+        let bit_length = max(x_list.len(), y_list.len());
+        let prime = BINARY_PRIME;
+        let ti_shares = &ctx.dt_shares.binary_triples;
+        let ti_shares_start_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
+        let mut e_shares = [0u8; bit_length];
+        let mut d_shares = [0u8; bit_length];
+        let mut c_shares = [0u8; bit_length];
+        let mut multiplication_e = [0u8; bit_length];
+        let mut w = -1;
+        //computeEShares in Java Lynx
+        for i in 0..bit_length {
+            let e_share = x_list[i] + y_list[i] + ctx.asymmetric_bit;
+            e_shares[i] = mod_floor(e_share, BINARY_PRIME as u8);
+        }
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        //compute D shares
+        thread_pool.execute(move || {
+            let (batch_count, output_map) = multi_thread_batch_mul_byte(x_list, y_list, ctx, bit_length);
+            let mut global_index = 0;
+            for i in 0..batch_count {
+                let product_result = output_map.get(&i).unwrap();
+                for item in product_result {
+                    let local_diff = y_list[global_index] - *item;
+                    d_shares[global_index] = mod_floor(local_diff, BINARY_PRIME as u8);
+                    global_index += 1;
+                }
+            }
+        });
+        //compute multiplication E parallel
+        thread_pool.execute(move || {
+            let mut main_index = bit_length - 1;
+            main_index -= 1;
+            multiplication_e[main_index] = e_shares[bit_length - 1];
+            let mut temp_mul_e = vec![0u8; bit_length];
+            while temp_mul_e.len() > 1 {
+                let inner_pool = ThreadPool::new(ctx.thread_count);
+                let mut i = 0;
+                let mut batch_count = 0;
+                let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+                while i < temp_mul_e.len() - 1 {
+                    let mut output_map = Arc::clone(&output_map);
+                    let to_index = min(i + ctx.batch_size, temp_mul_e.len());
+                    let mut ctx_copied = ctx.clone();
+                    let mut temp_mul_e = temp_mul_e.clone();
+                    inner_pool.execute(move || {
+                        let mut batch_mul_result = batch_multiplication_byte(&temp_mul_e[i..to_index - 1].to_vec(), &temp_mul_e[i + 1..to_index].to_vec(), &mut ctx_copied);
+                        let mut output_map = output_map.lock().unwrap();
+                        (*output_map).insert(batch_count, batch_mul_result);
+                    });
+                    i += to_index - 1;
+                    batch_count += 1;
+                }
+                inner_pool.join();
+                let output_map = &*(output_map.lock().unwrap());
+                let mut products = Vec::new();
+                for i in 0..batch_count {
+                    let product_result = output_map.get(&i).unwrap();
+                    for item in product_result {
+                        products.push(*item);
+                    }
+                }
+                temp_mul_e.clear();
+                temp_mul_e = products;
+                main_index -= 1;
+                multiplication_e[main_index] = *temp_mul_e.last().unwrap();
+            }
+            multiplication_e[0] = 0;
+        });
+        thread_pool.join();
+        //compute c shares
+        let mut i = 0;
+        let mut batch_count = 0;
+        let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+        while i < bit_length - 1 {
+            let mut output_map = Arc::clone(&output_map);
+            let to_index = min(i + ctx.batch_size, bit_length - 1);
+            let mut ctx_copied = ctx.clone();
+            let mut multiplication_e = multiplication_e.to_vec().clone();
+            let mut d_shares = d_shares.to_vec().clone();
+            thread_pool.execute(move || {
+                let mut batch_mul_result = batch_multiplication_byte(&multiplication_e[i + 1..to_index + 1].to_vec(), &d_shares[i..to_index].to_vec(), &mut ctx_copied);
+                let mut output_map = output_map.lock().unwrap();
+                (*output_map).insert(batch_count, batch_mul_result);
+            });
+            i = to_index;
+            batch_count += 1;
+        }
+        inner_pool.join();
+        let output_map = &*(output_map.lock().unwrap());
+        for i in 0..batch_count {
+            let products = output_map.get(&i).unwrap();
+            for j in 0..products.len() {
+                let global_index = i * 10 + j;
+                c_shares[global_index] = products[j];
+            }
+        }
+        c_shares[bit_length - 1] = d_shares[bit_length - 1];
+        //compute w shares
+        w = ctx.asymmetric_bit;
+        for i in 0..bit_length {
+            w += c_shares[i];
+            w = mod_floor(w, BINARY_PRIME as u8);
+        }
+        w
+    }
+
+    pub fn parallel_multiplication() {}
+
+    pub fn dot_product_bigint() {}
+
+    pub fn multiplication_bigint() {}
+
+    pub fn parallel_multiplication_big_integer() {}
+
+    pub fn equality_big_integer() {}
+
+
+    fn multi_thread_batch_mul_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty, bit_length: usize) -> (u32, HashMap<u32, Vec<u8>>) {
+        let inner_pool = ThreadPool::new(ctx.thread_count);
+        let mut i = 0;
+        let mut batch_count = 0;
+        let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+        while i < bit_length {
+            let mut output_map = Arc::clone(&output_map);
+            let to_index = min(i + ctx.batch_size, bit_length);
+            let mut ctx_copied = ctx.clone();
+            let mut x_list = x_list.clone();
+            let mut y_list = y_list.clone();
+            inner_pool.execute(move || {
+                let mut batch_mul_result = batch_multiplication_byte(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
+                let mut output_map = output_map.lock().unwrap();
+                (*output_map).insert(batch_count, batch_mul_result);
+            });
+            i = to_index;
+            batch_count += 1;
+        }
+        inner_pool.join();
+        let output_map = *(output_map.lock().unwrap());
+        (batch_count, output_map)
     }
 }
