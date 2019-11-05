@@ -12,6 +12,7 @@ pub mod random_forest {
         let mut remainder = ctx.tree_count;
         let mut party0_port = Arc::new(Mutex::new(ctx.party0_port));
         let mut party1_port = Arc::new(Mutex::new(ctx.party1_port));
+        //init in java Lynx
         let mut attr_values= Vec::new();
         let mut class_values= Vec::new();
         let mut attr_values_bigint = Vec::new();

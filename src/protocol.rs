@@ -4,7 +4,7 @@ pub mod protocol {
     **/
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
-    use crate::constants::constants::{BATCH_SIZE, U8S_PER_TX, BUF_SIZE, U64S_PER_TX};
+    use crate::constants::constants::{BATCH_SIZE, U8S_PER_TX, BUF_SIZE, U64S_PER_TX, BINARY_PRIME};
     use std::io::{Read, Write, BufReader, BufRead};
     use threadpool::ThreadPool;
     use std::collections::HashMap;
@@ -12,10 +12,11 @@ pub mod protocol {
     use std::cmp::min;
     use num::integer::*;
     use num::bigint::{BigUint, ToBigUint, ToBigInt};
-    use num::{Zero, One, FromPrimitive};
-    use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone};
+    use num::{Zero, One, FromPrimitive, abs};
+    use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone, truncate_local};
     use serde::{Serialize, Deserialize, Serializer};
     use std::ops::{Add, Mul};
+    use std::net::TcpStream;
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -100,7 +101,7 @@ pub mod protocol {
         let mut dummy_list = vec![Wrapping(0u64); binary_numbers.len()];
         let mut output = Vec::new();
         let mut binary_int_list = Vec::new();
-        for item in binary_numbers{
+        for item in binary_numbers {
             binary_int_list.push(Wrapping(*item as u64));
         }
         if ctx.asymmetric_bit == 1 {
@@ -128,35 +129,35 @@ pub mod protocol {
     }
 
     /* computed the dp modulo 2^64 of two vectors with pre/post truncation options */
-    //    pub fn dot_product(x_list: &Vec<Wrapping<u64>>,
-//                       y_list: &Vec<Wrapping<u64>>,
-//                       ctx: &mut ComputingParty,
-//                       decimal_precision: u32,
-//                       truncate: bool,
-//                       pretruncate: bool) -> Wrapping<u64> {
-//
-//        //println!("entering dot product");
-//        let z_list = batch_multiply(x_list, y_list, ctx);
-//
-//        if !truncate {
-//            return z_list.iter().sum();
-//        }
-//
-//        if !pretruncate {
-//            return utility::truncate_local(
-//                z_list.iter().sum(), decimal_precision, (*ctx).asymmetric_bit,
-//            );
-//        }
-//
-//
-//        let mut z_trunc_list = vec![Wrapping(0); z_list.len()];
-//        for i in 0..z_list.len() {
-//            z_trunc_list[i] = utility::truncate_local(
-//                z_list[i], decimal_precision, (*ctx).asymmetric_bit,
-//            );
-//        }
-//        z_trunc_list.iter().sum()
-//    }
+    pub fn dot_product(x_list: &Vec<Wrapping<u64>>,
+                       y_list: &Vec<Wrapping<u64>>,
+                       ctx: &mut ComputingParty,
+                       decimal_precision: u32,
+                       truncate: bool,
+                       pretruncate: bool) -> Wrapping<u64> {
+
+        //println!("entering dot product");
+        let z_list = batch_multiply(x_list, y_list, ctx);
+
+        if !truncate {
+            return z_list.iter().sum();
+        }
+
+        if !pretruncate {
+            return truncate_local(
+                z_list.iter().sum(), decimal_precision, (*ctx).asymmetric_bit,
+            );
+        }
+
+
+        let mut z_trunc_list = vec![Wrapping(0); z_list.len()];
+        for i in 0..z_list.len() {
+            z_trunc_list[i] = truncate_local(
+                z_list[i], decimal_precision, (*ctx).asymmetric_bit,
+            );
+        }
+        z_trunc_list.iter().sum()
+    }
 
     pub fn batch_multiply_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty) -> Vec<BigUint> {
         let mut result = vec![BigUint::zero(); x_list.len()];
@@ -359,5 +360,74 @@ pub mod protocol {
         }
 
         z_list
+    }
+
+    pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+        let mut input_shares = Vec::new();
+//        let mut d_shares = Vec::new();
+//        let mut e_shares = Vec::new();
+//        let mut c_shares = Vec::new();
+        let mut y_shares = Vec::new();
+        let mut x_shares = Vec::new();
+        let binary_str = format!("{:b}", input);
+        let input_binary_str_vec: Vec<&str> = binary_str.split("").collect();
+        let mut temp:Vec<u64> = Vec::new();
+        for item in input_binary_str_vec {
+            temp.push(item.parse::<u64>().unwrap());
+        }
+        let bit_length = ctx.dt_training.bit_length as usize;
+        let mut temp0 = vec![0u64; bit_length];
+        let diff = abs(bit_length as isize - temp.len() as isize);
+        for i in 0..diff {
+            temp.push(0);
+        }
+        // hard-coded for two-party
+        for i in 0..2 {
+            if i == ctx.party_id {
+                input_shares.push(&temp);
+            } else {
+                input_shares.push(&temp0);
+            }
+        }
+        //initY in Java Lynx
+        for i in 0..bit_length {
+            let y = input_shares[0][i] + input_shares[1][i];
+            y_shares.push(mod_floor(y, BINARY_PRIME as u64));
+        }
+        x_shares.push(Wrapping(y_shares[0]));
+
+        //bitMultiplication in Java Lynx
+
+
+        x_shares
+    }
+
+    pub fn multiplication_byte(x: u64, y: u64, ctx: &mut ComputingParty, ti_share_index: usize) -> u64 {
+        let mut diff_list = Vec::new();
+        let ti_share_triple = ctx.dt_shares.binary_triples[ti_share_index];
+        diff_list.push(mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0 as u64)).0, BINARY_PRIME as u64));
+        diff_list.push(mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1 as u64)).0, BINARY_PRIME as u64));
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+        o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+
+        let mut reader = BufReader::new(in_stream);
+        let mut diff_list_message = String::new();
+        reader.read_line(&mut diff_list_message).expect("multiplication_byte: fail to read diff list message");
+        let diff_list: Vec<Wrapping<u64>> = serde_json::from_str(&diff_list_message).unwrap();
+        let mut d: u64 = 0;
+        let mut e: u64 = 0;
+        d += diff_list[0].0;
+        e += diff_list[1].0;
+        d = mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0 as u64) + Wrapping(d)).0, BINARY_PRIME as u64);
+        e = mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1 as u64) + Wrapping(e)).0, BINARY_PRIME as u64);
+
+        let mut result: u64 = (Wrapping(ti_share_triple.2 as u64) + (Wrapping(d) * Wrapping(ti_share_triple.1 as u64)) + (Wrapping(ti_share_triple.0 as u64) * Wrapping(e))
+            + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u64))).0;
+        result = mod_floor(result, BINARY_PRIME as u64);
+        result
     }
 }

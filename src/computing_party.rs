@@ -19,6 +19,7 @@ pub mod computing_party {
     pub struct ComputingParty {
         /* options */
         pub debug_output: bool,
+        pub decimal_precision: u32,
 
         /* network */
         pub party_id: u8,
@@ -58,6 +59,7 @@ pub mod computing_party {
         fn clone(&self) -> Self {
             ComputingParty {
                 debug_output: self.debug_output,
+                decimal_precision: self.decimal_precision,
                 party_id: self.party_id,
                 ti_ip: self.ti_ip.clone(),
                 ti_port0: self.ti_port0,
@@ -465,6 +467,7 @@ pub mod computing_party {
 
         ComputingParty {
             debug_output,
+            decimal_precision,
             party_id,
             ti_ip,
             ti_port0,
