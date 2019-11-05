@@ -13,7 +13,7 @@ pub mod protocol {
     use num::integer::*;
     use num::bigint::{BigUint, ToBigUint, ToBigInt};
     use num::{Zero, One, FromPrimitive, abs};
-    use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone, truncate_local};
+    use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone, truncate_local, increment_current_share_index, ShareType};
     use serde::{Serialize, Deserialize, Serializer};
     use std::ops::{Add, Mul};
     use std::net::TcpStream;
@@ -362,21 +362,21 @@ pub mod protocol {
         z_list
     }
 
-    pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+    pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty) -> Vec<u8> {
         let mut input_shares = Vec::new();
-//        let mut d_shares = Vec::new();
-//        let mut e_shares = Vec::new();
-//        let mut c_shares = Vec::new();
+        let mut d_shares = Vec::new();
+        let mut e_shares = Vec::new();
+        let mut c_shares = Vec::new();
         let mut y_shares = Vec::new();
         let mut x_shares = Vec::new();
         let binary_str = format!("{:b}", input);
         let input_binary_str_vec: Vec<&str> = binary_str.split("").collect();
-        let mut temp:Vec<u64> = Vec::new();
+        let mut temp: Vec<u8> = Vec::new();
         for item in input_binary_str_vec {
-            temp.push(item.parse::<u64>().unwrap());
+            temp.push(item.parse::<u8>().unwrap());
         }
         let bit_length = ctx.dt_training.bit_length as usize;
-        let mut temp0 = vec![0u64; bit_length];
+        let mut temp0 = vec![0u8; bit_length];
         let diff = abs(bit_length as isize - temp.len() as isize);
         for i in 0..diff {
             temp.push(0);
@@ -392,21 +392,64 @@ pub mod protocol {
         //initY in Java Lynx
         for i in 0..bit_length {
             let y = input_shares[0][i] + input_shares[1][i];
-            y_shares.push(mod_floor(y, BINARY_PRIME as u64));
+            y_shares.push(mod_floor(y, BINARY_PRIME as u8));
         }
-        x_shares.push(Wrapping(y_shares[0]));
+        x_shares.push(y_shares[0]);
 
-        //bitMultiplication in Java Lynx
+        //bit_multiplication in Java Lynx
+        let first_c_share = multiplication_byte(input_shares[0][0], input_shares[1][0], ctx);
+        increment_current_share_index(ctx, ShareType::BinaryShare);
+        c_shares.push(mod_floor(first_c_share, BINARY_PRIME as u8));
 
+        //computeDShares in Java Lynx
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut i = 0;
+        let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+        let mut batch_count = 0;
+        while i < bit_length {
+            let mut output_map = Arc::clone(&output_map);
+            let to_index = min(i + ctx.batch_size, bit_length);
+            let mut ctx_copied = ctx.clone();
+            let mut x_list = x_list.clone();
+            let mut y_list = y_list.clone();
+            thread_pool.execute(move || {
+                let mut batch_mul_result = batch_multiplication_byte(&input_shares[0][i..to_index].to_vec(), &input_shares[1][i..to_index].to_vec(), &mut ctx_copied);
+                let mut output_map = output_map.lock().unwrap();
+                (*output_map).insert(batch_count, batch_mul_result);
+            });
+            i += ctx.batch_size;
+            batch_count += 1;
+        }
+        thread_pool.join();
+        let output_map = &(*(output_map.lock().unwrap()));
+        let mut global_index = 0;
+        for i in 0..batch_count {
+            let batch_result = output_map.get(&i).unwrap();
+            for item in batch_result.iter() {
+                d_shares.push(mod_floor(item + ctx.asymmetric_bit, BINARY_PRIME as u8));
+                global_index += 1;
+            }
+        }
 
+        for i  in 0..bit_length{
+            //computeVariables
+            let e_result = multiplication_byte(y_shares[i],c_shares[i-1],ctx)+ctx.asymmetric_bit;
+            e_shares[i] = mod_floor(e_result,BINARY_PRIME as u8);
+            let x_result =  y_shares[i]+c_shares[i-1];
+            x_shares[i] = mod_floor(x_result,BINARY_PRIME as u8);
+        }
         x_shares
     }
 
-    pub fn multiplication_byte(x: u64, y: u64, ctx: &mut ComputingParty, ti_share_index: usize) -> u64 {
+
+    pub fn multiplication_byte(x: u8, y: u8, ctx: &mut ComputingParty) -> u8 {
         let mut diff_list = Vec::new();
+        let ti_share_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
         let ti_share_triple = ctx.dt_shares.binary_triples[ti_share_index];
-        diff_list.push(mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0 as u64)).0, BINARY_PRIME as u64));
-        diff_list.push(mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1 as u64)).0, BINARY_PRIME as u64));
+        diff_list.push(mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0)).0, BINARY_PRIME as u8));
+        diff_list.push(mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1)).0, BINARY_PRIME as u8));
+        increment_current_share_index(ctx, ShareType::BinaryShare);
+
         let mut in_stream = ctx.in_stream.try_clone()
             .expect("failed cloning tcp o_stream");
 
@@ -417,17 +460,59 @@ pub mod protocol {
         let mut reader = BufReader::new(in_stream);
         let mut diff_list_message = String::new();
         reader.read_line(&mut diff_list_message).expect("multiplication_byte: fail to read diff list message");
-        let diff_list: Vec<Wrapping<u64>> = serde_json::from_str(&diff_list_message).unwrap();
-        let mut d: u64 = 0;
-        let mut e: u64 = 0;
-        d += diff_list[0].0;
-        e += diff_list[1].0;
-        d = mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0 as u64) + Wrapping(d)).0, BINARY_PRIME as u64);
-        e = mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1 as u64) + Wrapping(e)).0, BINARY_PRIME as u64);
+        let diff_list: Vec<u8> = serde_json::from_str(&diff_list_message).unwrap();
+        let mut d: u8 = 0;
+        let mut e: u8 = 0;
+        d = (Wrapping(d) + Wrapping(diff_list[0])).0;
+        e = (Wrapping(e) + Wrapping(diff_list[1])).0;
+        d = mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0 as u64) + Wrapping(d)).0, BINARY_PRIME as u8);
+        e = mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1 as u64) + Wrapping(e)).0, BINARY_PRIME as u8);
 
-        let mut result: u64 = (Wrapping(ti_share_triple.2 as u64) + (Wrapping(d) * Wrapping(ti_share_triple.1 as u64)) + (Wrapping(ti_share_triple.0 as u64) * Wrapping(e))
-            + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u64))).0;
-        result = mod_floor(result, BINARY_PRIME as u64);
+        let mut result: u8 = (Wrapping(ti_share_triple.2 as u8) + (Wrapping(d) * Wrapping(ti_share_triple.1 as u8)) + (Wrapping(ti_share_triple.0 as u8) * Wrapping(e))
+            + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u8))).0;
+        result = mod_floor(result, BINARY_PRIME as u8);
         result
+    }
+
+    pub fn batch_multiplication_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
+        let batch_size = x_list.len();
+        let mut diff_list = Vec::new();
+        let mut output = Vec::new();
+
+        for i in 0..batch_size {
+            let mut new_row = Vec::new();
+            let ti_share_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
+            let ti_share_triple = ctx.dt_shares.binary_triples[ti_share_index];
+            new_row.push(mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0)).0, BINARY_PRIME as u8));
+            new_row.push(mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1)).0, BINARY_PRIME as u8));
+            diff_list.push(new_row);
+            increment_current_share_index(ctx, ShareType::BinaryShare);
+        }
+
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+        o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+
+        let mut reader = BufReader::new(in_stream);
+        let mut diff_list_message = String::new();
+        reader.read_line(&mut diff_list_message).expect("multiplication_byte: fail to read diff list message");
+        let diff_list: Vec<Vec<u8>> = serde_json::from_str(&diff_list_message).unwrap();
+        for item in diff_list {
+            let mut d: u8 = 0;
+            let mut e: u8 = 0;
+            d = (Wrapping(d) + Wrapping(item[0])).0;
+            e = (Wrapping(e) + Wrapping(item[1])).0;
+            d = mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0 as u64) + Wrapping(d)).0, BINARY_PRIME as u8);
+            e = mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1 as u64) + Wrapping(e)).0, BINARY_PRIME as u8);
+
+            let mut result: u8 = (Wrapping(ti_share_triple.2 as u8) + (Wrapping(d) * Wrapping(ti_share_triple.1 as u8)) + (Wrapping(ti_share_triple.0 as u8) * Wrapping(e))
+                + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u8))).0;
+            result = mod_floor(result, BINARY_PRIME as u8);
+            output.push(result);
+        }
+        output
     }
 }

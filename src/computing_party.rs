@@ -1,5 +1,6 @@
 pub mod computing_party {
     extern crate num;
+
     use std::num::Wrapping;
     use std::net::{TcpStream, SocketAddr, TcpListener};
     use std::fs::File;
@@ -9,6 +10,7 @@ pub mod computing_party {
     use crate::decision_tree::decision_tree::{DecisionTreeData, DecisionTreeTraining, DecisionTreeShares, DecisionTreeTIShareMessage};
     use num::bigint::{BigUint, BigInt, ToBigUint, ToBigInt};
     use std::str::FromStr;
+    use std::sync::{Arc, Mutex};
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -76,13 +78,13 @@ pub mod computing_party {
 
                 dt_data: self.dt_data.clone(),
                 dt_training: self.dt_training.clone(),
-                dt_shares:self.dt_shares.clone(),
+                dt_shares: self.dt_shares.clone(),
 
                 thread_count: self.thread_count,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
 
-                tree_training_batch_size: self.tree_training_batch_size
+                tree_training_batch_size: self.tree_training_batch_size,
             }
         }
     }
@@ -183,7 +185,7 @@ pub mod computing_party {
             attr_values_bytes,
             class_values_bytes,
             attr_values_big_integer: vec![],
-            class_values_big_integer: vec![]
+            class_values_big_integer: vec![],
         }
     }
 
@@ -491,8 +493,12 @@ pub mod computing_party {
                 additive_triples: vec![],
                 additive_bigint_triples: vec![],
                 binary_triples: vec![],
-                equality_shares: vec![]
-            }
+                equality_shares: vec![],
+                current_additive_index: Arc::new(Mutex::new(0 as usize)),
+                current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
+                current_equality_index: Arc::new(Mutex::new(0 as usize)),
+                current_binary_index: Arc::new(Mutex::new(0 as usize)),
+            },
         }
     }
 
@@ -622,6 +628,10 @@ pub mod computing_party {
             additive_bigint_triples,
             binary_triples,
             equality_shares,
+            current_additive_index: Arc::new(Mutex::new(0 as usize)),
+            current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
+            current_equality_index: Arc::new(Mutex::new(0 as usize)),
+            current_binary_index: Arc::new(Mutex::new(0 as usize)),
         }
 //
 //

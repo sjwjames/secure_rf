@@ -3,6 +3,7 @@ pub mod utils {
     use num::integer::*;
     use std::ops::Sub;
     use std::num::Wrapping;
+    use crate::computing_party::computing_party::ComputingParty;
 
     pub fn big_uint_subtract(x: &BigUint, y: &BigUint, big_int_prime: &BigUint) -> BigUint {
         let result = x.to_bigint().unwrap().sub(y.to_bigint().unwrap()).mod_floor(&(big_int_prime.to_bigint().unwrap())).to_biguint().unwrap();
@@ -30,5 +31,34 @@ pub mod utils {
         }
 
         Wrapping(x.0 >> decimal_precision)
+    }
+
+    pub enum ShareType {
+        AdditiveShare,
+        AdditiveBigIntShare,
+        BinaryShare,
+        EqualityShare,
+    }
+
+    pub fn increment_current_share_index(ctx: &mut ComputingParty, share_type: ShareType) {
+
+        match share_type {
+            ShareType::AdditiveShare => {
+                let mut count = ctx.dt_shares.current_additive_index.lock().unwrap();
+                *count+=1;
+            }
+            ShareType::AdditiveBigIntShare => {
+                let mut count = ctx.dt_shares.current_additive_bigint_index.lock().unwrap();
+                *count+=1;
+            }
+            ShareType::BinaryShare => {
+                let mut count = ctx.dt_shares.current_binary_index.lock().unwrap();
+                *count+=1;
+            }
+            ShareType::EqualityShare => {
+                let mut count = ctx.dt_shares.current_equality_index.lock().unwrap();
+                *count+=1;
+            }
+        }
     }
 }

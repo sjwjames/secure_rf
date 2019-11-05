@@ -43,6 +43,10 @@ pub mod decision_tree {
         pub additive_bigint_triples: Vec<(BigUint, BigUint, BigUint)>,
         pub binary_triples: Vec<(u8, u8, u8)>,
         pub equality_shares: Vec<(BigUint)>,
+        pub current_additive_index:Arc<Mutex<usize>>,
+        pub current_additive_bigint_index:Arc<Mutex<usize>>,
+        pub current_equality_index:Arc<Mutex<usize>>,
+        pub current_binary_index:Arc<Mutex<usize>>,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -120,6 +124,10 @@ pub mod decision_tree {
                 additive_bigint_triples,
                 binary_triples,
                 equality_shares,
+                current_additive_index: Arc::clone(&self.current_additive_index),
+                current_additive_bigint_index: Arc::clone(&self.current_additive_bigint_index),
+                current_equality_index: Arc::clone(&self.current_equality_index),
+                current_binary_index: Arc::clone(&self.current_binary_index)
             }
         }
     }
