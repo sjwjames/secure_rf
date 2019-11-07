@@ -516,7 +516,7 @@ pub mod protocol {
         output
     }
 
-    pub fn arg_max(bit_shares: Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
+    pub fn arg_max(bit_shares: Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u64> {
         let number_count = bit_shares.len();
         let mut bit_length = 0;
         bit_shares.iter().map(|x| bit_length = max(bit_length, x.len()));
@@ -526,8 +526,58 @@ pub mod protocol {
         }
         let mut result = Vec::new();
         if number_count == 1 {
-            result.push(1 as u8);
-        } else {}
+            result.push(1 as u64);
+        } else {
+            //computeComparisons in JAVA Lynx
+            let ti_count = 2 * bit_length + (bit_length * (bit_length - 1) / 2);
+            let thread_pool = ThreadPool::new(ctx.thread_count);
+            let mut output_map = Arc::new(Mutex::new((HashMap::new())));
+            let mut key = 0;
+            for i in 0..number_count {
+                for j in 0..number_count {
+                    if i != j {
+                        let mut output_map = Arc::clone(&output_map);
+                        let mut ctx_copied = ctx.clone();
+                        let mut bit_shares = bit_shares.clone();
+                        thread_pool.execute(move||{
+                            key = i * number_count + j;
+                            let comparison_result=comparison(&bit_shares[i],&bit_shares[j],&mut ctx_copied);
+                            let mut output_map = &*(output_map.lock().unwrap());
+                            output_map.insert(key,comparison_result);
+                        });
+                    }
+                }
+            }
+
+            let output_map = &*(output_map.lock().unwrap());
+            for i in 0.. number_count*(number_count-1){
+                let comparison= output_map.get(&i).unwrap();
+                let key = i/(number_count-1);
+                w_intermediate.get(&key).unwrap().push(comparison);
+            }
+
+            let mut output_map = Arc::new(Mutex::new((HashMap::new())));
+            //multi-threaded parallel multiplication
+            for i in 0..number_count{
+                let mut vec = Vec::new();
+                for item in w_intermediate.get(&i).unwrap(){
+                    vec.push(item as u64);
+                }
+                let mut output_map = Arc::clone(&output_map);
+                let mut ctx_copied = ctx.clone();
+                thread_pool.execute(move||{
+                    let multi_result = parallel_multiplication(&vec,&mut ctx_copied);
+                    let mut output_map = &*(output_map.lock().unwrap());
+                    output_map.insert(i,multi_result);
+                });
+            }
+
+            let output_map = &*(output_map.lock().unwrap());
+            for i in 0..number_count{
+                let multi_result = output_map.get(&i).unwrap();
+                result[i] = *multi_result;
+            }
+        }
         result
     }
 
@@ -638,7 +688,27 @@ pub mod protocol {
         w
     }
 
-    pub fn parallel_multiplication() {}
+    pub fn parallel_multiplication(row: &Vec<u64>, ctx: &mut ComputingParty) -> u64 {
+        let mut products = row.clone();
+        while products.len() > 1 {
+            let size = products.len();
+            let mut push = -1;
+            let to_index1 = size / 2;
+            let to_index2 = size;
+            if size % 2 == 1 {
+                to_index2 -= 1;
+                push = products[size - 1];
+            }
+            let thread_pool = ThreadPool::new(ctx.thread_count);
+            let i1 = 0;
+            let i2 = to_index1;
+            while i1 < to_index1 && i2 < to_index2 {
+                let temp_index1 = min(i1 + ctx.batch_size, to_index1);
+                let temp_index2 = min(i2 + ctx.batch_size, to_index2);
+            }
+        }
+        products[0]
+    }
 
     pub fn dot_product_bigint() {}
 
