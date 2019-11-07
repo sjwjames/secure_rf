@@ -539,41 +539,41 @@ pub mod protocol {
                         let mut output_map = Arc::clone(&output_map);
                         let mut ctx_copied = ctx.clone();
                         let mut bit_shares = bit_shares.clone();
-                        thread_pool.execute(move||{
+                        thread_pool.execute(move || {
                             key = i * number_count + j;
-                            let comparison_result=comparison(&bit_shares[i],&bit_shares[j],&mut ctx_copied);
+                            let comparison_result = comparison(&bit_shares[i], &bit_shares[j], &mut ctx_copied);
                             let mut output_map = &*(output_map.lock().unwrap());
-                            output_map.insert(key,comparison_result);
+                            output_map.insert(key, comparison_result);
                         });
                     }
                 }
             }
 
             let output_map = &*(output_map.lock().unwrap());
-            for i in 0.. number_count*(number_count-1){
-                let comparison= output_map.get(&i).unwrap();
-                let key = i/(number_count-1);
+            for i in 0..number_count * (number_count - 1) {
+                let comparison = output_map.get(&i).unwrap();
+                let key = i / (number_count - 1);
                 w_intermediate.get(&key).unwrap().push(comparison);
             }
 
             let mut output_map = Arc::new(Mutex::new((HashMap::new())));
             //multi-threaded parallel multiplication
-            for i in 0..number_count{
+            for i in 0..number_count {
                 let mut vec = Vec::new();
-                for item in w_intermediate.get(&i).unwrap(){
+                for item in w_intermediate.get(&i).unwrap() {
                     vec.push(item as u64);
                 }
                 let mut output_map = Arc::clone(&output_map);
                 let mut ctx_copied = ctx.clone();
-                thread_pool.execute(move||{
-                    let multi_result = parallel_multiplication(&vec,&mut ctx_copied);
+                thread_pool.execute(move || {
+                    let multi_result = parallel_multiplication(&vec, &mut ctx_copied);
                     let mut output_map = &*(output_map.lock().unwrap());
-                    output_map.insert(i,multi_result);
+                    output_map.insert(i, multi_result);
                 });
             }
 
             let output_map = &*(output_map.lock().unwrap());
-            for i in 0..number_count{
+            for i in 0..number_count {
                 let multi_result = output_map.get(&i).unwrap();
                 result[i] = *multi_result;
             }
@@ -710,7 +710,35 @@ pub mod protocol {
         products[0]
     }
 
-    pub fn dot_product_bigint() {}
+    pub fn dot_product_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty) -> BigUint {
+        let mut dot_product = BigUint::zero();
+        let vector_length = x_list.len();
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut i = 0;
+        let output_map = Arc::new(Mutex::new(HashMap::new()));
+        let mut batch_count = 0;
+        while i < vector_length {
+            let to_index = min(i + ctx.batch_size, vector_length);
+            let mut output_map = Arc::clone(&output_map);
+            let mut ctx_copied = ctx.clone();
+            thread_pool.execute(move || {
+                let multi_result = batch_multiply_bigint(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
+                let mut output_map = &*(output_map.lock().unwrap());
+                output_map.insert(batch_count, multi_result);
+            });
+            batch_count += 1;
+            i = to_index;
+        }
+
+        let output_map = &*(output_map.lock().unwrap());
+        for i in 0..batch_count{
+            let multi_result = output_map.get(&i).unwrap();
+            for item in multi_result{
+                dot_product = dot_product.add(item).mod_floor(&ctx.dt_training.big_int_prime);
+            }
+        }
+        dot_product
+    }
 
     pub fn multiplication_bigint() {}
 
