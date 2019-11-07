@@ -13,7 +13,7 @@ pub mod protocol {
     use num::integer::*;
     use num::bigint::{BigUint, ToBigUint, ToBigInt};
     use num::{Zero, One, FromPrimitive, abs};
-    use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone, truncate_local, increment_current_share_index, ShareType, serialize_biguint_vec, deserialize_biguint_vec};
+    use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone, truncate_local, increment_current_share_index, ShareType, serialize_biguint_vec, deserialize_biguint_vec, get_current_equality_share, get_current_bigint_share};
     use serde::{Serialize, Deserialize, Serializer};
     use std::net::TcpStream;
     use std::ops::{Add, Mul};
@@ -826,7 +826,34 @@ pub mod protocol {
         big_uint_clone(&products[0])
     }
 
-    pub fn equality_big_integer() {}
+    pub fn equality_big_integer(x:&BigUint,y:&BigUint,ctx:&mut ComputingParty)->BigUint {
+        let equality_share = get_current_equality_share(ctx);
+        let bigint_share = get_current_bigint_share(ctx);
+        let prime = &ctx.dt_training.big_int_prime;
+        let diff = big_uint_subtract(x,y,prime);
+        let mut diff_list = Vec::new();
+        diff_list.push(big_uint_subtract(&diff,&bigint_share.0,prime));
+        diff_list.push(big_uint_subtract(equality_share,&bigint_share.1,prime));
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut message = serialize_biguint_vec(diff_list);
+        o_stream.write((message + "\n").as_bytes());
+
+        let mut reader = BufReader::new(in_stream);
+        let mut diff_list_message = String::new();
+        reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
+
+        let mut diff_list = deserialize_biguint_vec(diff_list_message);
+
+        let  d = big_uint_subtract(&diff,&bigint_share.0,prime).add(&diff_list[0]).mod_floor(prime);
+        let  e = big_uint_subtract(&diff,&bigint_share.0,prime).add(&diff_list[0]).mod_floor(prime);
+        let product = bigint_share.2.add(d.mul(&bigint_share.1)).add(&bigint_share.0.mul(e)).add(d.mul(&e).mul(BigUint::from(ctx.asymmetric_bit)));
+        product
+    }
 
 
     fn multi_thread_batch_mul_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty, bit_length: usize) -> (u32, HashMap<u32, Vec<u8>>) {

@@ -65,20 +65,18 @@ pub mod utils {
         serde_json::to_string(&(num.to_bytes_le())).unwrap()
     }
 
-    pub fn deserialize_biguint(message:String)->BigUint{
+    pub fn deserialize_biguint(message: String) -> BigUint {
         BigUint::from_bytes_le(message.as_bytes())
     }
 
-    pub fn deserialize_biguint_vec(message:String)->Vec<BigUint>{
+    pub fn deserialize_biguint_vec(message: String) -> Vec<BigUint> {
         let mut result = Vec::new();
-        let str_vec:Vec<&str> = message.split(";").collect();
-        for item in str_vec{
+        let str_vec: Vec<&str> = message.split(";").collect();
+        for item in str_vec {
             result.push(deserialize_biguint(String::from_str(item)));
         }
         result
     }
-
-
 
 
     pub fn increment_current_share_index(ctx: &mut ComputingParty, share_type: ShareType) {
@@ -100,5 +98,22 @@ pub mod utils {
                 *count += 1;
             }
         }
+    }
+
+
+    pub fn get_current_bigint_share(ctx: &mut ComputingParty) -> &(BigUint, BigUint, BigUint) {
+        let bigint_shares = &ctx.dt_shares.additive_bigint_triples;
+        let current_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
+        let result = &bigint_shares[current_index];
+        increment_current_share_index(ctx, ShareType::AdditiveBigIntShare);
+        result
+    }
+
+    pub fn get_current_equality_share(ctx: &mut ComputingParty) -> &BigUint {
+        let shares = &ctx.dt_shares.equality_shares;
+        let current_index = *(ctx.dt_shares.current_equality_index.lock().unwrap());
+        let result = &shares[current_index];
+        increment_current_share_index(ctx, ShareType::EqualityShare);
+        result
     }
 }
