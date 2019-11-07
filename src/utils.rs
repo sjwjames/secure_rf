@@ -40,24 +40,64 @@ pub mod utils {
         EqualityShare,
     }
 
-    pub fn increment_current_share_index(ctx: &mut ComputingParty, share_type: ShareType) {
+    pub fn serialize_biguint_vec(biguint_vec: Vec<BigUint>) -> String {
+        let mut str_vec = Vec::new();
+        for item in biguint_vec.iter() {
+            str_vec.push(serialize_biguint(item));
+        }
+        str_vec.join(";")
+    }
 
+    pub fn serialize_biguint_triple_vec(biguint_triple_vec: Vec<(BigUint, BigUint, BigUint)>) -> String {
+        let mut str_vec: Vec<String> = Vec::new();
+        for item in biguint_triple_vec.iter() {
+            let mut tuple_vec = Vec::new();
+            tuple_vec.push(serialize_biguint(&item.0));
+            tuple_vec.push(serialize_biguint(&item.1));
+            tuple_vec.push(serialize_biguint(&item.2));
+            str_vec.push("(" + tuple_vec.join(",") + ")");
+        }
+        str_vec.join(";")
+    }
+
+
+    pub fn serialize_biguint(num: &BigUint) -> String {
+        serde_json::to_string(&(num.to_bytes_le())).unwrap()
+    }
+
+    pub fn deserialize_biguint(message:String)->BigUint{
+        BigUint::from_bytes_le(message.as_bytes())
+    }
+
+    pub fn deserialize_biguint_vec(message:String)->Vec<BigUint>{
+        let mut result = Vec::new();
+        let str_vec:Vec<&str> = message.split(";").collect();
+        for item in str_vec{
+            result.push(deserialize_biguint(String::from_str(item)));
+        }
+        result
+    }
+
+
+
+
+    pub fn increment_current_share_index(ctx: &mut ComputingParty, share_type: ShareType) {
         match share_type {
             ShareType::AdditiveShare => {
                 let mut count = ctx.dt_shares.current_additive_index.lock().unwrap();
-                *count+=1;
+                *count += 1;
             }
             ShareType::AdditiveBigIntShare => {
                 let mut count = ctx.dt_shares.current_additive_bigint_index.lock().unwrap();
-                *count+=1;
+                *count += 1;
             }
             ShareType::BinaryShare => {
                 let mut count = ctx.dt_shares.current_binary_index.lock().unwrap();
-                *count+=1;
+                *count += 1;
             }
             ShareType::EqualityShare => {
                 let mut count = ctx.dt_shares.current_equality_index.lock().unwrap();
-                *count+=1;
+                *count += 1;
             }
         }
     }

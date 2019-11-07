@@ -13,10 +13,10 @@ pub mod protocol {
     use num::integer::*;
     use num::bigint::{BigUint, ToBigUint, ToBigInt};
     use num::{Zero, One, FromPrimitive, abs};
-    use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone, truncate_local, increment_current_share_index, ShareType};
+    use crate::utils::utils::{big_uint_subtract, big_uint_vec_clone, big_uint_clone, truncate_local, increment_current_share_index, ShareType, serialize_biguint_vec, deserialize_biguint_vec};
     use serde::{Serialize, Deserialize, Serializer};
-    use std::ops::{Add, Mul};
     use std::net::TcpStream;
+    use std::ops::{Add, Mul};
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -740,7 +740,46 @@ pub mod protocol {
         dot_product
     }
 
-    pub fn multiplication_bigint() {}
+    pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
+        let ti_shares = &ctx.dt_shares.additive_bigint_triples;
+        let mut current_index = &*(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
+        let share = &ti_shares[*current_index];
+        *current_index += 1;
+
+        let mut diff_list = Vec::new();
+        diff_list.push(big_uint_subtract(x, &share.0, &ctx.dt_training.big_int_prime));
+        diff_list.push(big_uint_subtract(y, &share.1, &ctx.dt_training.big_int_prime));
+
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut message = serialize_biguint_vec(diff_list);
+        o_stream.write((message + "\n").as_bytes());
+
+        let mut reader = BufReader::new(in_stream);
+        let mut diff_list_message = String::new();
+        reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
+
+        let mut diff_list = deserialize_biguint_vec(diff_list_message);
+        let mut d = BigUint::zero();
+        let mut e = BigUint::zero();
+        let prime = &ctx.dt_training.big_int_prime;
+        d = d.add(&diff_list[0]).mod_floor(prime);
+        e = e.add(&diff_list[1]).mod_floor(prime);
+        let ti_share_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
+        let share = &ctx.dt_shares.additive_bigint_triples[ti_share_index];
+        ti_share_index += 1;
+        d = big_uint_subtract(x, &share.0, prime).add(&d).mod_floor(&ctx.dt_training.big_int_prime);
+        e = big_uint_subtract(y, &share.1, prime).add(&e).mod_floor(&ctx.dt_training.big_int_prime);
+
+        let product = share.2.add(&d.mul(&share.1).mod_floor(prime)).mod_floor(prime)
+            .add(&e.mul(&share.0).mod_floor(prime)).mod_floor(prime)
+            .add(&d.mul(&e).mod_floor(prime).mul(BigUint::from(ctx.asymmetric_bit)).mod_floor(prime)).mod_floor(prime);
+        product
+    }
 
     pub fn parallel_multiplication_big_integer(row: &Vec<BigUint>, ctx: &mut ComputingParty) -> BigUint {
         let mut products = big_uint_vec_clone(row);
@@ -766,7 +805,7 @@ pub mod protocol {
                 thread_pool.execute(move || {
                     let multi_result = batch_multiply_bigint(&products[i1..temp_index1].to_vec(), &products[i2..temp_index2].to_vec(), &mut ctx_copied);
                     let mut output_map = &*(output_map.lock().unwrap());
-                    output_map.insert(batch_count,multi_result);
+                    output_map.insert(batch_count, multi_result);
                 });
                 i1 = temp_index1;
                 i2 = temp_index2;
@@ -774,13 +813,13 @@ pub mod protocol {
             }
             let mut new_products = Vec::new();
             let mut output_map = &*(output_map.lock().unwrap());
-            for i in 0..batch_count{
+            for i in 0..batch_count {
                 let multi_result = output_map.get(&i).unwrap();
                 new_products.append(&multi_result);
             }
             products.clear();
             products = big_uint_vec_clone(&new_products);
-            if !push.eq(&BigUint::from_i32(-1).unwrap()){
+            if !push.eq(&BigUint::from_i32(-1).unwrap()) {
                 products.push(push);
             }
         }
