@@ -731,9 +731,9 @@ pub mod protocol {
         }
 
         let output_map = &*(output_map.lock().unwrap());
-        for i in 0..batch_count{
+        for i in 0..batch_count {
             let multi_result = output_map.get(&i).unwrap();
-            for item in multi_result{
+            for item in multi_result {
                 dot_product = dot_product.add(item).mod_floor(&ctx.dt_training.big_int_prime);
             }
         }
@@ -742,7 +742,50 @@ pub mod protocol {
 
     pub fn multiplication_bigint() {}
 
-    pub fn parallel_multiplication_big_integer() {}
+    pub fn parallel_multiplication_big_integer(row: &Vec<BigUint>, ctx: &mut ComputingParty) -> BigUint {
+        let mut products = big_uint_vec_clone(row);
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        while products.len() > 1 {
+            let size = products.len();
+            let mut push = BigUint::from_i32(-1).unwrap();
+            let to_index1 = size / 2;
+            let to_index2 = size;
+            if size % 2 == 1 {
+                to_index2 -= 1;
+                push = BigUint::from(&products[size - 1]);
+            }
+            let mut i1 = 0;
+            let mut i2 = to_index1;
+            let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+            let mut batch_count = 0;
+            while i1 < to_index1 && i2 < to_index2 {
+                let temp_index1 = min(i1 + ctx.batch_size, to_index1);
+                let temp_index2 = min(i2 + ctx.batch_size, to_index2);
+                let mut output_map = Arc::clone(&output_map);
+                let mut ctx_copied = ctx.clone();
+                thread_pool.execute(move || {
+                    let multi_result = batch_multiply_bigint(&products[i1..temp_index1].to_vec(), &products[i2..temp_index2].to_vec(), &mut ctx_copied);
+                    let mut output_map = &*(output_map.lock().unwrap());
+                    output_map.insert(batch_count,multi_result);
+                });
+                i1 = temp_index1;
+                i2 = temp_index2;
+                batch_count += 1;
+            }
+            let mut new_products = Vec::new();
+            let mut output_map = &*(output_map.lock().unwrap());
+            for i in 0..batch_count{
+                let multi_result = output_map.get(&i).unwrap();
+                new_products.append(&multi_result);
+            }
+            products.clear();
+            products = big_uint_vec_clone(&new_products);
+            if !push.eq(&BigUint::from_i32(-1).unwrap()){
+                products.push(push);
+            }
+        }
+        big_uint_clone(&products[0])
+    }
 
     pub fn equality_big_integer() {}
 
