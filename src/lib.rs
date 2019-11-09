@@ -10,3 +10,4 @@ pub mod or_xor;
 pub mod multiplication;
 pub mod dot_product;
 pub mod comparison;
+pub mod bit_decomposition;
