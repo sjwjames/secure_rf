@@ -305,62 +305,59 @@ pub mod multiplication{
 
         output
     }
-//
-//    pub fn parallel_multiplication(row: &Vec<u8>, ctx: &mut ComputingParty) -> u8 {
-//        let mut products = row.clone();
-//        let thread_pool = ThreadPool::new(ctx.thread_count);
-//
-//        while products.len() > 1 {
-//            let size = products.len();
-//            let mut push = -1;
-//            let to_index1 = size / 2;
-//            let to_index2 = size;
-//            if size % 2 == 1 {
-//                to_index2 -= 1;
-//                push = products[size - 1] as i8;
-//            }
-//            let mut i1 = 0;
-//            let mut i2 = to_index1;
-//            let mut batch_count = 0;
-//            let mut output_map = Arc::new(Mutex::new(HashMap::new()));
-//
-//            while i1 < to_index1 && i2 < to_index2 {
-//                let temp_index1 = min(i1 + ctx.batch_size, to_index1);
-//                let temp_index2 = min(i2 + ctx.batch_size, to_index2);
-//                let mut products_copied = products.clone();
-//                let mut output_map = Arc::clone(&output_map);
-//                let mut ctx_copied = ctx.clone();
-//
-//                thread_pool.execute(move || {
-//                    let mut batch_mul_result = batch_multiplication_byte(&products_copied[i1..temp_index1].to_vec(), &products_copied[i2..temp_index2].to_vec(), &mut ctx_copied);
-//                    let mut output_map = output_map.lock().unwrap();
-//                    (*output_map).insert(batch_count, batch_mul_result);
-//                });
-//                batch_count += 1;
-//                i1 = temp_index1;
-//                i2 = temp_index2;
-//            }
-//            thread_pool.join();
-//            let mut new_products = Vec::new();
-//            let mut output_map = &*(output_map.lock().unwrap());
-//            for i in 0..batch_count {
-//                let mut multi_result = output_map.get(&i).unwrap();
-//                new_products.append(&mut multi_result);
-//            }
-//            products.clear();
-//            products = new_products.clone();
-//            if push != -1 {
-//                products.push(push as u8);
-//            }
-//        }
-//        products[0]
-//    }
-//
+
+    pub fn parallel_multiplication(row: &Vec<u8>, ctx: &mut ComputingParty) -> u8 {
+        let mut products = row.clone();
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+
+        while products.len() > 1 {
+            let size = products.len();
+            let mut push = -1;
+            let mut to_index1 = size / 2;
+            let mut to_index2 = size;
+            if size % 2 == 1 {
+                to_index2 -= 1;
+                push = products[size - 1] as i8;
+            }
+            let mut i1 = 0;
+            let mut i2 = to_index1;
+            let mut batch_count = 0;
+            let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+
+            while i1 < to_index1 && i2 < to_index2 {
+                let temp_index1 = min(i1 + ctx.batch_size, to_index1);
+                let temp_index2 = min(i2 + ctx.batch_size, to_index2);
+                let mut products_copied = products.clone();
+                let mut output_map = Arc::clone(&output_map);
+                let mut ctx_copied = ctx.clone();
+
+                thread_pool.execute(move || {
+                    let mut batch_mul_result = batch_multiplication_byte(&products_copied[i1..temp_index1].to_vec(), &products_copied[i2..temp_index2].to_vec(), &mut ctx_copied);
+                    let mut output_map = output_map.lock().unwrap();
+                    (*output_map).insert(batch_count,batch_mul_result);
+                });
+                batch_count += 1;
+                i1 = temp_index1;
+                i2 = temp_index2;
+            }
+            thread_pool.join();
+            let mut new_products = Vec::new();
+            let mut output_map = &*(output_map.lock().unwrap());
+            for i in 0..batch_count {
+                let mut multi_result = (output_map.get(&i).unwrap()).clone();
+                new_products.append( &mut multi_result);
+            }
+            products.clear();
+            products = new_products.clone();
+            if push != -1 {
+                products.push(push as u8);
+            }
+        }
+        products[0]
+    }
+
 //    pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
-//        let ti_shares = &ctx.dt_shares.additive_bigint_triples;
-//        let mut current_index = &*(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
-//        let share = &ti_shares[*current_index];
-//        *current_index += 1;
+//        let share = get_current_bigint_share(ctx);
 //
 //        let mut diff_list = Vec::new();
 //        diff_list.push(big_uint_subtract(x, &share.0, &ctx.dt_training.big_int_prime));
