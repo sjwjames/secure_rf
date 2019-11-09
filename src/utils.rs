@@ -55,7 +55,7 @@ pub mod utils {
             tuple_vec.push(serialize_biguint(&item.0));
             tuple_vec.push(serialize_biguint(&item.1));
             tuple_vec.push(serialize_biguint(&item.2));
-            str_vec.push("(" + tuple_vec.join(",") + ")");
+            str_vec.push(format!("({})",tuple_vec.join(",")));
         }
         str_vec.join(";")
     }
@@ -65,7 +65,7 @@ pub mod utils {
         serde_json::to_string(&(num.to_bytes_le())).unwrap()
     }
 
-    pub fn deserialize_biguint(message: String) -> BigUint {
+    pub fn deserialize_biguint(message: &str) -> BigUint {
         BigUint::from_bytes_le(message.as_bytes())
     }
 
@@ -73,7 +73,7 @@ pub mod utils {
         let mut result = Vec::new();
         let str_vec: Vec<&str> = message.split(";").collect();
         for item in str_vec {
-            result.push(deserialize_biguint(String::from_str(item)));
+            result.push(deserialize_biguint(item));
         }
         result
     }

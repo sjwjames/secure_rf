@@ -298,6 +298,10 @@ pub mod ti {
                     additive_bigint_triples: additive_bigint_share0,
                     binary_triples: binary_triples0,
                     equality_shares: equality_bigint_share0,
+                    current_additive_index: Arc::new(Mutex::new(0)),
+                    current_additive_bigint_index: Arc::new(Mutex::new(0)),
+                    current_equality_index: Arc::new(Mutex::new(0)),
+                    current_binary_index: Arc::new(Mutex::new(0))
                 };
 
                 let mut share1 = DecisionTreeShares {
@@ -305,6 +309,10 @@ pub mod ti {
                     additive_bigint_triples: additive_bigint_share1,
                     binary_triples: binary_triples1,
                     equality_shares: equality_bigint_share1,
+                    current_additive_index: Arc::new(Mutex::new(0)),
+                    current_additive_bigint_index: Arc::new(Mutex::new(0)),
+                    current_equality_index: Arc::new(Mutex::new(0)),
+                    current_binary_index: Arc::new(Mutex::new(0))
                 };
                 let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
                 let sender_thread0 = thread::spawn(move || {
