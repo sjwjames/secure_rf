@@ -3,7 +3,7 @@ pub mod random_forest {
     use crate::decision_tree::decision_tree;
     use std::sync::{Arc, Mutex};
     use threadpool::ThreadPool;
-    use crate::protocol::protocol::{change_binary_to_decimal_field, change_binary_to_bigint_field};
+    use crate::field_change::field_change::{change_binary_to_bigint_field, change_binary_to_decimal_field};
 
     pub struct RandomForest {}
 

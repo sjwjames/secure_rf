@@ -1,7 +1,9 @@
 pub mod field_change{
     use crate::computing_party::computing_party::ComputingParty;
     use std::num::Wrapping;
-    use num::{BigUint, Zero, FromPrimitive};
+    use num::integer::*;
+    use num::bigint::{BigUint, ToBigUint, ToBigInt};
+    use num::{Zero, One, FromPrimitive, abs, BigInt};
     use crate::or_xor::or_xor::{or_xor, or_xor_bigint};
 
     pub fn change_binary_to_decimal_field(binary_numbers: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {

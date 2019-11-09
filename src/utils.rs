@@ -4,6 +4,7 @@ pub mod utils {
     use std::ops::Sub;
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
+    use std::sync::{Mutex, Arc};
 
     pub fn big_uint_subtract(x: &BigUint, y: &BigUint, big_int_prime: &BigUint) -> BigUint {
         let result = x.to_bigint().unwrap().sub(y.to_bigint().unwrap()).mod_floor(&(big_int_prime.to_bigint().unwrap())).to_biguint().unwrap();
@@ -79,33 +80,38 @@ pub mod utils {
     }
 
 
-    pub fn increment_current_share_index(ctx: &mut ComputingParty, share_type: ShareType) {
-        match share_type {
-            ShareType::AdditiveShare => {
-                let mut count = ctx.dt_shares.current_additive_index.lock().unwrap();
-                *count += 1;
-            }
-            ShareType::AdditiveBigIntShare => {
-                let mut count = ctx.dt_shares.current_additive_bigint_index.lock().unwrap();
-                *count += 1;
-            }
-            ShareType::BinaryShare => {
-                let mut count = ctx.dt_shares.current_binary_index.lock().unwrap();
-                *count += 1;
-            }
-            ShareType::EqualityShare => {
-                let mut count = ctx.dt_shares.current_equality_index.lock().unwrap();
-                *count += 1;
-            }
-        }
+//    pub fn increment_current_share_index(ctx: &mut ComputingParty, share_type: ShareType) {
+//        match share_type {
+//            ShareType::AdditiveShare => {
+//                let mut count = ctx.dt_shares.current_additive_index.lock().unwrap();
+//                *count += 1;
+//            }
+//            ShareType::AdditiveBigIntShare => {
+//                let mut count = ctx.dt_shares.current_additive_bigint_index.lock().unwrap();
+//                *count += 1;
+//            }
+//            ShareType::BinaryShare => {
+//                let mut count = ctx.dt_shares.current_binary_index.lock().unwrap();
+//                *count += 1;
+//            }
+//            ShareType::EqualityShare => {
+//                let mut count = ctx.dt_shares.current_equality_index.lock().unwrap();
+//                *count += 1;
+//            }
+//        }
+//    }
+
+    pub fn increment_current_share_index(index:Arc<Mutex<usize>>) {
+        let mut count = index.lock().unwrap();
+        *count += 1;
     }
 
 
     pub fn get_current_bigint_share(ctx: &mut ComputingParty) -> &(BigUint, BigUint, BigUint) {
-        let bigint_shares = &ctx.dt_shares.additive_bigint_triples;
+        let bigint_shares =  &ctx.dt_shares.additive_bigint_triples;
         let current_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
         let result = &bigint_shares[current_index];
-        increment_current_share_index(ctx, ShareType::AdditiveBigIntShare);
+        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_bigint_index));
         result
     }
 
@@ -113,7 +119,7 @@ pub mod utils {
         let shares = &ctx.dt_shares.equality_shares;
         let current_index = *(ctx.dt_shares.current_equality_index.lock().unwrap());
         let result = &shares[current_index];
-        increment_current_share_index(ctx, ShareType::EqualityShare);
+        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_equality_index));
         result
     }
 }

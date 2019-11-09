@@ -5,10 +5,11 @@ pub mod decision_tree {
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
     use crate::utils::utils::big_uint_clone;
-    use crate::protocol::protocol::{change_binary_to_decimal_field, dot_product};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
+//    use crate::dot_product::dot_product::dot_product;
+    use crate::field_change::field_change::change_binary_to_decimal_field;
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -137,29 +138,29 @@ pub mod decision_tree {
 
     fn id3_model() {}
 
-    fn find_common_class_index(subset_transaction_bit_vector: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
-        let mut subset_decimal = change_binary_to_decimal_field(subset_transaction_bit_vector, ctx);
-        let mut s = Vec::new();
-        let thread_pool = ThreadPool::new(ctx.thread_count);
-        let mut result = Vec::new();
-        let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
-        for i in 0..ctx.dt_data.class_value_count {
-            let mut dp_result_map = Arc::clone(&dp_result_map);
-            let mut ctx = ctx.clone();
-            let mut subset_decimal = subset_decimal.clone();
-            let mut class_value_transaction = ctx.dt_data.class_values.clone();
-            thread_pool.execute(move || {
-                let precision = ctx.decimal_precision;
-                let dp_result = dot_product(&subset_decimal,&class_value_transaction[i],&mut ctx,precision,true,false);
-                let mut dp_result_map = dp_result_map.lock().unwrap();
-                (*dp_result_map).insert(i,dp_result);
-            });
-        }
-        thread_pool.join();
-        let mut dp_result_map = &*(dp_result_map.lock().unwrap());
-        for i in 0..ctx.dt_data.class_value_count{
-            s.push(dp_result_map.get(&i).unwrap());
-        }
-        result
-    }
+//    fn find_common_class_index(subset_transaction_bit_vector: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
+//        let mut subset_decimal = change_binary_to_decimal_field(subset_transaction_bit_vector, ctx);
+//        let mut s = Vec::new();
+//        let thread_pool = ThreadPool::new(ctx.thread_count);
+//        let mut result = Vec::new();
+//        let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
+//        for i in 0..ctx.dt_data.class_value_count {
+//            let mut dp_result_map = Arc::clone(&dp_result_map);
+//            let mut ctx = ctx.clone();
+//            let mut subset_decimal = subset_decimal.clone();
+//            let mut class_value_transaction = ctx.dt_data.class_values.clone();
+//            thread_pool.execute(move || {
+//                let precision = ctx.decimal_precision;
+//                let dp_result = dot_product(&subset_decimal,&class_value_transaction[i],&mut ctx,precision,true,false);
+//                let mut dp_result_map = dp_result_map.lock().unwrap();
+//                (*dp_result_map).insert(i,dp_result);
+//            });
+//        }
+//        thread_pool.join();
+//        let mut dp_result_map = &*(dp_result_map.lock().unwrap());
+//        for i in 0..ctx.dt_data.class_value_count{
+//            s.push(dp_result_map.get(&i).unwrap());
+//        }
+//        result
+//    }
 }
