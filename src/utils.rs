@@ -107,7 +107,7 @@ pub mod utils {
     }
 
 
-    pub fn get_current_bigint_share(ctx: &mut ComputingParty) -> &(BigUint, BigUint, BigUint) {
+    pub fn get_current_bigint_share(ctx: &ComputingParty) -> &(BigUint, BigUint, BigUint) {
         let bigint_shares =  &ctx.dt_shares.additive_bigint_triples;
         let current_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
         let result = &bigint_shares[current_index];
@@ -115,7 +115,7 @@ pub mod utils {
         result
     }
 
-    pub fn get_current_equality_share(ctx: &mut ComputingParty) -> &BigUint {
+    pub fn get_current_equality_share(ctx: &ComputingParty) -> &BigUint {
         let shares = &ctx.dt_shares.equality_shares;
         let current_index = *(ctx.dt_shares.current_equality_index.lock().unwrap());
         let result = &shares[current_index];

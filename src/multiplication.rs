@@ -356,89 +356,90 @@ pub mod multiplication{
         products[0]
     }
 
-//    pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
-//        let share = get_current_bigint_share(ctx);
-//
-//        let mut diff_list = Vec::new();
-//        diff_list.push(big_uint_subtract(x, &share.0, &ctx.dt_training.big_int_prime));
-//        diff_list.push(big_uint_subtract(y, &share.1, &ctx.dt_training.big_int_prime));
-//
-//        let mut in_stream = ctx.in_stream.try_clone()
-//            .expect("failed cloning tcp o_stream");
-//
-//        let mut o_stream = ctx.o_stream.try_clone()
-//            .expect("failed cloning tcp o_stream");
-//
-//        let mut message = serialize_biguint_vec(diff_list);
-//        o_stream.write((message + "\n").as_bytes());
-//
-//        let mut reader = BufReader::new(in_stream);
-//        let mut diff_list_message = String::new();
-//        reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
-//
-//        let mut diff_list = deserialize_biguint_vec(diff_list_message);
-//        let mut d = BigUint::zero();
-//        let mut e = BigUint::zero();
-//        let prime = &ctx.dt_training.big_int_prime;
-//        d = d.add(&diff_list[0]).mod_floor(prime);
-//        e = e.add(&diff_list[1]).mod_floor(prime);
-//        let ti_share_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
-//        let share = &ctx.dt_shares.additive_bigint_triples[ti_share_index];
-//        ti_share_index += 1;
-//        d = big_uint_subtract(x, &share.0, prime).add(&d).mod_floor(&ctx.dt_training.big_int_prime);
-//        e = big_uint_subtract(y, &share.1, prime).add(&e).mod_floor(&ctx.dt_training.big_int_prime);
-//
-//        let product = share.2.add(&d.mul(&share.1).mod_floor(prime)).mod_floor(prime)
-//            .add(&e.mul(&share.0).mod_floor(prime)).mod_floor(prime)
-//            .add(&d.mul(&e).mod_floor(prime).mul(BigUint::from(ctx.asymmetric_bit)).mod_floor(prime)).mod_floor(prime);
-//        product
-//    }
-//
-//    pub fn parallel_multiplication_big_integer(row: &Vec<BigUint>, ctx: &mut ComputingParty) -> BigUint {
-//        let mut products = big_uint_vec_clone(row);
-//        let thread_pool = ThreadPool::new(ctx.thread_count);
-//        while products.len() > 1 {
-//            let size = products.len();
-//            let mut push = BigInt::from_i32(-1).unwrap();
-//            let mut to_index1 = size / 2;
-//            let mut to_index2 = size;
-//            if size % 2 == 1 {
-//                to_index2 -= 1;
-//                push = products[size - 1].to_bigint().unwrap();
-//            }
-//            let mut i1 = 0;
-//            let mut i2 = to_index1;
-//            let mut output_map = Arc::new(Mutex::new(HashMap::new()));
-//            let mut batch_count = 0;
-//            while i1 < to_index1 && i2 < to_index2 {
-//                let temp_index1 = min(i1 + ctx.batch_size, to_index1);
-//                let temp_index2 = min(i2 + ctx.batch_size, to_index2);
-//                let mut output_map = Arc::clone(&output_map);
-//                let mut ctx_copied = ctx.clone();
-//                let mut products_slice = big_uint_vec_clone(&products[i1..temp_index1].to_vec());
-//                thread_pool.execute(move || {
-//                    let multi_result = batch_multiply_bigint(&products_slice, &products_slice, &mut ctx_copied);
-//                    let mut output_map = output_map.lock().unwrap();
-//                    (*output_map).insert(batch_count, multi_result);
-//                });
-//                i1 = temp_index1;
-//                i2 = temp_index2;
-//                batch_count += 1;
-//            }
-//            let mut new_products = Vec::new();
-//            let mut output_map = &*(output_map.lock().unwrap());
-//            for i in 0..batch_count {
-//                let mut multi_result = *output_map.get(&i).unwrap();
-//                new_products.append(&mut multi_result);
-//            }
-//            products.clear();
-//            products = big_uint_vec_clone(&new_products);
-//            if !push.eq(&BigInt::from_i32(-1).unwrap()) {
-//                products.push(push.to_biguint().unwrap());
-//            }
-//        }
-//        big_uint_clone(&products[0])
-//    }
+    pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
+        let share = get_current_bigint_share(ctx);
+
+        let mut diff_list = Vec::new();
+        diff_list.push(big_uint_subtract(x, &share.0, &ctx.dt_training.big_int_prime));
+        diff_list.push(big_uint_subtract(y, &share.1, &ctx.dt_training.big_int_prime));
+
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut message = serialize_biguint_vec(diff_list);
+        o_stream.write((message + "\n").as_bytes());
+
+        let mut reader = BufReader::new(in_stream);
+        let mut diff_list_message = String::new();
+        reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
+
+        let mut diff_list = deserialize_biguint_vec(diff_list_message);
+        let mut d = BigUint::zero();
+        let mut e = BigUint::zero();
+        let prime = &ctx.dt_training.big_int_prime;
+        d = d.add(&diff_list[0]).mod_floor(prime);
+        e = e.add(&diff_list[1]).mod_floor(prime);
+        let share = get_current_bigint_share(ctx);
+        d = big_uint_subtract(x, &share.0, prime).add(&d).mod_floor(&ctx.dt_training.big_int_prime);
+        e = big_uint_subtract(y, &share.1, prime).add(&e).mod_floor(&ctx.dt_training.big_int_prime);
+
+
+
+        let mut product =  big_uint_clone(&big_uint_clone(&share.2).add(&big_uint_clone(&d).mul(&big_uint_clone(&share.1)).mod_floor(prime)).mod_floor(prime));
+        product = product.add(big_uint_clone(&e).mul(&big_uint_clone(&share.0)).mod_floor(prime)).mod_floor(prime);
+        product = product.add(big_uint_clone(&d).mul(&big_uint_clone(&e)).mul(&BigUint::from(ctx.asymmetric_bit)).mod_floor(prime)).mod_floor(prime);
+
+        product
+    }
+
+    pub fn parallel_multiplication_big_integer(row: &Vec<BigUint>, ctx: &mut ComputingParty) -> BigUint {
+        let mut products = big_uint_vec_clone(row);
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        while products.len() > 1 {
+            let size = products.len();
+            let mut push = BigInt::from_i32(-1).unwrap();
+            let mut to_index1 = size / 2;
+            let mut to_index2 = size;
+            if size % 2 == 1 {
+                to_index2 -= 1;
+                push = products[size - 1].to_bigint().unwrap();
+            }
+            let mut i1 = 0;
+            let mut i2 = to_index1;
+            let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+            let mut batch_count = 0;
+            while i1 < to_index1 && i2 < to_index2 {
+                let temp_index1 = min(i1 + ctx.batch_size, to_index1);
+                let temp_index2 = min(i2 + ctx.batch_size, to_index2);
+                let mut output_map = Arc::clone(&output_map);
+                let mut ctx_copied = ctx.clone();
+                let mut products_slice = big_uint_vec_clone(&products[i1..temp_index1].to_vec());
+                thread_pool.execute(move || {
+                    let multi_result = batch_multiply_bigint(&products_slice, &products_slice, &mut ctx_copied);
+                    let mut output_map = output_map.lock().unwrap();
+                    (*output_map).insert(batch_count, multi_result);
+                });
+                i1 = temp_index1;
+                i2 = temp_index2;
+                batch_count += 1;
+            }
+            let mut new_products = Vec::new();
+            let mut output_map = &*(output_map.lock().unwrap());
+            for i in 0..batch_count {
+                let mut multi_result = (*output_map.get(&i).unwrap()).clone();
+                new_products.append(&mut multi_result);
+            }
+            products.clear();
+            products = big_uint_vec_clone(&new_products);
+            if !push.eq(&BigInt::from_i32(-1).unwrap()) {
+                products.push(push.to_biguint().unwrap());
+            }
+        }
+        big_uint_clone(&products[0])
+    }
 //
 //    pub fn multi_thread_batch_mul_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty, bit_length: usize) -> (u32, HashMap<u32, Vec<u8>>) {
 //        let inner_pool = ThreadPool::new(ctx.thread_count);
