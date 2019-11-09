@@ -440,28 +440,28 @@ pub mod multiplication{
         }
         big_uint_clone(&products[0])
     }
-//
-//    pub fn multi_thread_batch_mul_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty, bit_length: usize) -> (u32, HashMap<u32, Vec<u8>>) {
-//        let inner_pool = ThreadPool::new(ctx.thread_count);
-//        let mut i = 0;
-//        let mut batch_count = 0;
-//        let mut output_map = Arc::new(Mutex::new(HashMap::new()));
-//        while i < bit_length {
-//            let mut output_map = Arc::clone(&output_map);
-//            let to_index = min(i + ctx.batch_size, bit_length);
-//            let mut ctx_copied = ctx.clone();
-//            let mut x_list = x_list.clone();
-//            let mut y_list = y_list.clone();
-//            inner_pool.execute(move || {
-//                let mut batch_mul_result = batch_multiplication_byte(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
-//                let mut output_map = output_map.lock().unwrap();
-//                (*output_map).insert(batch_count, batch_mul_result);
-//            });
-//            i = to_index;
-//            batch_count += 1;
-//        }
-//        inner_pool.join();
-//        let output_map = *(output_map.lock().unwrap());
-//        (batch_count, output_map)
-//    }
+
+    pub fn multi_thread_batch_mul_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty, bit_length: usize) -> (u32, HashMap<u32, Vec<u8>>) {
+        let inner_pool = ThreadPool::new(ctx.thread_count);
+        let mut i = 0;
+        let mut batch_count = 0;
+        let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+        while i < bit_length {
+            let mut output_map = Arc::clone(&output_map);
+            let to_index = min(i + ctx.batch_size, bit_length);
+            let mut ctx_copied = ctx.clone();
+            let mut x_list = x_list.clone();
+            let mut y_list = y_list.clone();
+            inner_pool.execute(move || {
+                let mut batch_mul_result = batch_multiplication_byte(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
+                let mut output_map = output_map.lock().unwrap();
+                (*output_map).insert(batch_count, batch_mul_result);
+            });
+            i = to_index;
+            batch_count += 1;
+        }
+        inner_pool.join();
+        let output_map = (*output_map.lock().unwrap()).clone();
+        (batch_count, output_map)
+    }
 }
