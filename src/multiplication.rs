@@ -255,56 +255,56 @@ pub mod multiplication{
         result = mod_floor(result, BINARY_PRIME as u8);
         result
     }
-//
-//    pub fn batch_multiplication_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
-//        let batch_size = x_list.len();
-//        let mut diff_list = Vec::new();
-//        let mut output = Vec::new();
-//
-//        let mut ti_shares = Vec::new();
-//        for i in 0..batch_size {
-//            let mut new_row = Vec::new();
-//            let ti_share_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
-//            let ti_share_triple = ctx.dt_shares.binary_triples[ti_share_index];
-//            ti_shares.push(ti_share_triple);
-//            new_row.push(mod_floor((Wrapping(x_list[i]) - Wrapping(ti_share_triple.0)).0, BINARY_PRIME as u8));
-//            new_row.push(mod_floor((Wrapping(y_list[i]) - Wrapping(ti_share_triple.1)).0, BINARY_PRIME as u8));
-//            diff_list.push(new_row);
-//            increment_current_share_index(ctx, ShareType::BinaryShare);
-//        }
-//
-//        let mut in_stream = ctx.in_stream.try_clone()
-//            .expect("failed cloning tcp o_stream");
-//
-//        let mut o_stream = ctx.o_stream.try_clone()
-//            .expect("failed cloning tcp o_stream");
-//        o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
-//
-//        let mut reader = BufReader::new(in_stream);
-//        let mut diff_list_message = String::new();
-//        reader.read_line(&mut diff_list_message).expect("multiplication_byte: fail to read diff list message");
-//        let diff_list: Vec<Vec<u8>> = serde_json::from_str(&diff_list_message).unwrap();
-//
-//        let mut d_list = vec![0u8; batch_size];
-//        let mut e_list = vec![0u8; batch_size];
-//
-//        for i in 0..batch_size {
-//            d_list[i] = (Wrapping(d_list[i]) + Wrapping(diff_list[i][0])).0;
-//            e_list[i] = (Wrapping(e_list[i]) + Wrapping(diff_list[i][1])).0;
-//        }
-//
-//        for i in 0..batch_size {
-//            let ti_share_triple = ti_shares[i];
-//            let d = mod_floor((Wrapping(x_list[i]) - Wrapping(ti_share_triple.0 as u8) + Wrapping(d_list[i])).0, BINARY_PRIME as u8);
-//            let e = mod_floor((Wrapping(y_list[i]) - Wrapping(ti_share_triple.1 as u8) + Wrapping(e_list[i])).0, BINARY_PRIME as u8);
-//            let mut result: u8 = (Wrapping(ti_share_triple.2 as u8) + (Wrapping(d) * Wrapping(ti_share_triple.1 as u8)) + (Wrapping(ti_share_triple.0 as u8) * Wrapping(e))
-//                + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u8))).0;
-//            result = mod_floor(result, BINARY_PRIME as u8);
-//            output.push(result);
-//        }
-//
-//        output
-//    }
+
+    pub fn batch_multiplication_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
+        let batch_size = x_list.len();
+        let mut diff_list = Vec::new();
+        let mut output = Vec::new();
+
+        let mut ti_shares = Vec::new();
+        for i in 0..batch_size {
+            let mut new_row = Vec::new();
+            let ti_share_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
+            let ti_share_triple = ctx.dt_shares.binary_triples[ti_share_index];
+            ti_shares.push(ti_share_triple);
+            new_row.push(mod_floor((Wrapping(x_list[i]) - Wrapping(ti_share_triple.0)).0, BINARY_PRIME as u8));
+            new_row.push(mod_floor((Wrapping(y_list[i]) - Wrapping(ti_share_triple.1)).0, BINARY_PRIME as u8));
+            diff_list.push(new_row);
+            increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
+        }
+
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+        o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+
+        let mut reader = BufReader::new(in_stream);
+        let mut diff_list_message = String::new();
+        reader.read_line(&mut diff_list_message).expect("multiplication_byte: fail to read diff list message");
+        let diff_list: Vec<Vec<u8>> = serde_json::from_str(&diff_list_message).unwrap();
+
+        let mut d_list = vec![0u8; batch_size];
+        let mut e_list = vec![0u8; batch_size];
+
+        for i in 0..batch_size {
+            d_list[i] = (Wrapping(d_list[i]) + Wrapping(diff_list[i][0])).0;
+            e_list[i] = (Wrapping(e_list[i]) + Wrapping(diff_list[i][1])).0;
+        }
+
+        for i in 0..batch_size {
+            let ti_share_triple = ti_shares[i];
+            let d = mod_floor((Wrapping(x_list[i]) - Wrapping(ti_share_triple.0 as u8) + Wrapping(d_list[i])).0, BINARY_PRIME as u8);
+            let e = mod_floor((Wrapping(y_list[i]) - Wrapping(ti_share_triple.1 as u8) + Wrapping(e_list[i])).0, BINARY_PRIME as u8);
+            let mut result: u8 = (Wrapping(ti_share_triple.2 as u8) + (Wrapping(d) * Wrapping(ti_share_triple.1 as u8)) + (Wrapping(ti_share_triple.0 as u8) * Wrapping(e))
+                + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u8))).0;
+            result = mod_floor(result, BINARY_PRIME as u8);
+            output.push(result);
+        }
+
+        output
+    }
 //
 //    pub fn parallel_multiplication(row: &Vec<u8>, ctx: &mut ComputingParty) -> u8 {
 //        let mut products = row.clone();
