@@ -17,7 +17,7 @@ pub mod protocol {
     use serde::{Serialize, Deserialize, Serializer};
     use std::net::TcpStream;
     use std::ops::{Add, Mul};
-//    use crate::multiplication::multiplication::{batch_multiplication_byte, parallel_multiplication, multi_thread_batch_mul_byte};
+    use crate::multiplication::multiplication::{batch_multiplication_byte, parallel_multiplication, multi_thread_batch_mul_byte};
 
 //    pub fn arg_max(bit_shares: Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
 //        let number_count = bit_shares.len();
