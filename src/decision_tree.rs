@@ -8,8 +8,13 @@ pub mod decision_tree {
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
-//    use crate::dot_product::dot_product::dot_product;
+    //    use crate::dot_product::dot_product::dot_product;
     use crate::field_change::field_change::change_binary_to_decimal_field;
+    use std::thread::sleep;
+    use std::time::Duration;
+    use crate::dot_product::dot_product::dot_product;
+    use crate::bit_decomposition::bit_decomposition::bit_decomposition;
+    use crate::protocol::protocol::arg_max;
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -44,10 +49,10 @@ pub mod decision_tree {
         pub additive_bigint_triples: Vec<(BigUint, BigUint, BigUint)>,
         pub binary_triples: Vec<(u8, u8, u8)>,
         pub equality_shares: Vec<(BigUint)>,
-        pub current_additive_index:Arc<Mutex<usize>>,
-        pub current_additive_bigint_index:Arc<Mutex<usize>>,
-        pub current_equality_index:Arc<Mutex<usize>>,
-        pub current_binary_index:Arc<Mutex<usize>>,
+        pub current_additive_index: Arc<Mutex<usize>>,
+        pub current_additive_bigint_index: Arc<Mutex<usize>>,
+        pub current_equality_index: Arc<Mutex<usize>>,
+        pub current_binary_index: Arc<Mutex<usize>>,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
@@ -128,39 +133,62 @@ pub mod decision_tree {
                 current_additive_index: Arc::clone(&self.current_additive_index),
                 current_additive_bigint_index: Arc::clone(&self.current_additive_bigint_index),
                 current_equality_index: Arc::clone(&self.current_equality_index),
-                current_binary_index: Arc::clone(&self.current_binary_index)
+                current_binary_index: Arc::clone(&self.current_binary_index),
             }
         }
     }
 
 
-    pub fn train(mut ctx: ComputingParty, shares: DecisionTreeShares) {}
+    pub fn train(ctx: &mut ComputingParty) {}
 
     fn id3_model() {}
 
-//    fn find_common_class_index(subset_transaction_bit_vector: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
-//        let mut subset_decimal = change_binary_to_decimal_field(subset_transaction_bit_vector, ctx);
-//        let mut s = Vec::new();
-//        let thread_pool = ThreadPool::new(ctx.thread_count);
-//        let mut result = Vec::new();
-//        let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
-//        for i in 0..ctx.dt_data.class_value_count {
-//            let mut dp_result_map = Arc::clone(&dp_result_map);
-//            let mut ctx = ctx.clone();
-//            let mut subset_decimal = subset_decimal.clone();
-//            let mut class_value_transaction = ctx.dt_data.class_values.clone();
-//            thread_pool.execute(move || {
-//                let precision = ctx.decimal_precision;
-//                let dp_result = dot_product(&subset_decimal,&class_value_transaction[i],&mut ctx,precision,true,false);
-//                let mut dp_result_map = dp_result_map.lock().unwrap();
-//                (*dp_result_map).insert(i,dp_result);
-//            });
-//        }
-//        thread_pool.join();
-//        let mut dp_result_map = &*(dp_result_map.lock().unwrap());
-//        for i in 0..ctx.dt_data.class_value_count{
-//            s.push(dp_result_map.get(&i).unwrap());
-//        }
-//        result
-//    }
+    fn find_common_class_index(subset_transaction_bit_vector: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
+        let mut subset_decimal = change_binary_to_decimal_field(subset_transaction_bit_vector, ctx);
+        let mut s = Vec::new();
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
+        let mut ctx_copied = ctx.clone();
+
+        for i in 0..ctx.dt_data.class_value_count {
+            let mut dp_result_map = Arc::clone(&dp_result_map);
+            let mut subset_decimal = subset_decimal.clone();
+            let mut class_value_transaction = ctx.dt_data.class_values.clone();
+            let mut ctx = ctx_copied.clone();
+            thread_pool.execute(move || {
+                let precision = ctx.decimal_precision;
+                let dp_result = dot_product(&subset_decimal, &class_value_transaction[i], &mut ctx, precision, true, false);
+                let mut dp_result_map = dp_result_map.lock().unwrap();
+                (*dp_result_map).insert(i, (dp_result.0));
+            });
+        }
+        thread_pool.join();
+        let mut dp_result_map = &*(dp_result_map.lock().unwrap());
+        for i in 0..ctx.dt_data.class_value_count {
+            s.push((dp_result_map.get(&i).unwrap()).clone());
+        }
+
+        let mut ctx_copied = ctx.clone();
+        let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
+        for i in 0..ctx.dt_data.class_value_count {
+            let mut bd_result_map = Arc::clone(&bd_result_map);
+            let mut ctx = ctx_copied.clone();
+            let s_copied = s[i];
+            thread_pool.execute(move||{
+               let bd_result = bit_decomposition(s_copied,&mut ctx);
+                let mut bd_result_map = bd_result_map.lock().unwrap();
+                (*bd_result_map).insert(i, bd_result);
+            });
+        }
+        thread_pool.join();
+        let mut bd_result_map = &*(bd_result_map.lock().unwrap());
+        let mut bit_shares = Vec::new();
+        for i in 0..ctx.dt_data.class_value_count {
+            bit_shares.push((bd_result_map.get(&i).unwrap()).clone());
+        }
+
+        let mut arg_max = arg_max(&bit_shares,ctx);
+
+        arg_max
+    }
 }

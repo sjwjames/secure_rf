@@ -20,7 +20,7 @@ pub mod protocol {
     use crate::multiplication::multiplication::{batch_multiplication_byte, parallel_multiplication, multi_thread_batch_mul_byte};
     use crate::comparison::comparison::comparison;
 
-    pub fn arg_max(bit_shares: Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
+    pub fn arg_max(bit_shares: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
         let number_count = bit_shares.len();
 
         let mut result = Vec::new();

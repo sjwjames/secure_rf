@@ -46,7 +46,8 @@ pub mod or_xor{
         for i in 0..batch_count {
             let batch_result = output_map.get(&i).unwrap();
             for item in batch_result.iter() {
-                output.push(Wrapping(mod_floor(x_list[global_index].0 + y_list[global_index].0 - (constant_multiplier * item.0), ctx.dt_training.dataset_size_prime)));
+                let result = Wrapping(x_list[global_index].0) + Wrapping(y_list[global_index].0) - (Wrapping(constant_multiplier) * Wrapping(item.0));
+                output.push(Wrapping(mod_floor(result.0, ctx.dt_training.dataset_size_prime)));
                 global_index += 1;
             }
         }

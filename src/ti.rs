@@ -63,7 +63,7 @@ pub mod ti {
                 binary_shares_per_tree: self.equality_shares_per_tree,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
-                tree_training_batch_size:self.tree_training_batch_size,
+                tree_training_batch_size: self.tree_training_batch_size,
                 big_int_prime: self.big_int_prime.clone(),
                 prime: self.prime,
                 thread_count: self.thread_count,
@@ -301,7 +301,7 @@ pub mod ti {
                     current_additive_index: Arc::new(Mutex::new(0)),
                     current_additive_bigint_index: Arc::new(Mutex::new(0)),
                     current_equality_index: Arc::new(Mutex::new(0)),
-                    current_binary_index: Arc::new(Mutex::new(0))
+                    current_binary_index: Arc::new(Mutex::new(0)),
                 };
 
                 let mut share1 = DecisionTreeShares {
@@ -312,7 +312,7 @@ pub mod ti {
                     current_additive_index: Arc::new(Mutex::new(0)),
                     current_additive_bigint_index: Arc::new(Mutex::new(0)),
                     current_equality_index: Arc::new(Mutex::new(0)),
-                    current_binary_index: Arc::new(Mutex::new(0))
+                    current_binary_index: Arc::new(Mutex::new(0)),
                 };
                 let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
                 let sender_thread0 = thread::spawn(move || {
@@ -406,113 +406,6 @@ pub mod ti {
         stream.write(message_str.as_bytes());
         Ok(())
     }
-
-//    fn send_shares(handle: usize,
-//                   mut stream: TcpStream,
-//                   mut shares: (Vec<(u64, u64, u64)>, Vec<(u64, u64, u64)>)) -> io::Result<()> {
-//        stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
-//        stream.set_write_timeout(None).expect("set_write_timeout call failed");
-//        stream.set_read_timeout(None).expect("set_read_timeout call failed");
-//
-//        //println!("server {}: sending additive shares", handle);
-//
-//        //////////////////////// SEND ADDITIVES ////////////////////////
-//
-//        let mut remainder = shares.0.len();
-//
-//        while remainder >= TI_BATCH_SIZE {
-//            let mut tx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
-//
-//            for i in 0..TI_BATCH_SIZE {
-//                let (u, v, w) = shares.0.pop().unwrap();
-//
-//                unsafe {
-//                    tx_buf.u64_buf[3 * i] = u;
-//                    tx_buf.u64_buf[3 * i + 1] = v;
-//                    tx_buf.u64_buf[3 * i + 2] = w;
-//                }
-//            }
-//            let mut bytes_written = 0;
-//            while bytes_written < U8S_PER_TX {
-//                let current_bytes = unsafe {
-//                    stream.write(&tx_buf.u8_buf[bytes_written..])
-//                };
-//                bytes_written += current_bytes.unwrap();
-//            }
-//            remainder -= TI_BATCH_SIZE;
-//        }
-//
-//        let mut tx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
-//
-//        for i in 0..remainder {
-//            let (u, v, w) = shares.0.pop().unwrap();
-//
-//            unsafe {
-//                tx_buf.u64_buf[3 * i] = u;
-//                tx_buf.u64_buf[3 * i + 1] = v;
-//                tx_buf.u64_buf[3 * i + 2] = w;
-//            }
-//        }
-//        let mut bytes_written = 0;
-//        while bytes_written < U8S_PER_TX {
-//            let current_bytes = unsafe {
-//                stream.write(&tx_buf.u8_buf[bytes_written..])
-//            };
-//            bytes_written += current_bytes.unwrap();
-//        }
-//        //println!("server {}: additive shares sent. sending xor shares", handle);
-//
-//        /////////////////////////// SEND XOR SHARES //////////////////////////
-//
-//        let mut remainder = shares.1.len();
-//        while remainder >= TI_BATCH_SIZE {
-//            let mut tx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
-//
-//            for i in 0..TI_BATCH_SIZE {
-//                let (u, v, w) = shares.1.pop().unwrap();
-//
-//                unsafe {
-//                    tx_buf.u64_buf[3 * i] = u;
-//                    tx_buf.u64_buf[3 * i + 1] = v;
-//                    tx_buf.u64_buf[3 * i + 2] = w;
-//                }
-//            }
-//            let mut bytes_written = 0;
-//            while bytes_written < U8S_PER_TX {
-//                let current_bytes = unsafe {
-//                    stream.write(&tx_buf.u8_buf[bytes_written..])
-//                };
-//                bytes_written += current_bytes.unwrap();
-//            }
-//            remainder -= TI_BATCH_SIZE;
-//        }
-//
-//        let mut tx_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
-//
-//        for i in 0..remainder {
-//            let (u, v, w) = shares.1.pop().unwrap();
-//
-//            unsafe {
-//                tx_buf.u64_buf[3 * i] = u;
-//                tx_buf.u64_buf[3 * i + 1] = v;
-//                tx_buf.u64_buf[3 * i + 2] = w;
-//            }
-//        }
-//        let mut bytes_written = 0;
-//
-//        while bytes_written < U8S_PER_TX {
-//            let current_bytes = unsafe {
-//                stream.write(&tx_buf.u8_buf[bytes_written..])
-//            };
-//            bytes_written += current_bytes.unwrap();
-//        }
-//
-//
-//        //println!("server {}: xor shares sent", handle);
-//
-//        Ok(())
-//    }
-
 
     fn generate_binary_shares(ctx: &TI, thread_pool: &ThreadPool) -> (Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
@@ -715,9 +608,9 @@ pub mod ti {
         let u0: BigUint = rng.gen_biguint(bigint_bit_size);
         let v0: BigUint = rng.gen_biguint(bigint_bit_size);
         let w0: BigUint = rng.gen_biguint(bigint_bit_size);
-        let u1 = big_uint_subtract(&u,&u0,big_int_prime);
-        let v1 = big_uint_subtract(&v,&v0,big_int_prime);
-        let w1 = big_uint_subtract(&w,&w0,big_int_prime);
+        let u1 = big_uint_subtract(&u, &u0, big_int_prime);
+        let v1 = big_uint_subtract(&v, &v0, big_int_prime);
+        let w1 = big_uint_subtract(&w, &w0, big_int_prime);
         ((u0, v0, w0), (u1, v1, w1))
     }
 
