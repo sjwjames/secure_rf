@@ -1,4 +1,4 @@
-pub mod bit_decomposition{
+pub mod bit_decomposition {
     use crate::computing_party::computing_party::ComputingParty;
     use num::abs;
     use num::integer::*;
@@ -9,21 +9,21 @@ pub mod bit_decomposition{
     use threadpool::ThreadPool;
     use std::collections::HashMap;
     use std::cmp::min;
+    use std::num::Wrapping;
 
     pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty) -> Vec<u8> {
         let mut input_shares = Vec::new();
-        let mut d_shares = Vec::new();
-        let mut e_shares = Vec::new();
-        let mut c_shares = Vec::new();
-        let mut y_shares = Vec::new();
-        let mut x_shares = Vec::new();
+        let bit_length = ctx.dt_training.bit_length as usize;
+        let mut d_shares = vec![0u8; bit_length];
+        let mut c_shares = vec![0u8; bit_length];
+        let mut y_shares = vec![0u8; bit_length];
+        let mut x_shares = vec![0u8; bit_length];
         let binary_str = format!("{:b}", input);
         let input_binary_str_vec: Vec<&str> = binary_str.split("").collect();
         let mut temp: Vec<u8> = Vec::new();
-        for item in input_binary_str_vec {
-            temp.push(item.parse::<u8>().unwrap());
+        for item in binary_str.chars() {
+            temp.push(item as u8);
         }
-        let bit_length = ctx.dt_training.bit_length as usize;
         let mut temp0 = vec![0u8; bit_length];
         let diff = abs(bit_length as isize - temp.len() as isize);
         for i in 0..diff {
@@ -43,14 +43,14 @@ pub mod bit_decomposition{
         //initY in Java Lynx
         for i in 0..bit_length {
             let y = input_shares[0][i] + input_shares[1][i];
-            y_shares.push(mod_floor(y, BINARY_PRIME as u8));
+            y_shares[i] = mod_floor(y, BINARY_PRIME as u8);
         }
-        x_shares.push(y_shares[0]);
+        x_shares[0] = y_shares[0];
 
         //bit_multiplication in Java Lynx
         let first_c_share = multiplication_byte(input_shares[0][0], input_shares[1][0], ctx);
         increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
-        c_shares.push(mod_floor(first_c_share, BINARY_PRIME as u8));
+        c_shares[0] = mod_floor(first_c_share, BINARY_PRIME as u8);
 
         //computeDShares in Java Lynx
         let thread_pool = ThreadPool::new(ctx.thread_count);
@@ -76,17 +76,20 @@ pub mod bit_decomposition{
         for i in 0..batch_count {
             let batch_result = output_map.get(&i).unwrap();
             for item in batch_result.iter() {
-                d_shares.push(mod_floor(item + ctx.asymmetric_bit, BINARY_PRIME as u8));
+                d_shares[global_index] = mod_floor(item + ctx.asymmetric_bit, BINARY_PRIME as u8);
                 global_index += 1;
             }
         }
+        let mut e_shares = vec![0u8; bit_length];
 
-        for i in 0..bit_length {
+        for i in 1..bit_length {
             //computeVariables
-            let e_result = multiplication_byte(y_shares[i], c_shares[i - 1], ctx) + ctx.asymmetric_bit;
+            let e_result = (Wrapping(multiplication_byte(y_shares[i], c_shares[i - 1], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
             e_shares[i] = mod_floor(e_result, BINARY_PRIME as u8);
-            let x_result = y_shares[i] + c_shares[i - 1];
+            let x_result = (Wrapping(y_shares[i]) + Wrapping(c_shares[i - 1])).0;
             x_shares[i] = mod_floor(x_result, BINARY_PRIME as u8);
+            let c_result = (Wrapping(multiplication_byte(e_shares[i], d_shares[i], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
+            c_shares[i] = mod_floor(c_result, BINARY_PRIME as u8);
         }
         x_shares
     }

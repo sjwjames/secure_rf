@@ -1,7 +1,8 @@
 pub mod decision_tree {
     use crate::computing_party::computing_party::ComputingParty;
     use num::bigint::{BigInt, BigUint};
-    use std::io::Bytes;
+    use num::integer::*;
+    use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
     use crate::utils::utils::big_uint_clone;
@@ -15,6 +16,7 @@ pub mod decision_tree {
     use crate::dot_product::dot_product::dot_product;
     use crate::bit_decomposition::bit_decomposition::bit_decomposition;
     use crate::protocol::protocol::arg_max;
+    use crate::constants::constants::BINARY_PRIME;
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -139,12 +141,45 @@ pub mod decision_tree {
     }
 
 
-    pub fn train(ctx: &mut ComputingParty) {}
+    pub fn train(ctx: &mut ComputingParty) {
+        let major_class_index = find_common_class_index(ctx);
+        // Make majority class index one-hot encoding public
+        // Share major class index
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
 
-    fn id3_model() {}
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+        o_stream.write(format!("{}\n", serde_json::to_string(&major_class_index).unwrap()).as_bytes());
 
-    fn find_common_class_index(subset_transaction_bit_vector: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
-        let mut subset_decimal = change_binary_to_decimal_field(subset_transaction_bit_vector, ctx);
+        let mut reader = BufReader::new(in_stream);
+        let mut major_class_index_message = String::new();
+        reader.read_line(&mut major_class_index_message).expect("fail to read major class index message");
+        let mut major_class_index_receive:Vec<u8> = serde_json::from_str(&major_class_index_message).unwrap();
+        let class_value_count = ctx.dt_data.class_value_count;
+        let mut major_class_index_shared = vec![0u8;class_value_count];
+        for i in 0..class_value_count{
+            major_class_index_shared[i] = mod_floor((Wrapping((&major_class_index)[i])+Wrapping((&major_class_index_receive)[i])).0,BINARY_PRIME as u8);
+        }
+
+        let mut major_index = 0;
+        for i in 0..class_value_count{
+            if major_class_index_shared[i] == 1{
+                major_index = i;
+                break;
+            }
+        }
+
+        for i in major_index+1..class_value_count{
+            major_class_index_shared[i] = 0;
+        }
+
+
+    }
+
+    fn find_common_class_index(ctx: &mut ComputingParty) -> Vec<u8> {
+        let mut subset_transaction_bit_vector = ctx.dt_training.subset_transaction_bit_vector.clone();
+        let mut subset_decimal = change_binary_to_decimal_field(&subset_transaction_bit_vector, ctx);
         let mut s = Vec::new();
         let thread_pool = ThreadPool::new(ctx.thread_count);
         let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
@@ -174,8 +209,9 @@ pub mod decision_tree {
             let mut bd_result_map = Arc::clone(&bd_result_map);
             let mut ctx = ctx_copied.clone();
             let s_copied = s[i];
-            thread_pool.execute(move||{
-               let bd_result = bit_decomposition(s_copied,&mut ctx);
+            //run in parallel would cause data corruption
+            thread_pool.execute(move || {
+                let bd_result = bit_decomposition(s_copied, &mut ctx);
                 let mut bd_result_map = bd_result_map.lock().unwrap();
                 (*bd_result_map).insert(i, bd_result);
             });
@@ -187,7 +223,7 @@ pub mod decision_tree {
             bit_shares.push((bd_result_map.get(&i).unwrap()).clone());
         }
 
-        let mut arg_max = arg_max(&bit_shares,ctx);
+        let mut arg_max = arg_max(&bit_shares, ctx);
 
         arg_max
     }
