@@ -18,75 +18,76 @@ pub mod protocol {
     use std::net::TcpStream;
     use std::ops::{Add, Mul};
     use crate::multiplication::multiplication::{batch_multiplication_byte, parallel_multiplication, multi_thread_batch_mul_byte};
+    use crate::comparison::comparison::comparison;
 
-//    pub fn arg_max(bit_shares: Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
-//        let number_count = bit_shares.len();
-//
-//        let mut result = Vec::new();
-//        if number_count == 1 {
-//            result.push(1);
-//        } else {
-//            let mut bit_length = 0;
-//            bit_shares.iter().map(|x| bit_length = max(bit_length, x.len()));
-//            let mut w_intermediate = HashMap::new();
-//
-//            for i in 0..number_count {
-//                let mut list = Vec::new();
-//                w_intermediate.insert(i,list);
-//            }
-//            //computeComparisons in JAVA Lynx
-//            let ti_count = 2 * bit_length + (bit_length * (bit_length - 1) / 2);
-//            let thread_pool = ThreadPool::new(ctx.thread_count);
-//            let mut output_map = Arc::new(Mutex::new((HashMap::new())));
-//            let mut key = 0;
-//            for i in 0..number_count {
-//                for j in 0..number_count {
-//                    if i != j {
-//                        let mut output_map = Arc::clone(&output_map);
-//                        let mut ctx_copied = ctx.clone();
-//                        let mut bit_shares = bit_shares.clone();
-//                        thread_pool.execute(move || {
-//                            key = i * number_count + j;
-//                            let comparison_result = comparison(&bit_shares[i], &bit_shares[j], &mut ctx_copied);
-//                            let mut output_map = output_map.lock().unwrap();
-//                            (*output_map).insert(key, comparison_result);
-//                        });
-//                    }
-//                }
-//            }
-//
-//            let output_map = output_map.lock().unwrap();
-//            for i in 0..number_count * (number_count - 1) {
-//                let mut comparison = *output_map.get(&i).unwrap();
-//                let key = i / (number_count - 1);
-//                w_intermediate.get_mut(&key).unwrap().push(comparison);
-//            }
-//
-//            let mut output_map = Arc::new(Mutex::new((HashMap::new())));
-//            //multi-threaded parallel multiplication
-//            for i in 0..number_count {
-//                let mut vec = Vec::new();
-//                for item in w_intermediate.get(&i).unwrap().iter() {
-//                    vec.push(*item);
-//                }
-//                let mut output_map = Arc::clone(&output_map);
-//                let mut ctx_copied = ctx.clone();
-//                thread_pool.execute(move || {
-//                    let multi_result = parallel_multiplication(&vec, &mut ctx_copied);
-//                    let mut output_map = output_map.lock().unwrap();
-//                    (*output_map).insert(i, multi_result);
-//                });
-//            }
-//
-//            let output_map = &*(output_map.lock().unwrap());
-//            for i in 0..number_count {
-//                let multi_result = output_map.get(&i).unwrap();
-//                result[i] = *multi_result;
-//            }
-//        }
-//        result
-//    }
-//
+    pub fn arg_max(bit_shares: Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
+        let number_count = bit_shares.len();
+
+        let mut result = Vec::new();
+        if number_count == 1 {
+            result.push(1);
+        } else {
+            let mut bit_length = 0;
+            bit_shares.iter().map(|x| bit_length = max(bit_length, x.len()));
+            let mut w_intermediate = HashMap::new();
+
+            for i in 0..number_count {
+                let mut list = Vec::new();
+                w_intermediate.insert(i, list);
+            }
+            //computeComparisons in JAVA Lynx
+            let ti_count = 2 * bit_length + (bit_length * (bit_length - 1) / 2);
+            let thread_pool = ThreadPool::new(ctx.thread_count);
+            let mut output_map = Arc::new(Mutex::new((HashMap::new())));
+            let mut key = 0;
+            for i in 0..number_count {
+                for j in 0..number_count {
+                    if i != j {
+                        let mut output_map = Arc::clone(&output_map);
+                        let mut ctx_copied = ctx.clone();
+                        let mut bit_shares = bit_shares.clone();
+                        thread_pool.execute(move || {
+                            key = i * number_count + j;
+                            let comparison_result = comparison(&bit_shares[i], &bit_shares[j], &mut ctx_copied);
+                            let mut output_map = output_map.lock().unwrap();
+                            (*output_map).insert(key, comparison_result);
+                        });
+                    }
+                }
+            }
+
+            let output_map = output_map.lock().unwrap();
+            for i in 0..number_count * (number_count - 1) {
+                let mut comparison = *output_map.get(&i).unwrap();
+                let key = i / (number_count - 1);
+                w_intermediate.get_mut(&key).unwrap().push(comparison);
+            }
+
+            let mut output_map = Arc::new(Mutex::new((HashMap::new())));
+            //multi-threaded parallel multiplication
+            for i in 0..number_count {
+                let mut vec = Vec::new();
+                for item in w_intermediate.get(&i).unwrap().iter() {
+                    vec.push(*item);
+                }
+                let mut output_map = Arc::clone(&output_map);
+                let mut ctx_copied = ctx.clone();
+                thread_pool.execute(move || {
+                    let multi_result = parallel_multiplication(&vec, &mut ctx_copied);
+                    let mut output_map = output_map.lock().unwrap();
+                    (*output_map).insert(i, multi_result);
+                });
+            }
+
+            let output_map = &*(output_map.lock().unwrap());
+            for i in 0..number_count {
+                let multi_result = output_map.get(&i).unwrap();
+                result[i] = *multi_result;
+            }
+        }
+        result
+    }
+
 //    pub fn equality_big_integer(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
 //        let equality_share = get_current_equality_share(ctx);
 //        let bigint_share = get_current_bigint_share(ctx);
@@ -115,7 +116,4 @@ pub mod protocol {
 //        let product = bigint_share.2.add(d.mul(&bigint_share.1)).add(&bigint_share.0.mul(e)).add(d.mul(&e).mul(BigUint::from(ctx.asymmetric_bit)));
 //        product
 //    }
-
-
-
 }
