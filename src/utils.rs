@@ -122,4 +122,12 @@ pub mod utils {
         increment_current_share_index(Arc::clone(&ctx.dt_shares.current_equality_index));
         result
     }
+
+    pub fn get_current_additive_share(ctx:&ComputingParty)->&(Wrapping<u64>,Wrapping<u64>,Wrapping<u64>){
+        let shares = &ctx.dt_shares.additive_triples;
+        let current_index = *(ctx.dt_shares.current_additive_index.lock().unwrap());
+        let result = &shares[current_index];
+        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_index));
+        result
+    }
 }

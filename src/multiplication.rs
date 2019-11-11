@@ -14,6 +14,7 @@ pub mod multiplication{
     use serde::{Serialize, Deserialize, Serializer};
     use std::net::TcpStream;
     use std::ops::{Add, Mul};
+    use crate::message::message::{RFMessage, search_pop_message};
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -42,12 +43,14 @@ pub mod multiplication{
             tuple.push(serde_json::to_string(&(item.1.to_bytes_le())).unwrap());
             diff_list_str_vec.push(format!("({})", tuple.join(",")));
         }
-        o_stream.write((diff_list_str_vec.join(";") + "\n").as_bytes());
+        let message = RFMessage{
+            message_id: ctx.thread_hierarchy.join(":"),
+            message_content: diff_list_str_vec.join(";")
+        };
+        o_stream.write((serde_json::to_string(&message).unwrap()+ "\n").as_bytes());
 
-        let mut reader = BufReader::new(in_stream);
-        let mut diff_list_message = String::new();
-        reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
-
+        let mut message = search_pop_message(ctx).unwrap();
+        let mut diff_list_message = message.message_content;
         let mut diff_list_str_vec: Vec<&str> = diff_list_message.split(";").collect();
         let mut diff_list = Vec::new();
         for item in diff_list_str_vec {
@@ -147,12 +150,12 @@ pub mod multiplication{
         {
             let corr_rand = &mut ctx.dt_shares.additive_triples;
             for i in 0..tx_len {
-                let (u, v, w) = corr_rand.pop().unwrap();
+                let (u, v, w) = get_current_additive_share(ctx);
                 //let (u, v, w) = if ctx.asymmetric_bit == 1 {CR_1} else {CR_0};
 
-                u_list[i] = u;
-                v_list[i] = v;
-                w_list[i] = w;
+                u_list[i] = Wrapping(u.0);
+                v_list[i] = Wrapping(v.0);
+                w_list[i] = Wrapping(w.0);
 
                 d_list[i] = x_list[i] - u;
                 e_list[i] = y_list[i] - v;
@@ -307,6 +310,59 @@ pub mod multiplication{
                 + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u8))).0;
             result = mod_floor(result, BINARY_PRIME as u8);
             output.push(result);
+        }
+        ctx.thread_hierarchy.pop();
+        output
+    }
+
+    pub fn batch_multiplication_integer(x_list: &Vec<Wrapping<u64>>, y_list: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>>{
+        ctx.thread_hierarchy.push("batch_multiplication_integer".to_string());
+        let batch_size = x_list.len();
+        let mut diff_list = Vec::new();
+        let mut output = Vec::new();
+
+        let mut ti_shares = Vec::new();
+        let ctx_copied = ctx.clone();
+        for i in 0..batch_size {
+            let mut new_row = Vec::new();
+            let ti_share_triple = get_current_additive_share(&ctx_copied);
+            ti_shares.push(ti_share_triple);
+            new_row.push(mod_floor((x_list[i] - ti_share_triple.0).0, ctx.dt_training.prime));
+            new_row.push(mod_floor((y_list[i] - ti_share_triple.1).0, ctx.dt_training.prime));
+            diff_list.push(new_row);
+        }
+
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+        let message_id = ctx.thread_hierarchy.join(":");
+        let mut message = RFMessage{
+            message_id,
+            message_content: serde_json::to_string(&diff_list).unwrap()
+        };
+        o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
+
+        let mut message_received= search_pop_message(ctx).unwrap();
+        let diff_list: Vec<Vec<Wrapping<u64>>> = serde_json::from_str(&message_received.message_content).unwrap();
+
+        let mut d_list = vec![Wrapping(0u64); batch_size];
+        let mut e_list = vec![Wrapping(0u64); batch_size];
+
+        for i in 0..batch_size {
+            d_list[i] = (d_list[i] + diff_list[i][0]);
+            e_list[i] = (e_list[i] + diff_list[i][1]);
+        }
+
+        for i in 0..batch_size {
+            let ti_share_triple = ti_shares[i];
+            let d = mod_floor((x_list[i] - ti_share_triple.0 + d_list[i]).0, ctx.dt_training.prime);
+            let e = mod_floor((y_list[i] - ti_share_triple.1 + e_list[i]).0, ctx.dt_training.prime);
+            let mut result: u64 = (ti_share_triple.2 + (Wrapping(d) * ti_share_triple.1) + (ti_share_triple.0 * Wrapping(e))
+                + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u64))).0;
+            result = mod_floor(result, ctx.dt_training.prime);
+            output.push(Wrapping(result));
         }
         ctx.thread_hierarchy.pop();
         output

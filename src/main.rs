@@ -12,7 +12,6 @@ use std::io::{Write, Read};
 use std::str;
 use serde::{Serialize, Deserialize, Serializer};
 use num::integer::*;
-use random_forest_rust::message::message::MessageManager;
 
 
 fn main() {

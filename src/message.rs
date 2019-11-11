@@ -7,22 +7,23 @@ pub mod message {
     use std::time::SystemTime;
     use threadpool::ThreadPool;
     use std::thread;
+    use crate::computing_party::computing_party::ComputingParty;
 
     pub const MAX_SEARCH_TIMEOUT: u128 = 60 * 1000;
 
     #[derive(Serialize, Deserialize, Debug)]
-    pub struct Message {
+    pub struct RFMessage {
         pub message_id: String,
         pub message_content: String,
     }
 
     pub struct MessageManager {
-        pub map: HashMap<String, Message>,
+        pub map: HashMap<String, RFMessage>,
     }
 
-    impl Clone for Message {
+    impl Clone for RFMessage {
         fn clone(&self) -> Self {
-            Message {
+            RFMessage {
                 message_id: self.message_id.clone(),
                 message_content: self.message_content.clone(),
             }
@@ -39,7 +40,7 @@ pub mod message {
 
 
     impl MessageManager {
-        fn add_message(&mut self, message: &Message) -> Result<&'static str, &'static str> {
+        fn add_message(&mut self, message: &RFMessage) -> Result<&'static str, &'static str> {
             if self.map.contains_key(&message.message_id) {
                 Err("Unable to add the message since the id exists already")
             } else {
@@ -48,41 +49,53 @@ pub mod message {
             }
         }
 
-        pub fn search_pop_message(&mut self, message_id: String, in_stream: &TcpStream) -> Result<Message, &'static str> {
-            let mut remainder = MAX_SEARCH_TIMEOUT;
-            if self.map.contains_key(&message_id) {
-                let mut message = self.map.remove(&message_id);
-                return Ok(message.unwrap());
-            }
-            while remainder > 0 {
-                let mut now = SystemTime::now();
-                let mut reader = BufReader::new(in_stream);
-                let mut message_string = String::new();
-                reader.read_line(&mut message_string);
-                let message: Message = serde_json::from_str(&message_string).unwrap();
-                if message.message_id==message_id{
-                    return Ok(message);
-                }else{
-                    self.add_message(&message);
-                }
-
-                remainder -= now.elapsed().unwrap().as_millis();
-            }
-            Err("Cannot find the message")
-        }
-
-//        pub fn build_connection(&mut self, in_stream: &TcpStream){
-//            let mut in_stream_cloned = in_stream.try_clone().unwrap();
-//            let mut reader = BufReader::new(in_stream_cloned);
-//            let mut self_arc = Arc::new(Mutex::new(self));
-//            let receive_thread = thread::spawn( move|| {
-//                for line in reader.lines() {
-//                    let message_line = line.unwrap();
-//                    let message: Message = serde_json::from_str(&message_line).unwrap();
-//                    (*(self_arc.lock().unwrap())).add_message(&message);
+//        pub fn search_pop_message(&mut self, message_id: String, in_stream: &TcpStream) -> Result<RFMessage, &'static str> {
+//            let mut remainder = MAX_SEARCH_TIMEOUT;
+//            if self.map.contains_key(&message_id) {
+//                let mut message = self.map.remove(&message_id);
+//                return Ok(message.unwrap());
+//            }
+//            while remainder > 0 {
+//                let mut now = SystemTime::now();
+//                let mut reader = BufReader::new(in_stream);
+//                let mut message_string = String::new();
+//                reader.read_line(&mut message_string);
+//                let message: RFMessage = serde_json::from_str(&message_string).unwrap();
+//                if message.message_id==message_id{
+//                    return Ok(message);
+//                }else{
+//                    self.add_message(&message);
 //                }
-//            });
-//            receive_thread.join();
+//
+//                remainder -= now.elapsed().unwrap().as_millis();
+//            }
+//            Err("Cannot find the message")
 //        }
+    }
+
+    pub fn search_pop_message(ctx:&mut ComputingParty)->Result<RFMessage, &'static str> {
+        let manager = &mut ctx.message_manager;
+        let message_id = ctx.thread_hierarchy.join(":");
+        let mut in_stream = ctx.in_stream.try_clone().unwrap();
+        let mut remainder = MAX_SEARCH_TIMEOUT;
+        if manager.map.contains_key(&message_id) {
+            let mut message = manager.map.remove(&message_id);
+            return Ok(message.unwrap());
+        }
+        while remainder > 0 {
+            let mut now = SystemTime::now();
+            let mut reader = BufReader::new(&in_stream);
+            let mut message_string = String::new();
+            reader.read_line(&mut message_string);
+            let message: RFMessage = serde_json::from_str(&message_string).unwrap();
+            if message.message_id==message_id{
+                return Ok(message);
+            }else{
+                manager.add_message(&message);
+            }
+
+            remainder -= now.elapsed().unwrap().as_millis();
+        }
+        Err("Cannot find the message")
     }
 }

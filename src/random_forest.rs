@@ -10,7 +10,6 @@ pub mod random_forest {
 
 
     pub fn train(ctx: &mut ComputingParty) {
-
         ctx.thread_hierarchy.push("RF".to_string());
         let thread_pool = ThreadPool::with_name(format!("{}","RF"),ctx.thread_count);
         let mut remainder = ctx.tree_count;

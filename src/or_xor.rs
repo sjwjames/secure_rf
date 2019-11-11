@@ -14,7 +14,7 @@ pub mod or_xor{
     use serde::{Serialize, Deserialize, Serializer};
     use std::net::TcpStream;
     use std::ops::{Add, Mul};
-    use crate::multiplication::multiplication::{batch_multiply, batch_multiply_bigint};
+    use crate::multiplication::multiplication::{batch_multiply, batch_multiply_bigint, batch_multiplication_integer};
 
     pub fn or_xor(x_list: &Vec<Wrapping<u64>>,
                   y_list: &Vec<Wrapping<u64>>,
@@ -33,7 +33,7 @@ pub mod or_xor{
             let mut x_list = x_list.clone();
             let mut y_list = y_list.clone();
             thread_pool.execute(move || {
-                let mut batch_mul_result = batch_multiply(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
+                let mut batch_mul_result = batch_multiplication_integer(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
                 let mut output_map = output_map.lock().unwrap();
                 (*output_map).insert(batch_count, batch_mul_result);
             });
