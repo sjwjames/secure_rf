@@ -17,6 +17,7 @@ pub mod decision_tree {
     use crate::bit_decomposition::bit_decomposition::bit_decomposition;
     use crate::protocol::protocol::arg_max;
     use crate::constants::constants::BINARY_PRIME;
+    use crate::message::message::{RFMessage, search_pop_message};
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -146,22 +147,25 @@ pub mod decision_tree {
         let major_class_index = find_common_class_index(ctx);
         // Make majority class index one-hot encoding public
         // Share major class index
-        let mut in_stream = ctx.in_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
+        ctx.thread_hierarchy.push("share_major_class_index".to_string());
 
         let mut o_stream = ctx.o_stream.try_clone()
             .expect("failed cloning tcp o_stream");
-        o_stream.write(format!("{}\n", serde_json::to_string(&major_class_index).unwrap()).as_bytes());
+        let mut message = RFMessage{
+            message_id: ctx.thread_hierarchy.join(":"),
+            message_content: serde_json::to_string(&major_class_index).unwrap()
+        };
+        o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
 
-        let mut reader = BufReader::new(in_stream);
-        let mut major_class_index_message = String::new();
-        reader.read_line(&mut major_class_index_message).expect("fail to read major class index message");
-        let mut major_class_index_receive:Vec<u8> = serde_json::from_str(&major_class_index_message).unwrap();
+        let mut message = search_pop_message(ctx).unwrap();
+        let mut major_class_index_receive:Vec<u8> = serde_json::from_str(&message.message_content).unwrap();
+
         let class_value_count = ctx.dt_data.class_value_count;
         let mut major_class_index_shared = vec![0u8;class_value_count];
         for i in 0..class_value_count{
             major_class_index_shared[i] = mod_floor((Wrapping((&major_class_index)[i])+Wrapping((&major_class_index_receive)[i])).0,BINARY_PRIME as u8);
         }
+        ctx.thread_hierarchy.pop();
 
         let mut major_index = 0;
         for i in 0..class_value_count{
@@ -174,6 +178,7 @@ pub mod decision_tree {
         for i in major_index+1..class_value_count{
             major_class_index_shared[i] = 0;
         }
+
 
         ctx.thread_hierarchy.pop();
 

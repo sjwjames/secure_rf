@@ -14,7 +14,7 @@ pub mod dot_product{
     use serde::{Serialize, Deserialize, Serializer};
     use std::net::TcpStream;
     use std::ops::{Add, Mul};
-    use crate::multiplication::multiplication::{batch_multiply, batch_multiply_bigint};
+    use crate::multiplication::multiplication::{batch_multiply, batch_multiply_bigint, batch_multiplication_integer};
 
     /* computed the dp modulo 2^64 of two vectors with pre/post truncation options */
     pub fn dot_product(x_list: &Vec<Wrapping<u64>>,
@@ -25,7 +25,7 @@ pub mod dot_product{
                        pretruncate: bool) -> Wrapping<u64> {
         ctx.thread_hierarchy.push("dot_product".to_string());
         //println!("entering dot product");
-        let z_list = batch_multiply(x_list, y_list, ctx);
+        let z_list = batch_multiplication_integer(x_list, y_list, ctx);
 
         if !truncate {
             return z_list.iter().sum();
