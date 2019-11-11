@@ -2,62 +2,87 @@ pub mod message {
     use std::collections::HashMap;
     use serde::{Serialize, Deserialize, Serializer};
     use std::sync::{Arc, Mutex};
+    use std::net::TcpStream;
+    use std::io::{BufReader, BufRead, Read};
+    use std::time::SystemTime;
+    use threadpool::ThreadPool;
+    use std::thread;
+
+    pub const MAX_SEARCH_TIMEOUT: u128 = 60 * 1000;
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct Message {
         pub message_id: String,
-        pub message_content:String,
+        pub message_content: String,
     }
 
-    pub struct MessageManager{
-        pub map: HashMap<String,Message>,
-        pub current_message_id:Arc<Mutex<String>>
+    pub struct MessageManager {
+        pub map: HashMap<String, Message>,
     }
 
-    impl Clone for Message{
+    impl Clone for Message {
         fn clone(&self) -> Self {
-            Message{
+            Message {
                 message_id: self.message_id.clone(),
-                message_content: self.message_content.clone()
+                message_content: self.message_content.clone(),
             }
         }
     }
 
-    impl MessageManager{
-        pub fn new(thread_prefix:&str)->Self{
-            MessageManager{
-                map:HashMap::new(),
-                current_message_id:Arc::new(Mutex::new(format!("{}:0",thread_prefix)))
+    impl Clone for MessageManager {
+        fn clone(&self) -> Self {
+            MessageManager {
+                map: self.map.clone()
             }
         }
-        pub fn add_message(&mut self,message:&Message)->Result<&'static str,&'static str>{
-            if self.map.contains_key(&message.message_id){
+    }
+
+
+    impl MessageManager {
+        fn add_message(&mut self, message: &Message) -> Result<&'static str, &'static str> {
+            if self.map.contains_key(&message.message_id) {
                 Err("Unable to add the message since the id exists already")
-            }else{
-                self.map.insert(message.message_id.clone(),message.clone());
+            } else {
+                self.map.insert(message.message_id.clone(), message.clone());
                 Ok("Successfully add the message")
             }
         }
 
-        pub fn pop_message(&mut self,message_id:String)->Result<Message,&'static str>{
-            if self.map.contains_key(&message_id){
-                let mut message= self.map.remove(&message_id);
-                Ok(message.unwrap())
-            }else{
-                Err("Cannot find the message")
+        pub fn search_pop_message(&mut self, message_id: String, in_stream: &TcpStream) -> Result<Message, &'static str> {
+            let mut remainder = MAX_SEARCH_TIMEOUT;
+            if self.map.contains_key(&message_id) {
+                let mut message = self.map.remove(&message_id);
+                return Ok(message.unwrap());
             }
+            while remainder > 0 {
+                let mut now = SystemTime::now();
+                let mut reader = BufReader::new(in_stream);
+                let mut message_string = String::new();
+                reader.read_line(&mut message_string);
+                let message: Message = serde_json::from_str(&message_string).unwrap();
+                if message.message_id==message_id{
+                    return Ok(message);
+                }else{
+                    self.add_message(&message);
+                }
+
+                remainder -= now.elapsed().unwrap().as_millis();
+            }
+            Err("Cannot find the message")
         }
 
-        pub fn generate_new_message(&self,message_content:String)->Message{
-            let mut current_message = &*(self.current_message_id.lock().unwrap());
-            let message_in_array:Vec<&str> = current_message.split(":").collect();
-            let mut current_id:u64 = message_in_array[message_in_array.len()-1].parse().unwrap();
-            let prefix = message_in_array[0..message_in_array.len()-1].join(":");
-            current_id+=1;
-            Message{
-                message_id: format!("{}:{}",prefix,current_id),
-                message_content
-            }
-        }
+//        pub fn build_connection(&mut self, in_stream: &TcpStream){
+//            let mut in_stream_cloned = in_stream.try_clone().unwrap();
+//            let mut reader = BufReader::new(in_stream_cloned);
+//            let mut self_arc = Arc::new(Mutex::new(self));
+//            let receive_thread = thread::spawn( move|| {
+//                for line in reader.lines() {
+//                    let message_line = line.unwrap();
+//                    let message: Message = serde_json::from_str(&message_line).unwrap();
+//                    (*(self_arc.lock().unwrap())).add_message(&message);
+//                }
+//            });
+//            receive_thread.join();
+//        }
     }
 }

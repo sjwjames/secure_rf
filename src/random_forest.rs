@@ -5,9 +5,13 @@ pub mod random_forest {
     use threadpool::ThreadPool;
     use crate::field_change::field_change::{change_binary_to_bigint_field, change_binary_to_decimal_field};
     use std::thread::current;
+    use crate::message::message::MessageManager;
+    use std::collections::HashMap;
 
 
     pub fn train(ctx: &mut ComputingParty) {
+
+        ctx.thread_hierarchy.push("RF".to_string());
         let thread_pool = ThreadPool::with_name(format!("{}","RF"),ctx.thread_count);
         let mut remainder = ctx.tree_count;
         let mut party0_port = Arc::new(Mutex::new(ctx.party0_port));
@@ -66,5 +70,6 @@ pub mod random_forest {
         }
 
         thread_pool.join();
+        ctx.thread_hierarchy.pop();
     }
 }
