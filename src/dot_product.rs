@@ -23,7 +23,7 @@ pub mod dot_product{
                        decimal_precision: u32,
                        truncate: bool,
                        pretruncate: bool) -> Wrapping<u64> {
-
+        ctx.thread_hierarchy.push("dot_product".to_string());
         //println!("entering dot product");
         let z_list = batch_multiply(x_list, y_list, ctx);
 
@@ -44,6 +44,7 @@ pub mod dot_product{
                 z_list[i], decimal_precision, (*ctx).asymmetric_bit,
             );
         }
+        ctx.thread_hierarchy.pop();
         z_trunc_list.iter().sum()
     }
 

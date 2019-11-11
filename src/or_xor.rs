@@ -19,6 +19,7 @@ pub mod or_xor{
     pub fn or_xor(x_list: &Vec<Wrapping<u64>>,
                   y_list: &Vec<Wrapping<u64>>,
                   ctx: &mut ComputingParty, constant_multiplier: u64) -> Vec<Wrapping<u64>> {
+        ctx.thread_hierarchy.push("or_xor".to_string());
         let bit_length = x_list.len();
         let thread_pool = ThreadPool::new(ctx.thread_count);
         let mut i = 0;
@@ -28,6 +29,7 @@ pub mod or_xor{
             let mut output_map = Arc::clone(&output_map);
             let to_index = min(i + ctx.batch_size, bit_length);
             let mut ctx_copied = ctx.clone();
+            ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
             let mut x_list = x_list.clone();
             let mut y_list = y_list.clone();
             thread_pool.execute(move || {
@@ -51,10 +53,13 @@ pub mod or_xor{
                 global_index += 1;
             }
         }
+
+        ctx.thread_hierarchy.pop();
         output
     }
 
     pub fn or_xor_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty, constant_multiplier: &BigUint) -> Vec<BigUint> {
+        ctx.thread_hierarchy.push("or_xor_bigint".to_string());
         let bit_length = x_list.len();
         let mut output = vec![BigUint::zero(); bit_length];
         let thread_pool = ThreadPool::new(ctx.thread_count);
@@ -65,6 +70,7 @@ pub mod or_xor{
             let mut output_map = Arc::clone(&output_map);
             let to_index = min(i + ctx.batch_size, bit_length);
             let mut ctx_copied = ctx.clone();
+            ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
             let mut x_list = big_uint_vec_clone(x_list);
             let mut y_list = big_uint_vec_clone(y_list);
             thread_pool.execute(move || {
@@ -88,6 +94,7 @@ pub mod or_xor{
                 global_index += 1;
             }
         }
+        ctx.thread_hierarchy.pop();
         output
     }
 }

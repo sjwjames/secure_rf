@@ -38,6 +38,7 @@ fn run(){
                 run_ti_module(&mut ti_context);
             } else {
                 let mut party_context = initialize_party_context(settings_file.clone());
+                party_context.thread_hierarchy.push("RF".to_string());
                 random_forest::train(&mut party_context);
             }
         }

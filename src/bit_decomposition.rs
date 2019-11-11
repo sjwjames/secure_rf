@@ -12,6 +12,7 @@ pub mod bit_decomposition {
     use std::num::Wrapping;
 
     pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty) -> Vec<u8> {
+        ctx.thread_hierarchy.push("bit_decomposition".to_string());
         let mut input_shares = Vec::new();
         let bit_length = ctx.dt_training.bit_length as usize;
         let mut d_shares = vec![0u8; bit_length];
@@ -57,10 +58,12 @@ pub mod bit_decomposition {
         let mut i = 0;
         let mut output_map = Arc::new(Mutex::new(HashMap::new()));
         let mut batch_count = 0;
+        ctx.thread_hierarchy.push("compute_d_shares".to_string());
         while i < bit_length {
             let mut output_map = Arc::clone(&output_map);
             let to_index = min(i + ctx.batch_size, bit_length);
             let mut ctx_copied = ctx.clone();
+            ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
             let mut input_shares = input_shares.clone();
             thread_pool.execute(move || {
                 let mut batch_mul_result = batch_multiplication_byte(&input_shares[0][i..to_index].to_vec(), &input_shares[1][i..to_index].to_vec(), &mut ctx_copied);
@@ -71,6 +74,8 @@ pub mod bit_decomposition {
             batch_count += 1;
         }
         thread_pool.join();
+        ctx.thread_hierarchy.pop();
+
         let output_map = &(*(output_map.lock().unwrap()));
         let mut global_index = 0;
         for i in 0..batch_count {
@@ -82,6 +87,7 @@ pub mod bit_decomposition {
         }
         let mut e_shares = vec![0u8; bit_length];
 
+        ctx.thread_hierarchy.push("compute_variables".to_string());
         for i in 1..bit_length {
             //computeVariables
             let e_result = (Wrapping(multiplication_byte(y_shares[i], c_shares[i - 1], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
@@ -91,6 +97,11 @@ pub mod bit_decomposition {
             let c_result = (Wrapping(multiplication_byte(e_shares[i], d_shares[i], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
             c_shares[i] = mod_floor(c_result, BINARY_PRIME as u8);
         }
+        // pop computeVariables
+        ctx.thread_hierarchy.pop();
+
+        // pop bit_decomposition
+        ctx.thread_hierarchy.pop();
         x_shares
     }
 }

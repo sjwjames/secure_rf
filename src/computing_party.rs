@@ -55,6 +55,8 @@ pub mod computing_party {
         pub batch_size: usize,
         pub tree_training_batch_size: usize,
 
+        //multi_thread
+        pub thread_hierarchy:Vec<String>,
     }
 
     impl Clone for ComputingParty {
@@ -85,6 +87,7 @@ pub mod computing_party {
                 batch_size: self.batch_size,
 
                 tree_training_batch_size: self.tree_training_batch_size,
+                thread_hierarchy: self.thread_hierarchy.clone()
             }
         }
     }
@@ -499,6 +502,7 @@ pub mod computing_party {
                 current_equality_index: Arc::new(Mutex::new(0 as usize)),
                 current_binary_index: Arc::new(Mutex::new(0 as usize)),
             },
+            thread_hierarchy:vec![format!("{}","main")]
         }
     }
 

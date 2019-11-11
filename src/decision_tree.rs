@@ -142,6 +142,7 @@ pub mod decision_tree {
 
 
     pub fn train(ctx: &mut ComputingParty) {
+        ctx.thread_hierarchy.push("DT".to_string());
         let major_class_index = find_common_class_index(ctx);
         // Make majority class index one-hot encoding public
         // Share major class index
@@ -174,10 +175,12 @@ pub mod decision_tree {
             major_class_index_shared[i] = 0;
         }
 
+        ctx.thread_hierarchy.pop();
 
     }
 
     fn find_common_class_index(ctx: &mut ComputingParty) -> Vec<u8> {
+        ctx.thread_hierarchy.push("find_common_class_index".to_string());
         let mut subset_transaction_bit_vector = ctx.dt_training.subset_transaction_bit_vector.clone();
         let mut subset_decimal = change_binary_to_decimal_field(&subset_transaction_bit_vector, ctx);
         let mut s = Vec::new();
@@ -185,11 +188,13 @@ pub mod decision_tree {
         let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
         let mut ctx_copied = ctx.clone();
 
+        ctx_copied.thread_hierarchy.push("compute_dp".to_string());
         for i in 0..ctx.dt_data.class_value_count {
             let mut dp_result_map = Arc::clone(&dp_result_map);
             let mut subset_decimal = subset_decimal.clone();
             let mut class_value_transaction = ctx.dt_data.class_values.clone();
             let mut ctx = ctx_copied.clone();
+            ctx.thread_hierarchy.push(format!("{}",i));
             thread_pool.execute(move || {
                 let precision = ctx.decimal_precision;
                 let dp_result = dot_product(&subset_decimal, &class_value_transaction[i], &mut ctx, precision, true, false);
@@ -198,6 +203,8 @@ pub mod decision_tree {
             });
         }
         thread_pool.join();
+        ctx_copied.thread_hierarchy.pop();
+
         let mut dp_result_map = &*(dp_result_map.lock().unwrap());
         for i in 0..ctx.dt_data.class_value_count {
             s.push((dp_result_map.get(&i).unwrap()).clone());
@@ -205,9 +212,12 @@ pub mod decision_tree {
 
         let mut ctx_copied = ctx.clone();
         let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
+
+        ctx_copied.thread_hierarchy.push("compute_db".to_string());
         for i in 0..ctx.dt_data.class_value_count {
             let mut bd_result_map = Arc::clone(&bd_result_map);
             let mut ctx = ctx_copied.clone();
+            ctx.thread_hierarchy.push(format!("{}",i));
             let s_copied = s[i];
             //run in parallel would cause data corruption
             thread_pool.execute(move || {
@@ -217,6 +227,8 @@ pub mod decision_tree {
             });
         }
         thread_pool.join();
+        ctx_copied.thread_hierarchy.pop();
+
         let mut bd_result_map = &*(bd_result_map.lock().unwrap());
         let mut bit_shares = Vec::new();
         for i in 0..ctx.dt_data.class_value_count {
@@ -225,6 +237,7 @@ pub mod decision_tree {
 
         let mut arg_max = arg_max(&bit_shares, ctx);
 
+        ctx.thread_hierarchy.pop();
         arg_max
     }
 }

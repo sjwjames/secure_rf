@@ -9,6 +9,7 @@ pub mod comparison {
     use std::collections::HashMap;
 
     pub fn comparison(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> u8 {
+        ctx.thread_hierarchy.push("comparison".to_string());
         let bit_length = max(x_list.len(), y_list.len());
         let prime = BINARY_PRIME;
         let ti_shares = &ctx.dt_shares.binary_triples;
@@ -27,6 +28,7 @@ pub mod comparison {
         let mut x_list_copied = x_list.clone();
         let mut y_list_copied = y_list.clone();
         let mut ctx_copied = ctx.clone();
+        ctx_copied.thread_hierarchy.push("compute_D_shares".to_string());
         let mut d_shares_wrapper = Arc::new(Mutex::new(d_shares));
         let mut d_shares_wrapper_copy = Arc::clone(&d_shares_wrapper);
         thread_pool.execute(move || {
@@ -46,6 +48,7 @@ pub mod comparison {
         let mut d_shares = (*d_shares_wrapper.lock().unwrap()).clone();
         //compute multiplication E parallel
         let mut ctx_copied = ctx.clone();
+        ctx.thread_hierarchy.push("compute_E_parallel".to_string());
         let mut multiplication_e = vec![0u8; bit_length];
         let mut multiplication_e_wrapper = Arc::new(Mutex::new(multiplication_e));
         let mut multiplication_e_copied = Arc::clone(&multiplication_e_wrapper);
@@ -65,6 +68,7 @@ pub mod comparison {
                     let mut output_map = Arc::clone(&output_map);
                     let to_index = min(i + ctx_copied.batch_size, temp_mul_e.len());
                     let mut ctx_copied_inner = ctx_copied.clone();
+                    ctx_copied_inner.thread_hierarchy.push(format!("{}",batch_count));
                     let mut temp_mul_e = temp_mul_e.clone();
                     inner_pool.execute(move || {
                         let mut batch_mul_result = batch_multiplication_byte(&temp_mul_e[i..to_index - 1].to_vec(), &temp_mul_e[i + 1..to_index].to_vec(), &mut ctx_copied_inner);
@@ -91,17 +95,18 @@ pub mod comparison {
             (*multiplication_e_copied)[0] = 0;
         });
         thread_pool.join();
+        ctx.thread_hierarchy.pop();
         let mut multiplication_e = (*multiplication_e_wrapper.lock().unwrap()).clone();
         //compute c shares
         let mut i = 0;
         let mut batch_count = 0;
         let mut output_map = Arc::new(Mutex::new(HashMap::new()));
-
+        ctx.thread_hierarchy.push("compute_c_shares".to_string());
         while i < bit_length - 1 {
             let mut output_map = Arc::clone(&output_map);
             let to_index = min(i + ctx.batch_size, bit_length - 1);
             let mut ctx_copied = ctx.clone();
-
+            ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
             let d_shares_copied = (&d_shares)[i..to_index].to_vec().clone();
             let multiplication_e_copied = (&multiplication_e)[i + 1..to_index + 1].to_vec().clone();
             thread_pool.execute(move || {
@@ -113,6 +118,7 @@ pub mod comparison {
             batch_count += 1;
         }
         thread_pool.join();
+        ctx.thread_hierarchy.pop();
         let output_map = &*(output_map.lock().unwrap());
         for i in 0..batch_count {
             let products = output_map.get(&i).unwrap();
@@ -128,6 +134,8 @@ pub mod comparison {
             w += c_shares[i] as i8;
             w = mod_floor(w, BINARY_PRIME as i8);
         }
+
+        ctx.thread_hierarchy.pop();
         w as u8
     }
 }

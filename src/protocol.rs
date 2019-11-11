@@ -21,6 +21,7 @@ pub mod protocol {
     use crate::comparison::comparison::comparison;
 
     pub fn arg_max(bit_shares: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
+        ctx.thread_hierarchy.push("arg_max".to_string());
         let number_count = bit_shares.len();
 
         let mut result = Vec::new();
@@ -45,6 +46,7 @@ pub mod protocol {
                     if i != j {
                         let mut output_map = Arc::clone(&output_map);
                         let mut ctx_copied = ctx.clone();
+                        ctx_copied.thread_hierarchy.push(format!("{}",i * number_count + j));
                         let mut bit_shares = bit_shares.clone();
                         thread_pool.execute(move || {
                             key = i * number_count + j;
@@ -65,6 +67,7 @@ pub mod protocol {
 
             let mut output_map = Arc::new(Mutex::new((HashMap::new())));
             //multi-threaded parallel multiplication
+            ctx.thread_hierarchy.push("parallel_multiplication".to_string());
             for i in 0..number_count {
                 let mut vec = Vec::new();
                 for item in w_intermediate.get(&i).unwrap().iter() {
@@ -72,19 +75,22 @@ pub mod protocol {
                 }
                 let mut output_map = Arc::clone(&output_map);
                 let mut ctx_copied = ctx.clone();
+                ctx_copied.thread_hierarchy.push(format!("{}",i));
                 thread_pool.execute(move || {
                     let multi_result = parallel_multiplication(&vec, &mut ctx_copied);
                     let mut output_map = output_map.lock().unwrap();
                     (*output_map).insert(i, multi_result);
                 });
             }
-
+            ctx.thread_hierarchy.pop();
             let output_map = &*(output_map.lock().unwrap());
             for i in 0..number_count {
                 let multi_result = output_map.get(&i).unwrap();
                 result[i] = *multi_result;
             }
         }
+
+        ctx.thread_hierarchy.pop();
         result
     }
 

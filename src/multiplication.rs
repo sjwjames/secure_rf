@@ -21,6 +21,7 @@ pub mod multiplication{
     }
 
     pub fn batch_multiply_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty) -> Vec<BigUint> {
+        ctx.thread_hierarchy.push("batch_multiply_bigint".to_string());
         let mut result = vec![BigUint::zero(); x_list.len()];
         let mut diff_list = Vec::new();
         let prime = big_uint_clone(&ctx.dt_training.big_int_prime);
@@ -78,12 +79,13 @@ pub mod multiplication{
             let e = &big_uint_subtract(&y_list[i], v, &prime).mod_floor(&prime).add(&e_list[i]).mod_floor(&prime);
             result[i] = w.add(&d.mul(v)).add(&e.mul(u)).add(&(&d.mul(e)).mul(&big_asymmetric_bit)).mod_floor(&prime);
         }
-
+        ctx.thread_hierarchy.pop();
         result
     }
 
     /* computes entrywise product modulo 2^64 of two vectors */
     pub fn batch_multiply(x_list: &Vec<Wrapping<u64>>, y_list: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+        ctx.thread_hierarchy.push("batch_multiply".to_string());
         let mut z_list: Vec<Wrapping<u64>> = vec![Wrapping(0); (*x_list).len()];
 
         let mut remainder = (*x_list).len();
@@ -116,6 +118,7 @@ pub mod multiplication{
 
         z_list[BATCH_SIZE * index..].clone_from_slice(&(z_sublist[..remainder]));
 
+        ctx.thread_hierarchy.pop();
 
         z_list
     }
@@ -225,6 +228,7 @@ pub mod multiplication{
 
 
     pub fn multiplication_byte(x: u8, y: u8, ctx: &mut ComputingParty) -> u8 {
+        ctx.thread_hierarchy.push("multiplication_byte".to_string());
         let mut diff_list = Vec::new();
         let ti_share_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
         let ti_share_triple = ctx.dt_shares.binary_triples[ti_share_index];
@@ -253,10 +257,12 @@ pub mod multiplication{
         let mut result: u8 = (Wrapping(ti_share_triple.2 as u8) + (Wrapping(d) * Wrapping(ti_share_triple.1 as u8)) + (Wrapping(ti_share_triple.0 as u8) * Wrapping(e))
             + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u8))).0;
         result = mod_floor(result, BINARY_PRIME as u8);
+        ctx.thread_hierarchy.pop();
         result
     }
 
     pub fn batch_multiplication_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
+        ctx.thread_hierarchy.push("batch_multiplication_byte".to_string());
         let batch_size = x_list.len();
         let mut diff_list = Vec::new();
         let mut output = Vec::new();
@@ -302,11 +308,12 @@ pub mod multiplication{
             result = mod_floor(result, BINARY_PRIME as u8);
             output.push(result);
         }
-
+        ctx.thread_hierarchy.pop();
         output
     }
 
     pub fn parallel_multiplication(row: &Vec<u8>, ctx: &mut ComputingParty) -> u8 {
+        ctx.thread_hierarchy.push("parallel_multiplication".to_string());
         let mut products = row.clone();
         let thread_pool = ThreadPool::new(ctx.thread_count);
 
@@ -330,7 +337,7 @@ pub mod multiplication{
                 let mut products_copied = products.clone();
                 let mut output_map = Arc::clone(&output_map);
                 let mut ctx_copied = ctx.clone();
-
+                ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
                 thread_pool.execute(move || {
                     let mut batch_mul_result = batch_multiplication_byte(&products_copied[i1..temp_index1].to_vec(), &products_copied[i2..temp_index2].to_vec(), &mut ctx_copied);
                     let mut output_map = output_map.lock().unwrap();
@@ -353,6 +360,7 @@ pub mod multiplication{
                 products.push(push as u8);
             }
         }
+        ctx.thread_hierarchy.pop();
         products[0]
     }
 
