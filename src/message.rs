@@ -9,7 +9,7 @@ pub mod message {
     use std::thread;
     use crate::computing_party::computing_party::ComputingParty;
 
-    pub const MAX_SEARCH_TIMEOUT: u128 = 60 * 1000;
+    pub const MAX_SEARCH_TIMEOUT: u128 = 10 * 1000;
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct RFMessage {
@@ -73,9 +73,8 @@ pub mod message {
 //        }
     }
 
-    pub fn search_pop_message(ctx:&mut ComputingParty)->Result<RFMessage, &'static str> {
+    pub fn search_pop_message(ctx: &mut ComputingParty,message_id:String) -> Result<RFMessage, &'static str> {
         let manager = &mut ctx.message_manager;
-        let message_id = ctx.thread_hierarchy.join(":");
         let mut in_stream = ctx.in_stream.try_clone().unwrap();
         let mut remainder = MAX_SEARCH_TIMEOUT;
         if manager.map.contains_key(&message_id) {
@@ -88,14 +87,15 @@ pub mod message {
             let mut message_string = String::new();
             reader.read_line(&mut message_string);
             let message: RFMessage = serde_json::from_str(&message_string).unwrap();
-            if message.message_id==message_id{
+            if message.message_id == message_id {
                 return Ok(message);
-            }else{
+            } else {
                 manager.add_message(&message);
             }
-
-            remainder -= now.elapsed().unwrap().as_millis();
+            let complete_time =  now.elapsed().unwrap().as_millis();
+            if remainder > complete_time { remainder -= complete_time; } else { break; }
         }
         Err("Cannot find the message")
     }
+
 }

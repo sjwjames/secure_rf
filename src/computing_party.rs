@@ -746,4 +746,12 @@ pub mod computing_party {
 //
 //        (add_shares, xor_shares)
     }
+
+    pub fn reset_share_indices(ctx:&mut ComputingParty){
+        ctx.dt_shares.current_binary_index=Arc::new(Mutex::new(0));
+        ctx.dt_shares.current_additive_index=Arc::new(Mutex::new(0));
+        ctx.dt_shares.current_additive_bigint_index=Arc::new(Mutex::new(0));
+        ctx.dt_shares.current_equality_index=Arc::new(Mutex::new(0));
+
+    }
 }

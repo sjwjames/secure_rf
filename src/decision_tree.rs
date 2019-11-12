@@ -12,8 +12,8 @@ pub mod decision_tree {
     //    use crate::dot_product::dot_product::dot_product;
     use crate::field_change::field_change::change_binary_to_decimal_field;
     use std::thread::sleep;
-    use std::time::Duration;
-    use crate::dot_product::dot_product::dot_product;
+    use std::time::{Duration, SystemTime};
+    use crate::dot_product::dot_product::{dot_product, dot_product_integer};
     use crate::bit_decomposition::bit_decomposition::bit_decomposition;
     use crate::protocol::protocol::arg_max;
     use crate::constants::constants::BINARY_PRIME;
@@ -143,6 +143,7 @@ pub mod decision_tree {
 
 
     pub fn train(ctx: &mut ComputingParty) {
+        println!("start building model");
         ctx.thread_hierarchy.push("DT".to_string());
         let major_class_index = find_common_class_index(ctx);
         // Make majority class index one-hot encoding public
@@ -155,10 +156,17 @@ pub mod decision_tree {
             message_id: ctx.thread_hierarchy.join(":"),
             message_content: serde_json::to_string(&major_class_index).unwrap()
         };
-        o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
+        let mut major_class_index_receive:Vec<u8> = Vec::new();
+        if ctx.asymmetric_bit==1{
+            o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
+            let mut received_message = search_pop_message(ctx,message.message_id.clone()).unwrap();
+            major_class_index_receive= serde_json::from_str(&received_message.message_content).unwrap();
+        }else{
+            let mut received_message = search_pop_message(ctx,message.message_id.clone()).unwrap();
+            major_class_index_receive= serde_json::from_str(&received_message.message_content).unwrap();
+            o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
+        }
 
-        let mut message = search_pop_message(ctx).unwrap();
-        let mut major_class_index_receive:Vec<u8> = serde_json::from_str(&message.message_content).unwrap();
 
         let class_value_count = ctx.dt_data.class_value_count;
         let mut major_class_index_shared = vec![0u8;class_value_count];
@@ -179,12 +187,13 @@ pub mod decision_tree {
             major_class_index_shared[i] = 0;
         }
 
-
+        println!("{:?}",major_class_index_shared);
         ctx.thread_hierarchy.pop();
 
     }
 
     fn find_common_class_index(ctx: &mut ComputingParty) -> Vec<u8> {
+        let mut now = SystemTime::now();
         ctx.thread_hierarchy.push("find_common_class_index".to_string());
         let mut subset_transaction_bit_vector = ctx.dt_training.subset_transaction_bit_vector.clone();
         let mut subset_decimal = change_binary_to_decimal_field(&subset_transaction_bit_vector, ctx);
@@ -196,18 +205,19 @@ pub mod decision_tree {
         ctx_copied.thread_hierarchy.push("compute_dp".to_string());
         for i in 0..ctx.dt_data.class_value_count {
             let mut dp_result_map = Arc::clone(&dp_result_map);
-            let mut subset_decimal = subset_decimal.clone();
+            let mut subset_decimal_cloned = subset_decimal.clone();
             let mut class_value_transaction = ctx.dt_data.class_values.clone();
             let mut ctx = ctx_copied.clone();
             ctx.thread_hierarchy.push(format!("{}",i));
             thread_pool.execute(move || {
                 let precision = ctx.decimal_precision;
-                let dp_result = dot_product(&subset_decimal, &class_value_transaction[i], &mut ctx, precision, true, false);
+                let dp_result = dot_product_integer(&subset_decimal_cloned, &class_value_transaction[i], &mut ctx);
                 let mut dp_result_map = dp_result_map.lock().unwrap();
                 (*dp_result_map).insert(i, (dp_result.0));
             });
         }
         thread_pool.join();
+        println!("compute_dp completes in {}ms",now.elapsed().unwrap().as_millis());
         ctx_copied.thread_hierarchy.pop();
 
         let mut dp_result_map = &*(dp_result_map.lock().unwrap());
@@ -218,7 +228,7 @@ pub mod decision_tree {
         let mut ctx_copied = ctx.clone();
         let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
 
-        ctx_copied.thread_hierarchy.push("compute_db".to_string());
+        ctx_copied.thread_hierarchy.push("compute_bd".to_string());
         for i in 0..ctx.dt_data.class_value_count {
             let mut bd_result_map = Arc::clone(&bd_result_map);
             let mut ctx = ctx_copied.clone();
@@ -232,6 +242,7 @@ pub mod decision_tree {
             });
         }
         thread_pool.join();
+        println!("compute_bd completes in {}ms",now.elapsed().unwrap().as_millis());
         ctx_copied.thread_hierarchy.pop();
 
         let mut bd_result_map = &*(bd_result_map.lock().unwrap());
@@ -243,6 +254,7 @@ pub mod decision_tree {
         let mut arg_max = arg_max(&bit_shares, ctx);
 
         ctx.thread_hierarchy.pop();
+        println!("find common class index completes in {}ms",now.elapsed().unwrap().as_millis());
         arg_max
     }
 }

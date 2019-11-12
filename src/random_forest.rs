@@ -1,5 +1,5 @@
 pub mod random_forest {
-    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive};
+    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, reset_share_indices};
     use crate::decision_tree::decision_tree;
     use std::sync::{Arc, Mutex};
     use threadpool::ThreadPool;
@@ -50,22 +50,35 @@ pub mod random_forest {
 
             dt_ctx.dt_data.class_values = class_values;
             dt_ctx.dt_data.class_values_big_integer = class_values_bigint;
-            thread_pool.execute(move || {
-                let mut p0_port = p0_port.lock().unwrap();
-                *p0_port += 1;
-                dt_ctx.party0_port = *p0_port;
+            reset_share_indices(&mut dt_ctx);
+//            thread_pool.execute(move || {
+//                let mut p0_port = p0_port.lock().unwrap();
+//                *p0_port += 1;
+//                dt_ctx.party0_port = *p0_port;
+//
+//                let mut p1_port = p1_port.lock().unwrap();
+//                *p1_port += 1;
+//                dt_ctx.party1_port = *p1_port;
+//
+//                let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);
+//                let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr);
+//                dt_ctx.in_stream = in_stream;
+//                dt_ctx.o_stream = o_stream;
+//                let dt_training = decision_tree::train(&mut dt_ctx);
+//            });
+            let mut p0_port = p0_port.lock().unwrap();
+            *p0_port += 1;
+            dt_ctx.party0_port = *p0_port;
 
-                let mut p1_port = p1_port.lock().unwrap();
-                *p1_port += 1;
-                dt_ctx.party1_port = *p1_port;
+            let mut p1_port = p1_port.lock().unwrap();
+            *p1_port += 1;
+            dt_ctx.party1_port = *p1_port;
 
-                let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);
-                let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr);
-                dt_ctx.in_stream = in_stream;
-                dt_ctx.o_stream = o_stream;
-                let dt_training = decision_tree::train(&mut dt_ctx);
-            });
-
+            let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);
+            let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr);
+            dt_ctx.in_stream = in_stream;
+            dt_ctx.o_stream = o_stream;
+            let dt_training = decision_tree::train(&mut dt_ctx);
         }
 
         thread_pool.join();

@@ -1,4 +1,4 @@
-pub mod dot_product{
+pub mod dot_product {
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
     use crate::constants::constants::{BATCH_SIZE, U8S_PER_TX, BUF_SIZE, U64S_PER_TX, BINARY_PRIME};
@@ -48,6 +48,44 @@ pub mod dot_product{
         z_trunc_list.iter().sum()
     }
 
+    pub fn dot_product_integer(x_list: &Vec<Wrapping<u64>>,
+                               y_list: &Vec<Wrapping<u64>>,
+                               ctx: &mut ComputingParty) -> Wrapping<u64> {
+        ctx.thread_hierarchy.push("dot_product".to_string());
+        let mut dot_product: Wrapping<u64> = Wrapping(0 as u64);
+        let vector_length = x_list.len();
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut batch_count = 0;
+        let mut i = 0;
+        let output_map = Arc::new(Mutex::new(HashMap::new()));
+        while i < vector_length {
+            let to_index = min(i + ctx.batch_size, vector_length);
+            let mut ctx_copied = ctx.clone();
+            let x_list_copied = x_list[i..to_index].to_vec().clone();
+            let y_list_copied = y_list[i..to_index].to_vec().clone();
+            let mut output_map = Arc::clone(&output_map);
+            ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
+            thread_pool.execute(move || {
+                let multi_result = batch_multiplication_integer(&x_list_copied, &y_list_copied, &mut ctx_copied);
+                let mut output_map = output_map.lock().unwrap();
+                (*output_map).insert(batch_count, multi_result);
+            });
+            batch_count += 1;
+            i = to_index;
+        }
+        thread_pool.join();
+        let output_map = &*(output_map.lock().unwrap());
+        for i in 0..batch_count {
+            let multi_result = output_map.get(&i).unwrap();
+            for item in multi_result {
+                dot_product = dot_product + item;
+            }
+        }
+        dot_product = Wrapping(mod_floor(dot_product.0,ctx.dt_training.prime));
+        ctx.thread_hierarchy.pop();
+        dot_product
+    }
+
     pub fn dot_product_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty) -> BigUint {
         let mut dot_product = BigUint::zero();
         let vector_length = x_list.len();
@@ -79,5 +117,4 @@ pub mod dot_product{
         }
         dot_product
     }
-
 }

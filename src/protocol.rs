@@ -29,7 +29,9 @@ pub mod protocol {
             result.push(1);
         } else {
             let mut bit_length = 0;
-            bit_shares.iter().map(|x| bit_length = max(bit_length, x.len()));
+            for item in bit_shares.iter(){
+                bit_length = max(bit_length, item.len());
+            }
             let mut w_intermediate = HashMap::new();
 
             for i in 0..number_count {
@@ -57,7 +59,7 @@ pub mod protocol {
                     }
                 }
             }
-
+            thread_pool.join();
             let output_map = output_map.lock().unwrap();
             for i in 0..number_count * (number_count - 1) {
                 let mut comparison = *output_map.get(&i).unwrap();
@@ -82,6 +84,7 @@ pub mod protocol {
                     (*output_map).insert(i, multi_result);
                 });
             }
+            thread_pool.join();
             ctx.thread_hierarchy.pop();
             let output_map = &*(output_map.lock().unwrap());
             for i in 0..number_count {

@@ -135,7 +135,7 @@ pub mod utils {
         let shares = &ctx.dt_shares.binary_triples;
         let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
         let result = &shares[current_index];
-        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
+//        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
         result
     }
 }
