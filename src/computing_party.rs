@@ -11,8 +11,9 @@ pub mod computing_party {
     use num::bigint::{BigUint, BigInt, ToBigUint, ToBigInt};
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
-    use crate::message::message::{MessageManager, setup_message_manager};
+    use crate::message::message::{MessageManager};
     use std::collections::HashMap;
+    use std::thread;
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -58,8 +59,8 @@ pub mod computing_party {
         pub tree_training_batch_size: usize,
 
         //multi_thread
-        pub thread_hierarchy:Vec<String>,
-        pub message_manager:Arc<Mutex<MessageManager>>
+        pub thread_hierarchy: Vec<String>,
+        pub message_manager: Arc<Mutex<MessageManager>>,
     }
 
     impl Clone for ComputingParty {
@@ -91,7 +92,9 @@ pub mod computing_party {
 
                 tree_training_batch_size: self.tree_training_batch_size,
                 thread_hierarchy: self.thread_hierarchy.clone(),
-                message_manager: Arc::clone(&self.message_manager)
+                message_manager: Arc::new(Mutex::new(MessageManager{
+                    map: HashMap::new()
+                })),
             }
         }
     }
@@ -160,7 +163,9 @@ pub mod computing_party {
         loop {
             match TcpStream::connect(socket) {
                 Ok(stream) => return stream,
-                Err(_) => println!("{} connection refused by {}", prefix, socket),
+//                Err(_) => println!("{} connection refused by {}", prefix, socket),
+                Err(_) => print!(""),
+
             };
         }
     }
@@ -506,8 +511,10 @@ pub mod computing_party {
                 current_equality_index: Arc::new(Mutex::new(0 as usize)),
                 current_binary_index: Arc::new(Mutex::new(0 as usize)),
             },
-            thread_hierarchy:vec![format!("{}","main")],
-            message_manager: setup_message_manager(&in_stream_copied)
+            thread_hierarchy: vec![format!("{}", "main")],
+            message_manager: Arc::new(Mutex::new(MessageManager{
+                map: HashMap::new()
+            })),
         }
     }
 
@@ -526,7 +533,7 @@ pub mod computing_party {
         (internal_addr, external_addr)
     }
 
-    pub fn try_setup_socket(internal_addr: &str, external_addr: &str) -> (TcpStream, TcpStream) {
+    pub fn try_setup_socket(internal_addr: &str, external_addr: &str, message_manager: &Arc<Mutex<MessageManager>>) -> (TcpStream,TcpStream) {
         let server_socket: SocketAddr = internal_addr
             .parse()
             .expect("unable to parse internal socket address");
@@ -557,6 +564,7 @@ pub mod computing_party {
         o_stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
         o_stream.set_write_timeout(None).expect("set_write_timeout call failed");
         o_stream.set_read_timeout(None).expect("set_read_timeout call failed");
+
 
         in_stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
         in_stream.set_write_timeout(None).expect("set_write_timeout call failed");
@@ -745,11 +753,10 @@ pub mod computing_party {
 //        (add_shares, xor_shares)
     }
 
-    pub fn reset_share_indices(ctx:&mut ComputingParty){
-        ctx.dt_shares.current_binary_index=Arc::new(Mutex::new(0));
-        ctx.dt_shares.current_additive_index=Arc::new(Mutex::new(0));
-        ctx.dt_shares.current_additive_bigint_index=Arc::new(Mutex::new(0));
-        ctx.dt_shares.current_equality_index=Arc::new(Mutex::new(0));
-
+    pub fn reset_share_indices(ctx: &mut ComputingParty) {
+        ctx.dt_shares.current_binary_index = Arc::new(Mutex::new(0));
+        ctx.dt_shares.current_additive_index = Arc::new(Mutex::new(0));
+        ctx.dt_shares.current_additive_bigint_index = Arc::new(Mutex::new(0));
+        ctx.dt_shares.current_equality_index = Arc::new(Mutex::new(0));
     }
 }

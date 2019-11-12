@@ -2,14 +2,14 @@ pub mod message {
     use std::collections::HashMap;
     use serde::{Serialize, Deserialize, Serializer};
     use std::sync::{Arc, Mutex};
-    use std::net::TcpStream;
+    use std::net::{TcpStream, TcpListener};
     use std::io::{BufReader, BufRead, Read};
     use std::time::SystemTime;
     use threadpool::ThreadPool;
     use std::thread;
     use crate::computing_party::computing_party::ComputingParty;
 
-    pub const MAX_SEARCH_TIMEOUT: u128 = 10 * 1000;
+    pub const MAX_SEARCH_TIMES: u128 = 1000;
 
     #[derive(Serialize, Deserialize, Debug)]
     pub struct RFMessage {
@@ -73,37 +73,43 @@ pub mod message {
 //        }
     }
 
-    pub fn search_pop_message(ctx: &mut ComputingParty, message_id: String) -> Result<RFMessage, &'static str> {
-        let mut manager = Arc::clone(&ctx.message_manager);
-        let mut manager = manager.lock().unwrap();
-        let mut remainder = MAX_SEARCH_TIMEOUT;
-        while remainder > 0 {
-            let mut now = SystemTime::now();
-            if (*manager).map.contains_key(&message_id) {
-                let mut message = (*manager).map.remove(&message_id);
-                return Ok(message.unwrap());
+    pub fn search_pop_message(ctx:&mut ComputingParty, message_id: String) -> Result<RFMessage, &'static str> {
+        let in_stream = ctx.in_stream.try_clone().unwrap();
+        let manager = Arc::clone(&ctx.message_manager);
+        let mut manager_content = manager.lock().unwrap();
+        if (*manager_content).map.contains_key(&message_id) {
+            let mut message = (*manager_content).map.remove(&message_id);
+            return Ok(message.unwrap());
+        }
+        let mut manager_arc = Arc::clone(&manager);
+        loop{
+            let in_stream=in_stream.try_clone().unwrap();
+            let mut reader = BufReader::new(&in_stream);
+            let mut line = String::new();
+            reader.read_line(&mut line);
+            let message: RFMessage = serde_json::from_str(&line).unwrap();
+            if message.message_id.eq(&message_id) {
+                return Ok(message);
             }
-            let complete_time = now.elapsed().unwrap().as_millis();
-            if remainder > complete_time { remainder -= complete_time; } else { break; }
+            let mut manager = manager_arc.lock().unwrap();
+            (*manager).add_message(&message);
         }
         Err("Cannot find the message")
     }
 
-    pub fn setup_message_manager(in_stream: &TcpStream)->Arc<Mutex<MessageManager>> {
-        let mut in_stream = in_stream.try_clone().unwrap();
-        let mut messenger = MessageManager{
-            map: HashMap::new()
-        };
-        let mut manager_arc = Arc::new(Mutex::new(messenger));
-        let mut manager_copied = Arc::clone(&manager_arc);
-        let receive_thread = thread::spawn(move || {
-            let mut reader = BufReader::new(&in_stream);
-            for line in reader.lines() {
-                let message: RFMessage = serde_json::from_str(&line.unwrap()).unwrap();
-                let mut manager = manager_copied.lock().unwrap();
-                (*manager).add_message(&message);
-            }
-        });
-        manager_arc
-    }
+//    pub fn setup_message_manager(in_stream: &TcpStream,manager:&Arc<Mutex<MessageManager>>) {
+//        let mut manager_copied = Arc::clone(manager);
+//        thread::spawn(move || {
+//            let in_stream = in_stream.try_clone().unwrap();
+//            let mut reader = BufReader::new(&stream);
+//            for line in reader.lines(){
+//                let message: RFMessage = serde_json::from_str(&line.unwrap()).unwrap();
+//                println!("{} received", &message.message_id);
+//                let mut manager = manager_copied.lock().unwrap();
+//                (*manager).add_message(&message);
+//            }
+//
+//        });
+//    }
+
 }

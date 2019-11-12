@@ -37,6 +37,7 @@ pub mod or_xor{
                 let mut output_map = output_map.lock().unwrap();
                 (*output_map).insert(batch_count, batch_mul_result);
             });
+
             i += ctx.batch_size;
             batch_count += 1;
         }

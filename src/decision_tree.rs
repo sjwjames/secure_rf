@@ -152,44 +152,45 @@ pub mod decision_tree {
 
         let mut o_stream = ctx.o_stream.try_clone()
             .expect("failed cloning tcp o_stream");
-        let mut message = RFMessage{
+        let mut message = RFMessage {
             message_id: ctx.thread_hierarchy.join(":"),
-            message_content: serde_json::to_string(&major_class_index).unwrap()
+            message_content: serde_json::to_string(&major_class_index).unwrap(),
         };
-        let mut major_class_index_receive:Vec<u8> = Vec::new();
-        if ctx.asymmetric_bit==1{
+        let mut major_class_index_receive: Vec<u8> = Vec::new();
+        if ctx.asymmetric_bit == 1 {
             o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
-            let mut received_message = search_pop_message(ctx,message.message_id.clone()).unwrap();
-            major_class_index_receive= serde_json::from_str(&received_message.message_content).unwrap();
-        }else{
-            let mut received_message = search_pop_message(ctx,message.message_id.clone()).unwrap();
-            major_class_index_receive= serde_json::from_str(&received_message.message_content).unwrap();
+            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
+            major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
+        } else {
+            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
+            major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
             o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
         }
-
+//        o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
+//        let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
+//        major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
 
         let class_value_count = ctx.dt_data.class_value_count;
-        let mut major_class_index_shared = vec![0u8;class_value_count];
-        for i in 0..class_value_count{
-            major_class_index_shared[i] = mod_floor((Wrapping((&major_class_index)[i])+Wrapping((&major_class_index_receive)[i])).0,BINARY_PRIME as u8);
+        let mut major_class_index_shared = vec![0u8; class_value_count];
+        for i in 0..class_value_count {
+            major_class_index_shared[i] = mod_floor((Wrapping((&major_class_index)[i]) + Wrapping((&major_class_index_receive)[i])).0, BINARY_PRIME as u8);
         }
         ctx.thread_hierarchy.pop();
 
         let mut major_index = 0;
-        for i in 0..class_value_count{
-            if major_class_index_shared[i] == 1{
+        for i in 0..class_value_count {
+            if major_class_index_shared[i] == 1 {
                 major_index = i;
                 break;
             }
         }
 
-        for i in major_index+1..class_value_count{
+        for i in major_index + 1..class_value_count {
             major_class_index_shared[i] = 0;
         }
 
-        println!("{:?}",major_class_index_shared);
+        println!("{:?}", major_class_index_shared);
         ctx.thread_hierarchy.pop();
-
     }
 
     fn find_common_class_index(ctx: &mut ComputingParty) -> Vec<u8> {
@@ -208,7 +209,7 @@ pub mod decision_tree {
             let mut subset_decimal_cloned = subset_decimal.clone();
             let mut class_value_transaction = ctx.dt_data.class_values.clone();
             let mut ctx = ctx_copied.clone();
-            ctx.thread_hierarchy.push(format!("{}",i));
+            ctx.thread_hierarchy.push(format!("{}", i));
             thread_pool.execute(move || {
                 let precision = ctx.decimal_precision;
                 let dp_result = dot_product_integer(&subset_decimal_cloned, &class_value_transaction[i], &mut ctx);
@@ -217,7 +218,7 @@ pub mod decision_tree {
             });
         }
         thread_pool.join();
-        println!("compute_dp completes in {}ms",now.elapsed().unwrap().as_millis());
+        println!("compute_dp completes in {}ms", now.elapsed().unwrap().as_millis());
         ctx_copied.thread_hierarchy.pop();
 
         let mut dp_result_map = &*(dp_result_map.lock().unwrap());
@@ -232,7 +233,7 @@ pub mod decision_tree {
         for i in 0..ctx.dt_data.class_value_count {
             let mut bd_result_map = Arc::clone(&bd_result_map);
             let mut ctx = ctx_copied.clone();
-            ctx.thread_hierarchy.push(format!("{}",i));
+            ctx.thread_hierarchy.push(format!("{}", i));
             let s_copied = s[i];
             //run in parallel would cause data corruption
             thread_pool.execute(move || {
@@ -242,7 +243,7 @@ pub mod decision_tree {
             });
         }
         thread_pool.join();
-        println!("compute_bd completes in {}ms",now.elapsed().unwrap().as_millis());
+        println!("compute_bd completes in {}ms", now.elapsed().unwrap().as_millis());
         ctx_copied.thread_hierarchy.pop();
 
         let mut bd_result_map = &*(bd_result_map.lock().unwrap());
@@ -254,7 +255,7 @@ pub mod decision_tree {
         let mut arg_max = arg_max(&bit_shares, ctx);
 
         ctx.thread_hierarchy.pop();
-        println!("find common class index completes in {}ms",now.elapsed().unwrap().as_millis());
+        println!("find common class index completes in {}ms", now.elapsed().unwrap().as_millis());
         arg_max
     }
 }
