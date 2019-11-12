@@ -73,29 +73,37 @@ pub mod message {
 //        }
     }
 
-    pub fn search_pop_message(ctx: &mut ComputingParty,message_id:String) -> Result<RFMessage, &'static str> {
-        let manager = &mut ctx.message_manager;
-        let mut in_stream = ctx.in_stream.try_clone().unwrap();
+    pub fn search_pop_message(ctx: &mut ComputingParty, message_id: String) -> Result<RFMessage, &'static str> {
+        let mut manager = Arc::clone(&ctx.message_manager);
+        let mut manager = manager.lock().unwrap();
         let mut remainder = MAX_SEARCH_TIMEOUT;
-        if manager.map.contains_key(&message_id) {
-            let mut message = manager.map.remove(&message_id);
-            return Ok(message.unwrap());
-        }
         while remainder > 0 {
             let mut now = SystemTime::now();
-            let mut reader = BufReader::new(&in_stream);
-            let mut message_string = String::new();
-            reader.read_line(&mut message_string);
-            let message: RFMessage = serde_json::from_str(&message_string).unwrap();
-            if message.message_id == message_id {
-                return Ok(message);
-            } else {
-                manager.add_message(&message);
+            if (*manager).map.contains_key(&message_id) {
+                let mut message = (*manager).map.remove(&message_id);
+                return Ok(message.unwrap());
             }
-            let complete_time =  now.elapsed().unwrap().as_millis();
+            let complete_time = now.elapsed().unwrap().as_millis();
             if remainder > complete_time { remainder -= complete_time; } else { break; }
         }
         Err("Cannot find the message")
     }
 
+    pub fn setup_message_manager(in_stream: &TcpStream)->Arc<Mutex<MessageManager>> {
+        let mut in_stream = in_stream.try_clone().unwrap();
+        let mut messenger = MessageManager{
+            map: HashMap::new()
+        };
+        let mut manager_arc = Arc::new(Mutex::new(messenger));
+        let mut manager_copied = Arc::clone(&manager_arc);
+        let receive_thread = thread::spawn(move || {
+            let mut reader = BufReader::new(&in_stream);
+            for line in reader.lines() {
+                let message: RFMessage = serde_json::from_str(&line.unwrap()).unwrap();
+                let mut manager = manager_copied.lock().unwrap();
+                (*manager).add_message(&message);
+            }
+        });
+        manager_arc
+    }
 }

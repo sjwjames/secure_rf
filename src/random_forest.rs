@@ -5,7 +5,7 @@ pub mod random_forest {
     use threadpool::ThreadPool;
     use crate::field_change::field_change::{change_binary_to_bigint_field, change_binary_to_decimal_field};
     use std::thread::current;
-    use crate::message::message::MessageManager;
+    use crate::message::message::{MessageManager, setup_message_manager};
     use std::collections::HashMap;
 
 
@@ -78,6 +78,7 @@ pub mod random_forest {
             let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr);
             dt_ctx.in_stream = in_stream;
             dt_ctx.o_stream = o_stream;
+            dt_ctx.message_manager = setup_message_manager(&dt_ctx.in_stream);
             let dt_training = decision_tree::train(&mut dt_ctx);
         }
 

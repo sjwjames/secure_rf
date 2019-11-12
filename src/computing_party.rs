@@ -11,7 +11,7 @@ pub mod computing_party {
     use num::bigint::{BigUint, BigInt, ToBigUint, ToBigInt};
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
-    use crate::message::message::MessageManager;
+    use crate::message::message::{MessageManager, setup_message_manager};
     use std::collections::HashMap;
 
     union Xbuffer {
@@ -59,7 +59,7 @@ pub mod computing_party {
 
         //multi_thread
         pub thread_hierarchy:Vec<String>,
-        pub message_manager:MessageManager
+        pub message_manager:Arc<Mutex<MessageManager>>
     }
 
     impl Clone for ComputingParty {
@@ -91,7 +91,7 @@ pub mod computing_party {
 
                 tree_training_batch_size: self.tree_training_batch_size,
                 thread_hierarchy: self.thread_hierarchy.clone(),
-                message_manager: self.message_manager.clone()
+                message_manager: Arc::clone(&self.message_manager)
             }
         }
     }
@@ -473,7 +473,7 @@ pub mod computing_party {
             bit_length,
             big_int_ti_index: 0,
         };
-
+        let mut in_stream_copied = in_stream.try_clone().unwrap();
         ComputingParty {
             debug_output,
             decimal_precision,
@@ -507,9 +507,7 @@ pub mod computing_party {
                 current_binary_index: Arc::new(Mutex::new(0 as usize)),
             },
             thread_hierarchy:vec![format!("{}","main")],
-            message_manager:MessageManager{
-                map: HashMap::new()
-            }
+            message_manager: setup_message_manager(&in_stream_copied)
         }
     }
 
