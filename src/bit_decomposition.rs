@@ -90,11 +90,15 @@ pub mod bit_decomposition {
         ctx.thread_hierarchy.push("compute_variables".to_string());
         for i in 1..bit_length {
             //computeVariables
+            ctx.thread_hierarchy.push("compute_e".to_string());
             let e_result = (Wrapping(multiplication_byte(y_shares[i], c_shares[i - 1], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
+            ctx.thread_hierarchy.pop();
             e_shares[i] = mod_floor(e_result, BINARY_PRIME as u8);
             let x_result = (Wrapping(y_shares[i]) + Wrapping(c_shares[i - 1])).0;
             x_shares[i] = mod_floor(x_result, BINARY_PRIME as u8);
+            ctx.thread_hierarchy.push("compute_c".to_string());
             let c_result = (Wrapping(multiplication_byte(e_shares[i], d_shares[i], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
+            ctx.thread_hierarchy.pop();
             c_shares[i] = mod_floor(c_result, BINARY_PRIME as u8);
         }
         // pop computeVariables

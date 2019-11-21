@@ -255,18 +255,15 @@ pub mod multiplication {
             message_content: serde_json::to_string(&diff_list).unwrap(),
         };
         let mut received_list: Vec<u8> = Vec::new();
-//        if ctx.asymmetric_bit == 1 {
-//            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-//            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//            received_list = serde_json::from_str(&received_message.message_content).unwrap();
-//        } else {
-//            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//            received_list = serde_json::from_str(&received_message.message_content).unwrap();
-//            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-//        }
-        o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-        let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-        received_list = serde_json::from_str(&received_message.message_content).unwrap();
+        if ctx.asymmetric_bit == 1 {
+            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
+            let mut received_message =  search_pop_message(ctx, message.message_id.clone()).unwrap();
+            received_list = serde_json::from_str(&received_message.message_content).unwrap();
+        } else {
+            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
+            received_list = serde_json::from_str(&received_message.message_content).unwrap();
+            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
+        }
 
         let mut d: u8 = 0;
         let mut e: u8 = 0;

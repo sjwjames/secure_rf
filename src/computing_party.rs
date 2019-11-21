@@ -11,7 +11,7 @@ pub mod computing_party {
     use num::bigint::{BigUint, BigInt, ToBigUint, ToBigInt};
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
-    use crate::message::message::{MessageManager};
+    use crate::message::message::{MessageManager, RFMessage};
     use std::collections::HashMap;
     use std::thread;
 
@@ -92,9 +92,7 @@ pub mod computing_party {
 
                 tree_training_batch_size: self.tree_training_batch_size,
                 thread_hierarchy: self.thread_hierarchy.clone(),
-                message_manager: Arc::new(Mutex::new(MessageManager{
-                    map: HashMap::new()
-                })),
+                message_manager: Arc::clone(&(self.message_manager)),
             }
         }
     }
@@ -533,7 +531,7 @@ pub mod computing_party {
         (internal_addr, external_addr)
     }
 
-    pub fn try_setup_socket(internal_addr: &str, external_addr: &str, message_manager: &Arc<Mutex<MessageManager>>) -> (TcpStream,TcpStream) {
+    pub fn try_setup_socket(internal_addr: &str, external_addr: &str, ctx: &mut ComputingParty) -> (TcpStream,TcpStream) {
         let server_socket: SocketAddr = internal_addr
             .parse()
             .expect("unable to parse internal socket address");
@@ -560,6 +558,19 @@ pub mod computing_party {
             Ok((stream, _addr)) => stream,
             Err(_) => panic!("failed to accept connection"),
         };
+
+        let in_stream_cloned = in_stream.try_clone().unwrap();
+        let mut message_manager = Arc::clone(&ctx.message_manager);
+        thread::spawn(move||{
+            loop{
+                let mut reader = BufReader::new(&in_stream_cloned);
+                let mut line = String::new();
+                reader.read_line(&mut line);
+                let message: RFMessage = serde_json::from_str(&line).unwrap();
+                let mut manager = message_manager.lock().unwrap();
+                (*manager).add_message(&message);
+            }
+        });
 
         o_stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
         o_stream.set_write_timeout(None).expect("set_write_timeout call failed");

@@ -30,71 +30,63 @@ pub mod message {
         }
     }
 
-    impl Clone for MessageManager {
-        fn clone(&self) -> Self {
-            MessageManager {
-                map: self.map.clone()
-            }
-        }
-    }
-
 
     impl MessageManager {
-        fn add_message(&mut self, message: &RFMessage) -> Result<&'static str, &'static str> {
-            if self.map.contains_key(&message.message_id) {
-                Err("Unable to add the message since the id exists already")
-            } else {
-                self.map.insert(message.message_id.clone(), message.clone());
-                Ok("Successfully add the message")
-            }
+        pub fn add_message(&mut self, message: &RFMessage) -> Result<&'static str, &'static str> {
+            self.map.insert(message.message_id.clone(), message.clone());
+            Ok("Successfully add the message")
         }
-
-//        pub fn search_pop_message(&mut self, message_id: String, in_stream: &TcpStream) -> Result<RFMessage, &'static str> {
-//            let mut remainder = MAX_SEARCH_TIMEOUT;
-//            if self.map.contains_key(&message_id) {
-//                let mut message = self.map.remove(&message_id);
-//                return Ok(message.unwrap());
-//            }
-//            while remainder > 0 {
-//                let mut now = SystemTime::now();
-//                let mut reader = BufReader::new(in_stream);
-//                let mut message_string = String::new();
-//                reader.read_line(&mut message_string);
-//                let message: RFMessage = serde_json::from_str(&message_string).unwrap();
-//                if message.message_id==message_id{
-//                    return Ok(message);
-//                }else{
-//                    self.add_message(&message);
-//                }
-//
-//                remainder -= now.elapsed().unwrap().as_millis();
-//            }
-//            Err("Cannot find the message")
-//        }
     }
 
-    pub fn search_pop_message(ctx:&mut ComputingParty, message_id: String) -> Result<RFMessage, &'static str> {
-        let in_stream = ctx.in_stream.try_clone().unwrap();
-        let manager = Arc::clone(&ctx.message_manager);
-        let mut manager_content = manager.lock().unwrap();
-        if (*manager_content).map.contains_key(&message_id) {
-            let mut message = (*manager_content).map.remove(&message_id);
-            return Ok(message.unwrap());
-        }
-        let mut manager_arc = Arc::clone(&manager);
+//    pub fn search_pop_message(ctx: &mut ComputingParty, message_id: String) -> Result<RFMessage, &'static str> {
+//        println!("querying {}", &message_id);
+//        let in_stream = ctx.in_stream.try_clone().unwrap();
+//        let manager = Arc::clone(&ctx.message_manager);
+//        let mut manager_content = manager.lock().unwrap();
+//        if (*manager_content).map.contains_key(&message_id) {
+//            let mut message = (*manager_content).map.remove(&message_id);
+//            println!("found    {}", &message_id);
+//            return Ok(message.unwrap());
+//        }
+//
+//        let mut manager_arc = Arc::clone(&manager);
+//        let in_stream = in_stream.try_clone().unwrap();
+//        let mut reader = BufReader::new(&in_stream);
+//        let mut line = String::new();
+//        reader.read_line(&mut line);
+//        let message: RFMessage = serde_json::from_str(&line).unwrap();
+//        if message.message_id.eq(&message_id) {
+//            println!("found    {}", &message_id);
+//            return Ok(message);
+//        }
+//        let mut manager = manager_arc.lock().unwrap();
+//        (*manager).add_message(&message);
+//
+//        search_pop_message(ctx, message_id);
+//
+//        Err("Cannot find the message")
+//    }
+
+
+    pub fn search_pop_message(ctx: &mut ComputingParty, message_id: String) -> Result<RFMessage, &'static str> {
+        println!("querying {}", &message_id);
+        let mut manager_content = ctx.message_manager.lock().unwrap();
         loop{
-            let in_stream=in_stream.try_clone().unwrap();
-            let mut reader = BufReader::new(&in_stream);
-            let mut line = String::new();
-            reader.read_line(&mut line);
-            let message: RFMessage = serde_json::from_str(&line).unwrap();
-            if message.message_id.eq(&message_id) {
-                return Ok(message);
+            if (*manager_content).map.contains_key(&message_id){
+                break;
             }
-            let mut manager = manager_arc.lock().unwrap();
-            (*manager).add_message(&message);
         }
-        Err("Cannot find the message")
+        let mut message = (*manager_content).map.remove(&message_id);
+        println!("found    {}", &message_id);
+        return Ok(message.unwrap());
+//        if (*manager_content).map.contains_key(&message_id) {
+//            let mut message = (*manager_content).map.remove(&message_id);
+//            println!("found    {}", &message_id);
+//            return Ok(message.unwrap());
+//        }else{
+//
+//        }
+        Err("asd")
     }
 
 //    pub fn setup_message_manager(in_stream: &TcpStream,manager:&Arc<Mutex<MessageManager>>) {
@@ -111,5 +103,4 @@ pub mod message {
 //
 //        });
 //    }
-
 }
