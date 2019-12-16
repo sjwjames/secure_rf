@@ -1,7 +1,7 @@
 extern crate random_forest_rust;
 extern crate serde;
 
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 use std::{env, thread};
 use random_forest_rust::ti::ti::{TI, initialize_ti_context, run_ti_module};
 use random_forest_rust::computing_party::computing_party::initialize_party_context;
@@ -12,14 +12,58 @@ use std::io::{Write, Read};
 use std::str;
 use serde::{Serialize, Deserialize, Serializer};
 use num::integer::*;
+use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOptions, ConsumerMessage};
+use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue};
 
+fn test_mq() {
+    let args: Vec<String> = env::args().collect();
+    let settings_file = args[1].clone();
 
-fn main() {
-    run();
+    let mut settings = config::Config::default();
+    settings
+        .merge(config::File::with_name(&settings_file.as_str())).unwrap()
+        .merge(config::Environment::with_prefix("APP")).unwrap();
+
+    match settings.get_int("party_id") {
+        Ok(party_id) => {
+            if party_id == 1 {
+                let address = "amqp://guest:guest@localhost:5672".to_string();
+                let routing_key = "hello1".to_string();
+                let message = "hello party 0".to_string();
+                push_message_to_queue(&address,&routing_key,&message);
+
+                //subscribe
+                let address = "amqp://guest:guest@localhost:5673".to_string();
+                let routing_key = "hello1".to_string();
+                let message_count = 1;
+                receive_message_from_queue(&address,&routing_key,message_count);
+            } else {
+                //publish
+                let address = "amqp://guest:guest@localhost:5673".to_string();
+                let routing_key = "hello1".to_string();
+                let message = "hello party 1".to_string();
+                push_message_to_queue(&address,&routing_key,&message);
+
+                //subscribe
+                let address = "amqp://guest:guest@localhost:5672".to_string();
+                let routing_key = "hello1".to_string();
+                let message_count = 1;
+                receive_message_from_queue(&address,&routing_key,message_count);
+            }
+        }
+        Err(error) => {
+            panic!("{}",error);
+        }
+    };
 }
 
-fn run(){
-        let prefix = "main:      ";
+fn main() {
+    test_mq();
+}
+
+
+fn run() {
+    let prefix = "main:      ";
 
     println!("{} runtime count starting...", &prefix);
     let now = SystemTime::now();

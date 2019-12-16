@@ -358,6 +358,8 @@ pub mod multiplication {
             diff_list.push(new_row);
         }
 
+
+
         let mut o_stream = ctx.o_stream.try_clone()
             .expect("failed cloning tcp o_stream");
         let message_id = ctx.thread_hierarchy.join(":");
@@ -367,6 +369,7 @@ pub mod multiplication {
         };
 
         let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
+
 
         if ctx.asymmetric_bit == 1 {
             o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());

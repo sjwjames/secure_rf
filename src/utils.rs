@@ -5,6 +5,10 @@ pub mod utils {
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
     use std::sync::{Mutex, Arc};
+    use amiquip::{Connection, Exchange, Publish, Channel, QueueDeclareOptions, ConsumerOptions, ConsumerMessage};
+    use std::collections::HashMap;
+    use std::process::exit;
+
 
     pub fn big_uint_subtract(x: &BigUint, y: &BigUint, big_int_prime: &BigUint) -> BigUint {
         let result = x.to_bigint().unwrap().sub(y.to_bigint().unwrap()).mod_floor(&(big_int_prime.to_bigint().unwrap())).to_biguint().unwrap();
@@ -56,7 +60,7 @@ pub mod utils {
             tuple_vec.push(serialize_biguint(&item.0));
             tuple_vec.push(serialize_biguint(&item.1));
             tuple_vec.push(serialize_biguint(&item.2));
-            str_vec.push(format!("({})",tuple_vec.join(",")));
+            str_vec.push(format!("({})", tuple_vec.join(",")));
         }
         str_vec.join(";")
     }
@@ -101,14 +105,14 @@ pub mod utils {
 //        }
 //    }
 
-    pub fn increment_current_share_index(index:Arc<Mutex<usize>>) {
+    pub fn increment_current_share_index(index: Arc<Mutex<usize>>) {
         let mut count = index.lock().unwrap();
         *count += 1;
     }
 
 
     pub fn get_current_bigint_share(ctx: &ComputingParty) -> &(BigUint, BigUint, BigUint) {
-        let bigint_shares =  &ctx.dt_shares.additive_bigint_triples;
+        let bigint_shares = &ctx.dt_shares.additive_bigint_triples;
         let current_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
         let result = &bigint_shares[current_index];
         increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_bigint_index));
@@ -123,7 +127,7 @@ pub mod utils {
         result
     }
 
-    pub fn get_current_additive_share(ctx:&ComputingParty)->&(Wrapping<u64>,Wrapping<u64>,Wrapping<u64>){
+    pub fn get_current_additive_share(ctx: &ComputingParty) -> &(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) {
         let shares = &ctx.dt_shares.additive_triples;
         let current_index = *(ctx.dt_shares.current_additive_index.lock().unwrap());
         let result = &shares[current_index];
@@ -131,11 +135,48 @@ pub mod utils {
         result
     }
 
-    pub fn get_current_binary_share(ctx:&ComputingParty)->&(u8,u8,u8){
+    pub fn get_current_binary_share(ctx: &ComputingParty) -> &(u8, u8, u8) {
         let shares = &ctx.dt_shares.binary_triples;
         let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
         let result = &shares[current_index];
 //        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
         result
+    }
+
+    pub fn receive_message_from_queue(address: &String, routing_key: &String, message_count: usize) -> Vec<String> {
+        let mut connection = Connection::insecure_open(address).unwrap();
+        let channel = connection.open_channel(None).unwrap();
+        let queue = channel.queue_declare(routing_key, QueueDeclareOptions::default()).unwrap();
+        let consumer = queue.consume(ConsumerOptions::default()).unwrap();
+        let mut count = 0;
+        let mut result = Vec::new();
+        for (i, message) in consumer.receiver().iter().enumerate() {
+            if message_count == count {
+                break;
+            }
+            match message {
+                ConsumerMessage::Delivery(delivery) => {
+                    let body = String::from_utf8_lossy(&delivery.body).to_string();
+                    println!("({:>3}) Received [{}]", i, body);
+                    result.push(body.clone());
+                    consumer.ack(delivery).unwrap();
+                }
+                other => {
+                    println!("Consumer ended: {:?}", other);
+                    break;
+                }
+            }
+            count += 1;
+        }
+        connection.close();
+        result
+    }
+
+    pub fn push_message_to_queue(address: &String, routing_key: &String, message: &String) {
+        let mut connection = Connection::insecure_open(address).unwrap();
+        let channel = connection.open_channel(None).unwrap();
+        let exchange = Exchange::direct(&channel);
+        exchange.publish(Publish::new(message.as_bytes(), routing_key)).unwrap();
+        connection.close();
     }
 }

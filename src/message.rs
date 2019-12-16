@@ -8,6 +8,7 @@ pub mod message {
     use threadpool::ThreadPool;
     use std::thread;
     use crate::computing_party::computing_party::ComputingParty;
+    use amiquip::{Channel, Connection, Exchange};
 
     pub const MAX_SEARCH_TIMES: u128 = 1000;
 
@@ -19,6 +20,11 @@ pub mod message {
 
     pub struct MessageManager {
         pub map: HashMap<String, RFMessage>,
+    }
+
+    pub struct MQMetaMaps<'a>{
+        pub connection_map:HashMap<String,Connection>,
+        pub exchange_map:HashMap<String,Exchange<'a>>
     }
 
     impl Clone for RFMessage {

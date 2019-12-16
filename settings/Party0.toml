@@ -19,6 +19,13 @@ party0_port = 5000
 party1_ip   = "127.0.0.1"
 party1_port = 6000
 
+#[message_queue]
+party0_mq_ip = "127.0.0.1"
+party0_mq_port = 5672
+
+party1_mq_ip = "127.0.0.1"
+party1_mq_port = 5673
+
 #[LOGISTIC REGRESSION]
 
 decimal_precision = 10

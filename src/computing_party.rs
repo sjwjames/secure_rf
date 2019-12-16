@@ -11,9 +11,11 @@ pub mod computing_party {
     use num::bigint::{BigUint, BigInt, ToBigUint, ToBigInt};
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
-    use crate::message::message::{MessageManager};
+    use crate::message::message::{MessageManager, MQMetaMaps};
     use std::collections::HashMap;
     use std::thread;
+    use amiquip::{Connection, Channel, Exchange};
+
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -39,7 +41,15 @@ pub mod computing_party {
         pub o_stream: TcpStream,
         pub ti_stream: TcpStream,
 
-        /* mpc */
+        /* mq */
+        pub party0_mq_ip: String,
+        pub party0_mq_port: u16,
+        pub party1_mq_ip: String,
+        pub party1_mq_port: u16,
+        pub party0_mq_address: String,
+        pub party1_mq_address: String,
+
+        /* mpc*/
         pub asymmetric_bit: u8,
 
         /* input output */
@@ -79,6 +89,12 @@ pub mod computing_party {
                 in_stream: self.in_stream.try_clone().expect("failed to clone in_stream"),
                 o_stream: self.o_stream.try_clone().expect("failed to clone o_stream"),
                 ti_stream: self.ti_stream.try_clone().expect("failed to clone ti_stream"),
+                party0_mq_ip: self.party0_mq_ip.clone(),
+                party0_mq_port: self.party0_mq_port,
+                party1_mq_ip: self.party1_mq_ip.clone(),
+                party1_mq_port: self.party1_mq_port,
+                party0_mq_address: self.party0_mq_address.clone(),
+                party1_mq_address: self.party1_mq_address.clone(),
                 asymmetric_bit: self.asymmetric_bit,
                 output_path: self.output_path.clone(),
 
@@ -92,9 +108,10 @@ pub mod computing_party {
 
                 tree_training_batch_size: self.tree_training_batch_size,
                 thread_hierarchy: self.thread_hierarchy.clone(),
-                message_manager: Arc::new(Mutex::new(MessageManager{
+                message_manager: Arc::new(Mutex::new(MessageManager {
                     map: HashMap::new()
                 })),
+
             }
         }
     }
@@ -165,7 +182,6 @@ pub mod computing_party {
                 Ok(stream) => return stream,
 //                Err(_) => println!("{} connection refused by {}", prefix, socket),
                 Err(_) => print!(""),
-
             };
         }
     }
@@ -271,6 +287,34 @@ pub mod computing_party {
             Ok(num) => num as u16,
             Err(error) => {
                 panic!("Encountered a problem while parsing party1_port: {:?} ", error)
+            }
+        };
+
+        let party0_mq_ip = match settings.get_str("party0_mq_ip") {
+            Ok(num) => num as String,
+            Err(error) => {
+                panic!("Encountered a problem while parsing party0_mq_ip: {:?} ", error)
+            }
+        };
+
+        let party1_mq_ip = match settings.get_str("party1_mq_ip") {
+            Ok(num) => num as String,
+            Err(error) => {
+                panic!("Encountered a problem while parsing party1_mq_ip: {:?} ", error)
+            }
+        };
+
+        let party0_mq_port = match settings.get_int("party0_mq_port") {
+            Ok(num) => num as u16,
+            Err(error) => {
+                panic!("Encountered a problem while parsing party0_mq_port: {:?} ", error)
+            }
+        };
+
+        let party1_mq_port = match settings.get_int("party1_mq_port") {
+            Ok(num) => num as u16,
+            Err(error) => {
+                panic!("Encountered a problem while parsing party1_mq_port: {:?} ", error)
             }
         };
 
@@ -479,6 +523,9 @@ pub mod computing_party {
             big_int_ti_index: 0,
         };
         let mut in_stream_copied = in_stream.try_clone().unwrap();
+        let party0_mq_address = format!("amqp://guest:guest@{}:{}", party0_mq_ip.clone(), party0_mq_port);
+        let party1_mq_address = format!("amqp://guest:guest@{}:{}", party1_mq_ip.clone(), party1_mq_port);
+
         ComputingParty {
             debug_output,
             decimal_precision,
@@ -493,6 +540,12 @@ pub mod computing_party {
             asymmetric_bit: party_id,
             output_path,
             ti_stream,
+            party0_mq_ip,
+            party0_mq_port,
+            party1_mq_ip,
+            party1_mq_port,
+            party0_mq_address,
+            party1_mq_address,
             in_stream,
             o_stream,
             thread_count,
@@ -512,9 +565,9 @@ pub mod computing_party {
                 current_binary_index: Arc::new(Mutex::new(0 as usize)),
             },
             thread_hierarchy: vec![format!("{}", "main")],
-            message_manager: Arc::new(Mutex::new(MessageManager{
+            message_manager: Arc::new(Mutex::new(MessageManager {
                 map: HashMap::new()
-            })),
+            }))
         }
     }
 
@@ -533,7 +586,7 @@ pub mod computing_party {
         (internal_addr, external_addr)
     }
 
-    pub fn try_setup_socket(internal_addr: &str, external_addr: &str, message_manager: &Arc<Mutex<MessageManager>>) -> (TcpStream,TcpStream) {
+    pub fn try_setup_socket(internal_addr: &str, external_addr: &str, message_manager: &Arc<Mutex<MessageManager>>) -> (TcpStream, TcpStream) {
         let server_socket: SocketAddr = internal_addr
             .parse()
             .expect("unable to parse internal socket address");
@@ -757,6 +810,5 @@ pub mod computing_party {
         ctx.dt_shares.current_binary_index = Arc::new(Mutex::new(0));
         ctx.dt_shares.current_additive_index = Arc::new(Mutex::new(0));
         ctx.dt_shares.current_additive_bigint_index = Arc::new(Mutex::new(0));
-        ctx.dt_shares.current_equality_index = Arc::new(Mutex::new(0));
     }
 }
