@@ -370,7 +370,7 @@ pub mod multiplication {
 
         let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
 
-
+        
         if ctx.asymmetric_bit == 1 {
             o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
             let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();

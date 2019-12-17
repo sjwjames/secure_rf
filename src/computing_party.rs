@@ -42,12 +42,12 @@ pub mod computing_party {
         pub ti_stream: TcpStream,
 
         /* mq */
-        pub party0_mq_ip: String,
-        pub party0_mq_port: u16,
-        pub party1_mq_ip: String,
-        pub party1_mq_port: u16,
-        pub party0_mq_address: String,
-        pub party1_mq_address: String,
+        pub local_mq_ip: String,
+        pub local_mq_port: u16,
+        pub remote_mq_ip: String,
+        pub remote_mq_port: u16,
+        pub local_mq_address: String,
+        pub remote_mq_address: String,
 
         /* mpc*/
         pub asymmetric_bit: u8,
@@ -89,12 +89,12 @@ pub mod computing_party {
                 in_stream: self.in_stream.try_clone().expect("failed to clone in_stream"),
                 o_stream: self.o_stream.try_clone().expect("failed to clone o_stream"),
                 ti_stream: self.ti_stream.try_clone().expect("failed to clone ti_stream"),
-                party0_mq_ip: self.party0_mq_ip.clone(),
-                party0_mq_port: self.party0_mq_port,
-                party1_mq_ip: self.party1_mq_ip.clone(),
-                party1_mq_port: self.party1_mq_port,
-                party0_mq_address: self.party0_mq_address.clone(),
-                party1_mq_address: self.party1_mq_address.clone(),
+                local_mq_ip: self.local_mq_ip.clone(),
+                local_mq_port: self.local_mq_port,
+                remote_mq_ip: self.remote_mq_ip.clone(),
+                remote_mq_port: self.remote_mq_port,
+                local_mq_address: self.local_mq_address.clone(),
+                remote_mq_address: self.remote_mq_address.clone(),
                 asymmetric_bit: self.asymmetric_bit,
                 output_path: self.output_path.clone(),
 
@@ -290,28 +290,28 @@ pub mod computing_party {
             }
         };
 
-        let party0_mq_ip = match settings.get_str("party0_mq_ip") {
+        let local_mq_ip = match settings.get_str("local_mq_ip") {
             Ok(num) => num as String,
             Err(error) => {
-                panic!("Encountered a problem while parsing party0_mq_ip: {:?} ", error)
+                panic!("Encountered a problem while parsing local_mq_ip: {:?} ", error)
             }
         };
 
-        let party1_mq_ip = match settings.get_str("party1_mq_ip") {
+        let remote_mq_ip = match settings.get_str("remote_mq_ip") {
             Ok(num) => num as String,
             Err(error) => {
-                panic!("Encountered a problem while parsing party1_mq_ip: {:?} ", error)
+                panic!("Encountered a problem while parsing remote_mq_ip: {:?} ", error)
             }
         };
 
-        let party0_mq_port = match settings.get_int("party0_mq_port") {
+        let local_mq_port = match settings.get_int("local_mq_port") {
             Ok(num) => num as u16,
             Err(error) => {
-                panic!("Encountered a problem while parsing party0_mq_port: {:?} ", error)
+                panic!("Encountered a problem while parsing local_mq_port: {:?} ", error)
             }
         };
 
-        let party1_mq_port = match settings.get_int("party1_mq_port") {
+        let remote_mq_port = match settings.get_int("remote_mq_port") {
             Ok(num) => num as u16,
             Err(error) => {
                 panic!("Encountered a problem while parsing party1_mq_port: {:?} ", error)
@@ -523,8 +523,8 @@ pub mod computing_party {
             big_int_ti_index: 0,
         };
         let mut in_stream_copied = in_stream.try_clone().unwrap();
-        let party0_mq_address = format!("amqp://guest:guest@{}:{}", party0_mq_ip.clone(), party0_mq_port);
-        let party1_mq_address = format!("amqp://guest:guest@{}:{}", party1_mq_ip.clone(), party1_mq_port);
+        let local_mq_address = format!("amqp://guest:guest@{}:{}", local_mq_ip.clone(), local_mq_port);
+        let remote_mq_address = format!("amqp://guest:guest@{}:{}", remote_mq_ip.clone(), remote_mq_port);
 
         ComputingParty {
             debug_output,
@@ -540,12 +540,12 @@ pub mod computing_party {
             asymmetric_bit: party_id,
             output_path,
             ti_stream,
-            party0_mq_ip,
-            party0_mq_port,
-            party1_mq_ip,
-            party1_mq_port,
-            party0_mq_address,
-            party1_mq_address,
+            local_mq_ip,
+            local_mq_port,
+            remote_mq_ip,
+            remote_mq_port,
+            local_mq_address,
+            remote_mq_address,
             in_stream,
             o_stream,
             thread_count,
