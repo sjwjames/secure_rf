@@ -31,8 +31,8 @@ pub mod multiplication {
                             big_uint_subtract(&y_list[i], &ctx.dt_shares.additive_bigint_triples[i].1, &prime)));
         }
 
-        let mut o_stream = ctx.o_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
+//        let mut o_stream = ctx.o_stream.try_clone()
+//            .expect("failed cloning tcp o_stream");
 
         let mut diff_list_str_vec = Vec::new();
         for item in diff_list.iter() {
@@ -41,12 +41,12 @@ pub mod multiplication {
             tuple.push(serde_json::to_string(&(item.1.to_bytes_le())).unwrap());
             diff_list_str_vec.push(format!("({})", tuple.join(",")));
         }
-        let message = RFMessage {
-            message_id: ctx.thread_hierarchy.join(":"),
-            message_content: diff_list_str_vec.join(";"),
-        };
+//        let message = RFMessage {
+//            message_id: ctx.thread_hierarchy.join(":"),
+//            message_content: diff_list_str_vec.join(";"),
+//        };
 
-        let mut diff_list_message = String::new();
+//        let mut diff_list_message = String::new();
 //        if ctx.asymmetric_bit == 1 {
 //            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
 //            let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
@@ -56,9 +56,16 @@ pub mod multiplication {
 //            diff_list_message = message_received.message_content;
 //            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
 //        }
-        o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-        let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
-        diff_list_message = message_received.message_content;
+//        o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
+//        let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
+//        diff_list_message = message_received.message_content;
+
+        let mut diff_list_message = String::new();
+        let message_id = ctx.thread_hierarchy.join(":");
+        let message_content = serde_json::to_string(&diff_list_str_vec.join(";")).unwrap();
+        push_message_to_queue(&ctx.local_mq_address,&message_id,&message_content);
+        let message_received = receive_message_from_queue(&ctx.remote_mq_address,&message_id,1);
+        diff_list_message = serde_json::from_str(&message_received[0]).unwrap();
 
         let mut diff_list_str_vec: Vec<&str> = diff_list_message.split(";").collect();
         let mut diff_list = Vec::new();
@@ -360,31 +367,38 @@ pub mod multiplication {
 
 
 
-        let mut o_stream = ctx.o_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
-        let message_id = ctx.thread_hierarchy.join(":");
-        let mut message = RFMessage {
-            message_id,
-            message_content: serde_json::to_string(&diff_list).unwrap(),
-        };
 
-        let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
+//        let mut o_stream = ctx.o_stream.try_clone()
+//            .expect("failed cloning tcp o_stream");
+//        let message_id = ctx.thread_hierarchy.join(":");
+//        let mut message = RFMessage {
+//            message_id,
+//            message_content: serde_json::to_string(&diff_list).unwrap(),
+//        };
+//
+//        let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
 
-        
-        if ctx.asymmetric_bit == 1 {
-            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-            let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
-            received_list = serde_json::from_str(&message_received.message_content).unwrap();
-        } else {
-            let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
-            received_list = serde_json::from_str(&message_received.message_content).unwrap();
-            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-        }
+
+//        if ctx.asymmetric_bit == 1 {
+//            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
+//            let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
+//            received_list = serde_json::from_str(&message_received.message_content).unwrap();
+//        } else {
+//            let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
+//            received_list = serde_json::from_str(&message_received.message_content).unwrap();
+//            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
+//        }
 //        println!("sending {}",&message.message_id);
 //        o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
 //        let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
 //        received_list = serde_json::from_str(&message_received.message_content).unwrap();
 
+        let message_id = ctx.thread_hierarchy.join(":");
+        let message_content = serde_json::to_string(&diff_list).unwrap();
+        push_message_to_queue(&ctx.local_mq_address,&message_id,&message_content);
+        let message_received = receive_message_from_queue(&ctx.remote_mq_address,&message_id,1);
+        let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
+        received_list = serde_json::from_str(&message_received[0]).unwrap();
 
         let mut d_list = vec![Wrapping(0u64); batch_size];
         let mut e_list = vec![Wrapping(0u64); batch_size];

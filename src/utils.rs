@@ -151,12 +151,10 @@ pub mod utils {
         let mut count = 0;
         let mut result = Vec::new();
         for (i, message) in consumer.receiver().iter().enumerate() {
-            if message_count == count {
-                break;
-            }
             match message {
                 ConsumerMessage::Delivery(delivery) => {
                     let body = String::from_utf8_lossy(&delivery.body).to_string();
+                    print!("queue:{} ",routing_key);
                     println!("({:>3}) Received [{}]", i, body);
                     result.push(body.clone());
                     consumer.ack(delivery).unwrap();
@@ -167,6 +165,9 @@ pub mod utils {
                 }
             }
             count += 1;
+            if message_count == count {
+                break;
+            }
         }
         connection.close();
         result

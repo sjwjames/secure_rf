@@ -29,25 +29,25 @@ fn test_mq() {
             if party_id == 1 {
                 let address = "amqp://guest:guest@localhost:5672".to_string();
                 let routing_key = "hello1".to_string();
-                let message = "hello party 0".to_string();
+                let message = "hello party 0, from party 1".to_string();
                 push_message_to_queue(&address,&routing_key,&message);
 
                 //subscribe
                 let address = "amqp://guest:guest@localhost:5673".to_string();
                 let routing_key = "hello1".to_string();
-                let message_count = 1;
+                let message_count = 10;
                 receive_message_from_queue(&address,&routing_key,message_count);
             } else {
                 //publish
                 let address = "amqp://guest:guest@localhost:5673".to_string();
                 let routing_key = "hello1".to_string();
-                let message = "hello party 1".to_string();
+                let message = "hello party 1,from party 0".to_string();
                 push_message_to_queue(&address,&routing_key,&message);
 
                 //subscribe
                 let address = "amqp://guest:guest@localhost:5672".to_string();
                 let routing_key = "hello1".to_string();
-                let message_count = 1;
+                let message_count = 10;
                 receive_message_from_queue(&address,&routing_key,message_count);
             }
         }
@@ -58,7 +58,8 @@ fn test_mq() {
 }
 
 fn main() {
-    test_mq();
+    //test_mq();
+    run();
 }
 
 

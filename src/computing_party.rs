@@ -15,6 +15,7 @@ pub mod computing_party {
     use std::collections::HashMap;
     use std::thread;
     use amiquip::{Connection, Channel, Exchange};
+    use threadpool::ThreadPool;
 
 
     union Xbuffer {
@@ -358,6 +359,8 @@ pub mod computing_party {
                 panic!("Encountered a problem while parsing thread_count: {:?}", error)
             }
         };
+
+
         let tree_count = match settings.get_int("tree_count") {
             Ok(num) => num as usize,
             Err(error) => {

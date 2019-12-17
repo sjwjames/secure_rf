@@ -19,9 +19,10 @@ pub mod or_xor{
     pub fn or_xor(x_list: &Vec<Wrapping<u64>>,
                   y_list: &Vec<Wrapping<u64>>,
                   ctx: &mut ComputingParty, constant_multiplier: u64) -> Vec<Wrapping<u64>> {
+        println!("or_xor starts");
         ctx.thread_hierarchy.push("or_xor".to_string());
         let bit_length = x_list.len();
-        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let thread_pool = ThreadPool::new((bit_length/ctx.batch_size)+1);
         let mut i = 0;
         let mut output_map = Arc::new(Mutex::new(HashMap::new()));
         let mut batch_count = 0;
@@ -38,7 +39,7 @@ pub mod or_xor{
                 (*output_map).insert(batch_count, batch_mul_result);
             });
 
-            i += ctx.batch_size;
+            i = to_index;
             batch_count += 1;
         }
         thread_pool.join();
@@ -56,10 +57,12 @@ pub mod or_xor{
         }
 
         ctx.thread_hierarchy.pop();
+        println!("or_xor ends");
         output
     }
 
     pub fn or_xor_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty, constant_multiplier: &BigUint) -> Vec<BigUint> {
+        println!("or_xor_bigint starts");
         ctx.thread_hierarchy.push("or_xor_bigint".to_string());
         let bit_length = x_list.len();
         let mut output = vec![BigUint::zero(); bit_length];
@@ -79,7 +82,7 @@ pub mod or_xor{
                 let mut output_map = output_map.lock().unwrap();
                 (*output_map).insert(batch_count, batch_mul_result);
             });
-            i += ctx.batch_size;
+            i = to_index;
             batch_count += 1;
         }
         thread_pool.join();
@@ -96,6 +99,7 @@ pub mod or_xor{
             }
         }
         ctx.thread_hierarchy.pop();
+        println!("or_xor_bigint ends");
         output
     }
 }
