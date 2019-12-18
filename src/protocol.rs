@@ -21,15 +21,16 @@ pub mod protocol {
     use crate::comparison::comparison::comparison;
 
     pub fn arg_max(bit_shares: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
+        println!("arg_max starts");
         ctx.thread_hierarchy.push("arg_max".to_string());
         let number_count = bit_shares.len();
 
-        let mut result = Vec::new();
+        let mut result = vec![0u8;number_count];
         if number_count == 1 {
-            result.push(1);
+            result[0]=1;
         } else {
             let mut bit_length = 0;
-            for item in bit_shares.iter(){
+            for item in bit_shares.iter() {
                 bit_length = max(bit_length, item.len());
             }
             let mut w_intermediate = HashMap::new();
@@ -51,11 +52,11 @@ pub mod protocol {
                         ctx_copied.thread_hierarchy.push(format!("{}",i * number_count + j));
                         let mut bit_shares = bit_shares.clone();
                         thread_pool.execute(move || {
-                            key = i * number_count + j;
                             let comparison_result = comparison(&bit_shares[i], &bit_shares[j], &mut ctx_copied);
                             let mut output_map = output_map.lock().unwrap();
                             (*output_map).insert(key, comparison_result);
                         });
+                        key += 1;
                     }
                 }
             }
@@ -77,7 +78,7 @@ pub mod protocol {
                 }
                 let mut output_map = Arc::clone(&output_map);
                 let mut ctx_copied = ctx.clone();
-                ctx_copied.thread_hierarchy.push(format!("{}",i));
+                ctx_copied.thread_hierarchy.push(format!("{}", i));
                 thread_pool.execute(move || {
                     let multi_result = parallel_multiplication(&vec, &mut ctx_copied);
                     let mut output_map = output_map.lock().unwrap();
@@ -94,6 +95,7 @@ pub mod protocol {
         }
 
         ctx.thread_hierarchy.pop();
+        println!("arg_max ends");
         result
     }
 
@@ -123,7 +125,7 @@ pub mod protocol {
         let d = big_uint_subtract(&diff, &bigint_share.0, prime).add(&diff_list[0]).mod_floor(prime);
         let e = big_uint_subtract(&diff, &bigint_share.0, prime).add(&diff_list[0]).mod_floor(prime);
         let product = big_uint_clone(&bigint_share.2).add(&big_uint_clone(&d).mul(&big_uint_clone(&bigint_share.1)))
-                  .add(big_uint_clone(&bigint_share.0).mul(big_uint_clone(&e))).add(big_uint_clone(&d).mul(&big_uint_clone(&e)).mul(BigUint::from(ctx.asymmetric_bit)));
+            .add(big_uint_clone(&bigint_share.0).mul(big_uint_clone(&e))).add(big_uint_clone(&d).mul(&big_uint_clone(&e)).mul(BigUint::from(ctx.asymmetric_bit)));
         product
     }
 }

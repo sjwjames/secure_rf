@@ -77,6 +77,7 @@ pub mod random_forest {
             let mut attr_values_bigint = Vec::new();
             let mut class_values_bigint = Vec::new();
             let mut attr_values_bytes = dt_ctx.dt_data.attr_values_bytes.clone();
+            // multi-thread could help
             for item in attr_values_bytes.iter() {
                 let mut attr_data_item = Vec::new();
                 let mut attr_data_bigint_item = Vec::new();

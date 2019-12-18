@@ -7,6 +7,7 @@ pub mod comparison {
     use std::sync::{Arc, Mutex};
     use crate::multiplication::multiplication::{multi_thread_batch_mul_byte, batch_multiplication_byte};
     use std::collections::HashMap;
+    use num::abs;
 
     pub fn comparison(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> u8 {
         ctx.thread_hierarchy.push("comparison".to_string());
@@ -38,7 +39,7 @@ pub mod comparison {
             for i in 0..batch_count {
                 let product_result = output_map.get(&i).unwrap();
                 for item in product_result {
-                    let local_diff = y_list_copied[global_index] - *item;
+                    let local_diff = abs(y_list_copied[global_index] as i16 - *item as i16) as u8;
 
                     (*d_shares_wrapper_copy)[global_index] = mod_floor(local_diff, BINARY_PRIME as u8);
                     global_index += 1;
@@ -89,8 +90,10 @@ pub mod comparison {
                 }
                 temp_mul_e.clear();
                 temp_mul_e = products;
-                main_index -= 1;
-                (*multiplication_e_copied)[main_index] = *temp_mul_e.last().unwrap();
+                if main_index>0 {
+                    main_index -= 1;
+                    (*multiplication_e_copied)[main_index] = *temp_mul_e.last().unwrap();
+                }
             }
             (*multiplication_e_copied)[0] = 0;
         });

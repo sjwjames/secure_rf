@@ -235,7 +235,6 @@ pub mod decision_tree {
             let mut ctx = ctx_copied.clone();
             ctx.thread_hierarchy.push(format!("{}", i));
             let s_copied = s[i];
-            //run in parallel would cause data corruption
             thread_pool.execute(move || {
                 let bd_result = bit_decomposition(s_copied, &mut ctx);
                 let mut bd_result_map = bd_result_map.lock().unwrap();

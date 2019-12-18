@@ -88,6 +88,7 @@ pub mod bit_decomposition {
         let mut e_shares = vec![0u8; bit_length];
 
         ctx.thread_hierarchy.push("compute_variables".to_string());
+
         for i in 1..bit_length {
             //computeVariables
             let e_result = (Wrapping(multiplication_byte(y_shares[i], c_shares[i - 1], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
