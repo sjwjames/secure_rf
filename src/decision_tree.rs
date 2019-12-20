@@ -5,7 +5,7 @@ pub mod decision_tree {
     use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue};
+    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
@@ -18,9 +18,9 @@ pub mod decision_tree {
     use crate::protocol::protocol::{arg_max, equality_big_integer};
     use crate::constants::constants::BINARY_PRIME;
     use crate::message::message::{RFMessage, search_pop_message};
-    use crate::multiplication::multiplication::{batch_multiply_bigint, multiplication_bigint};
+    use crate::multiplication::multiplication::{batch_multiply_bigint, multiplication_bigint, batch_multiplication_byte};
     use num::{Zero, ToPrimitive, One};
-    use std::ops::Add;
+    use std::ops::{Add, Mul};
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -233,11 +233,13 @@ pub mod decision_tree {
         let mut subset_transaction = ctx.dt_training.subset_transaction_bit_vector.clone();
         let mut transactions_decimal = change_binary_to_bigint_field(&subset_transaction, ctx);
 
+
+        let class_value_count = ctx.dt_data.class_value_count;
         let thread_pool = ThreadPool::new(ctx.thread_count);
         let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
         let dataset_size = ctx.dt_data.instance_count;
         ctx.thread_hierarchy.push("major_class_trans_count".to_string());
-        for i in 0..ctx.dt_data.class_value_count {
+        for i in 0..class_value_count {
             let mut dp_result = Arc::clone(&dp_result_map);
             let mut transactions_decimal_cp = transactions_decimal.clone();
             let mut dt_ctx = ctx.clone();
@@ -255,27 +257,27 @@ pub mod decision_tree {
         let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
         let mut major_class_trans_count = BigUint::zero();
         let mut dp_result_map = dp_result_map.lock().unwrap();
-        for i in 0..ctx.dt_data.class_value_count {
+        for i in 0..class_value_count {
             let mut dp_result = (*dp_result_map).get(&i).unwrap();
             major_class_trans_count = major_class_trans_count.add(big_uint_clone(dp_result)).mod_floor(&bigint_prime);
         }
 
-        println!("Majority Class Transaction Count: {}",major_class_trans_count.to_u64().unwrap());
+        println!("Majority Class Transaction Count: {}", major_class_trans_count.to_u64().unwrap());
 
         let mut transaction_count = BigUint::zero();
-        let list = if ctx.asymmetric_bit==1{
-            vec![BigUint::one();dataset_size]
-        }else{
-            vec![BigUint::zero();dataset_size]
+        let list = if ctx.asymmetric_bit == 1 {
+            vec![BigUint::one(); dataset_size]
+        } else {
+            vec![BigUint::zero(); dataset_size]
         };
-        let transaction_count=dot_product_bigint(&transactions_decimal,&list,ctx);
-        println!("Transactions in current subset: {}",transaction_count.to_u64().unwrap());
+        let transaction_count = dot_product_bigint(&transactions_decimal, &list, ctx);
+        println!("Transactions in current subset: {}", transaction_count.to_u64().unwrap());
 
-        let eq_test_result = equality_big_integer(&transaction_count,&major_class_trans_count,ctx);
-        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}",eq_test_result.to_u64().unwrap());
+        let eq_test_result = equality_big_integer(&transaction_count, &major_class_trans_count, ctx);
+        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_result.to_u64().unwrap());
 
         let mut compute_result = BigUint::one();
-        let stopping_bit = multiplication_bigint(&eq_test_result,&compute_result,ctx);
+        let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
 
         ctx.thread_hierarchy.push("stop_criteria".to_string());
         let message_id = ctx.thread_hierarchy.join(":");
@@ -283,20 +285,102 @@ pub mod decision_tree {
         push_message_to_queue(&ctx.local_mq_address, &message_id, &message_content);
         let message_received = receive_message_from_queue(&ctx.remote_mq_address, &message_id, 1);
         ctx.thread_hierarchy.pop();
-        let stopping_bit_received:Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
+        let stopping_bit_received: Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
         let stopping_bit_received = BigUint::from_bytes_le(&stopping_bit_received);
 
-        let stopping_check = stopping_bit.add(&stopping_bit).mod_floor(&bigint_prime);
-        if stopping_check.eq(&BigUint::zero()){
+        let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
+        if stopping_check.eq(&BigUint::zero()) {
             println!("Exited on base case: All transactions predict same outcome");
-            ctx.dt_results.result_list.push(format!("class={}",major_index));
+            ctx.dt_results.result_list.push(format!("class={}", major_index));
             return;
         }
 
         println!("Base case not reached. Continuing.");
-        
 
+        let mut class_value_trans_vector = ctx.dt_data.class_values_bytes.clone();
+        let mut u_list = Vec::new();
+        //todo multi-thread
+        for i in 0..class_value_count {
+            let batch_multi_result = batch_multiplication_byte(&subset_transaction, &class_value_trans_vector[i], ctx);
+            u_list.push(batch_multi_result);
+        }
 
+        //todo multi-thread
+        let mut u_decimal = Vec::new();
+        for i in 0..class_value_count {
+            u_decimal.push(change_binary_to_bigint_field(&u_list[i], ctx));
+        }
+
+        let attr_count = ctx.dt_data.attribute_count;
+        let attr_val_count = ctx.dt_data.attr_value_count;
+        let mut x: Vec<Vec<Vec<BigUint>>> = vec![vec![vec![BigUint::zero();attr_val_count];class_value_count];attr_count];
+        let mut x2: Vec<Vec<Vec<BigUint>>> = vec![vec![vec![BigUint::zero();attr_val_count];class_value_count];attr_count];
+        let mut y: Vec<Vec<BigUint>> = vec![vec![BigUint::zero();attr_val_count];attr_count];
+        let mut gini_numerators: Vec<BigUint> = vec![BigUint::zero();attr_count];
+        let mut gini_denominators: Vec<BigUint> = vec![BigUint::zero();attr_count];
+        let attributes = &ctx.dt_training.attribute_bit_vector;
+        let attr_value_trans_bigint_vec = &ctx.dt_data.attr_values_big_integer;
+
+        ctx.thread_hierarchy.push("main_computation".to_string());
+        for k in 0..attr_count {
+            if attributes[k] != 0 {
+                for j in 0..attr_val_count{
+                    // Determine the number of transactions that are:
+                    // 1. in the current subset
+                    // 2. predict the i-th class value
+                    // 3. and have the j-th value of the k-th attribute
+                    let attr_value_trans_bigint = big_uint_vec_clone(&attr_value_trans_bigint_vec[k][j]);
+                    let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
+
+                    for i in 0..class_value_count{
+                        let mut ctx_cp = ctx.clone();
+                        let mut dp_result_map_cp = Arc::clone(&dp_result_map);
+                        ctx_cp.thread_hierarchy.push(format!("{}",i));
+                        thread_pool.execute(move||{
+                            let dp_result = dot_product_bigint(&u_decimal[i],&attr_value_trans_bigint,&mut ctx_cp);
+                            let mut dp_result_map_cp = dp_result_map_cp.lock().unwrap();
+                            (*dp_result_map_cp).insert(i,dp_result);
+                        });
+                    }
+
+                    thread_pool.join();
+                    let mut dp_result_map = dp_result_map.lock().unwrap();
+                    for i in 0..class_value_count{
+                        let dp_result = (*dp_result_map).get(&i).unwrap();
+                        x[k][i][j] = big_uint_clone(dp_result);
+                        y[k][j] = (y[k][j]).add(dp_result).mod_floor(&bigint_prime);
+                    }
+                    y[k][j] = ctx.dt_training.alpha.mul(&y[k][j]).add(if ctx.asymmetric_bit==1{
+                        BigUint::one()
+                    }else{
+                        BigUint::zero()
+                    }).mod_floor(bigint_prime);
+                }
+
+                ctx.thread_hierarchy.push("compute_x_square".to_string());
+                let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
+                for i in 0..class_value_count{
+                    let mut batch_multi_result_map_cp = Arc::clone(&batch_multi_result_map);
+                    let mut ctx_cp = ctx.clone();
+                    ctx_cp.thread_hierarchy.push(format!("{}",i));
+                    thread_pool.execute(move||{
+                        let batch_multi_result=batch_multiply_bigint(&x[k][i],&x[k][i],&mut ctx_cp);
+                        let mut batch_multi_result_map_cp = batch_multi_result_map_cp.lock().unwrap();
+                        (*batch_multi_result_map_cp).insert(i,batch_multi_result);
+                    });
+                }
+                thread_pool.join();
+                let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
+                for i in 0..class_value_count{
+                    x2[k][i] = big_uint_vec_clone((*batch_multi_result_map).get(&i).unwrap());
+                }
+                ctx.thread_hierarchy.pop();
+
+            }
+        }
+        ctx.thread_hierarchy.pop();
+
+        ctx.thread_hierarchy.pop();
     }
 
     fn find_common_class_index(ctx: &mut ComputingParty) -> Vec<u8> {
