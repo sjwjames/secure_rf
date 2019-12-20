@@ -18,7 +18,7 @@ pub mod decision_tree {
     use crate::protocol::protocol::{arg_max, equality_big_integer};
     use crate::constants::constants::BINARY_PRIME;
     use crate::message::message::{RFMessage, search_pop_message};
-    use crate::multiplication::multiplication::{batch_multiply_bigint, multiplication_bigint, batch_multiplication_byte};
+    use crate::multiplication::multiplication::{batch_multiply_bigint, multiplication_bigint, batch_multiplication_byte, parallel_multiplication_big_integer};
     use num::{Zero, ToPrimitive, One};
     use std::ops::{Add, Mul};
 
@@ -313,18 +313,18 @@ pub mod decision_tree {
 
         let attr_count = ctx.dt_data.attribute_count;
         let attr_val_count = ctx.dt_data.attr_value_count;
-        let mut x: Vec<Vec<Vec<BigUint>>> = vec![vec![vec![BigUint::zero();attr_val_count];class_value_count];attr_count];
-        let mut x2: Vec<Vec<Vec<BigUint>>> = vec![vec![vec![BigUint::zero();attr_val_count];class_value_count];attr_count];
-        let mut y: Vec<Vec<BigUint>> = vec![vec![BigUint::zero();attr_val_count];attr_count];
-        let mut gini_numerators: Vec<BigUint> = vec![BigUint::zero();attr_count];
-        let mut gini_denominators: Vec<BigUint> = vec![BigUint::zero();attr_count];
+        let mut x: Vec<Vec<Vec<BigUint>>> = vec![vec![vec![BigUint::zero(); attr_val_count]; class_value_count]; attr_count];
+        let mut x2: Vec<Vec<Vec<BigUint>>> = vec![vec![vec![BigUint::zero(); attr_val_count]; class_value_count]; attr_count];
+        let mut y: Vec<Vec<BigUint>> = vec![vec![BigUint::zero(); attr_val_count]; attr_count];
+        let mut gini_numerators: Vec<BigUint> = vec![BigUint::zero(); attr_count];
+        let mut gini_denominators: Vec<BigUint> = vec![BigUint::zero(); attr_count];
         let attributes = &ctx.dt_training.attribute_bit_vector;
         let attr_value_trans_bigint_vec = &ctx.dt_data.attr_values_big_integer;
 
         ctx.thread_hierarchy.push("main_computation".to_string());
         for k in 0..attr_count {
             if attributes[k] != 0 {
-                for j in 0..attr_val_count{
+                for j in 0..attr_val_count {
                     // Determine the number of transactions that are:
                     // 1. in the current subset
                     // 2. predict the i-th class value
@@ -332,53 +332,101 @@ pub mod decision_tree {
                     let attr_value_trans_bigint = big_uint_vec_clone(&attr_value_trans_bigint_vec[k][j]);
                     let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
 
-                    for i in 0..class_value_count{
+                    for i in 0..class_value_count {
                         let mut ctx_cp = ctx.clone();
                         let mut dp_result_map_cp = Arc::clone(&dp_result_map);
-                        ctx_cp.thread_hierarchy.push(format!("{}",i));
-                        thread_pool.execute(move||{
-                            let dp_result = dot_product_bigint(&u_decimal[i],&attr_value_trans_bigint,&mut ctx_cp);
+                        ctx_cp.thread_hierarchy.push(format!("{}", i));
+                        thread_pool.execute(move || {
+                            let dp_result = dot_product_bigint(&u_decimal[i], &attr_value_trans_bigint, &mut ctx_cp);
                             let mut dp_result_map_cp = dp_result_map_cp.lock().unwrap();
-                            (*dp_result_map_cp).insert(i,dp_result);
+                            (*dp_result_map_cp).insert(i, dp_result);
                         });
                     }
 
                     thread_pool.join();
                     let mut dp_result_map = dp_result_map.lock().unwrap();
-                    for i in 0..class_value_count{
+                    for i in 0..class_value_count {
                         let dp_result = (*dp_result_map).get(&i).unwrap();
                         x[k][i][j] = big_uint_clone(dp_result);
                         y[k][j] = (y[k][j]).add(dp_result).mod_floor(&bigint_prime);
                     }
-                    y[k][j] = ctx.dt_training.alpha.mul(&y[k][j]).add(if ctx.asymmetric_bit==1{
+                    y[k][j] = ctx.dt_training.alpha.mul(&y[k][j]).add(if ctx.asymmetric_bit == 1 {
                         BigUint::one()
-                    }else{
+                    } else {
                         BigUint::zero()
                     }).mod_floor(bigint_prime);
                 }
 
                 ctx.thread_hierarchy.push("compute_x_square".to_string());
                 let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
-                for i in 0..class_value_count{
+                for i in 0..class_value_count {
                     let mut batch_multi_result_map_cp = Arc::clone(&batch_multi_result_map);
                     let mut ctx_cp = ctx.clone();
-                    ctx_cp.thread_hierarchy.push(format!("{}",i));
-                    thread_pool.execute(move||{
-                        let batch_multi_result=batch_multiply_bigint(&x[k][i],&x[k][i],&mut ctx_cp);
+                    ctx_cp.thread_hierarchy.push(format!("{}", i));
+                    thread_pool.execute(move || {
+                        let batch_multi_result = batch_multiply_bigint(&x[k][i], &x[k][i], &mut ctx_cp);
                         let mut batch_multi_result_map_cp = batch_multi_result_map_cp.lock().unwrap();
-                        (*batch_multi_result_map_cp).insert(i,batch_multi_result);
+                        (*batch_multi_result_map_cp).insert(i, batch_multi_result);
                     });
                 }
                 thread_pool.join();
                 let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
-                for i in 0..class_value_count{
+                for i in 0..class_value_count {
                     x2[k][i] = big_uint_vec_clone((*batch_multi_result_map).get(&i).unwrap());
                 }
                 ctx.thread_hierarchy.pop();
 
+                let p_multi = parallel_multiplication_big_integer(&y[k], ctx);
+                gini_denominators[k] = p_multi;
+
+                gini_numerators[k] = BigUint::zero();
+                for j in 0..attr_val_count {
+                    let mut y_without_j = Vec::new();
+                    for l in 0..y[k].len() {
+                        if j != l {
+                            y_without_j.push(y[k][l]);
+                        }
+                    }
+                    let mut y_prod_without_j = parallel_multiplication_big_integer(&y_without_j, ctx);
+                    let mut sum_x2 = BigUint::zero();
+                    for i in 0..class_value_count {
+                        sum_x2 = sum_x2.add(&x2[k][i][j]).mod_floor(&bigint_prime);
+                    }
+
+                    let mut multi0 = multiplication_bigint(&sum_x2, &y_prod_without_j, ctx);
+                    gini_numerators[k] = gini_numerators[k].add(&multi0).mod_floor(&bigint_prime);
+                }
             }
         }
         ctx.thread_hierarchy.pop();
+
+        let mut k = 0;
+        while attributes[k] == 0 {
+            k += 1;
+        }
+
+        let mut gini_max_numerator = big_uint_clone(&gini_numerators[k]);
+        let mut gini_max_denominator = big_uint_clone(&gini_denominators[k]);
+        let mut gini_argmax = BigUint::from(k);
+        k += 1;
+        while k < attr_count {
+            if attributes[k]==1{
+                let mut left_operand = BigUint::zero();
+                let mut right_operand = BigUint::zero();
+                let mut gini_argmaxes = [if ctx.asymmetric_bit==1 {BigUint::from(k)}else{BigUint::zero()},&gini_argmax];
+                let mut numerators = [&gini_numerators[k],&gini_max_numerator];
+                let mut denominators = [&gini_denominators[k],&gini_max_denominator];
+                let mut new_assignments_bin = vec![BigUint::zero();2];
+                let mut new_assignments =  vec![BigUint::zero();2];
+
+
+                let mult0 = multiplication_bigint(&numerators[0],denominators[1],ctx);
+                let mult1 = multiplication_bigint(&numerators[1],denominators[0],ctx);
+
+                new_assignments_bin[0] =
+            }
+            k += 1;
+        }
 
         ctx.thread_hierarchy.pop();
     }

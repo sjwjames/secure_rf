@@ -1,10 +1,10 @@
 pub mod bit_decomposition {
     use crate::computing_party::computing_party::ComputingParty;
-    use num::abs;
+    use num::{abs, BigUint};
     use num::integer::*;
     use crate::constants::constants::BINARY_PRIME;
     use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte};
-    use crate::utils::utils::increment_current_share_index;
+    use crate::utils::utils::{increment_current_share_index, big_uint_clone};
     use std::sync::{Arc, Mutex};
     use threadpool::ThreadPool;
     use std::collections::HashMap;
@@ -15,10 +15,7 @@ pub mod bit_decomposition {
         ctx.thread_hierarchy.push("bit_decomposition".to_string());
         let mut input_shares = Vec::new();
         let bit_length = ctx.dt_training.bit_length as usize;
-        let mut d_shares = vec![0u8; bit_length];
-        let mut c_shares = vec![0u8; bit_length];
-        let mut y_shares = vec![0u8; bit_length];
-        let mut x_shares = vec![0u8; bit_length];
+
         let binary_str = format!("{:b}", input);
         let input_binary_str_vec: Vec<&str> = binary_str.split("").collect();
         let mut temp: Vec<u8> = Vec::new();
@@ -41,14 +38,56 @@ pub mod bit_decomposition {
                 input_shares.push(temp0);
             }
         }
-        //initY in Java Lynx
-        for i in 0..bit_length {
-            let y = input_shares[0][i] + input_shares[1][i];
-            y_shares[i] = mod_floor(y, BINARY_PRIME as u8);
-        }
-        x_shares[0] = y_shares[0];
 
-        //bit_multiplication in Java Lynx
+
+        let x_shares = generate_bit_decomposition(bit_length,&input_shares,ctx);
+
+        // pop bit_decomposition
+        ctx.thread_hierarchy.pop();
+        x_shares
+    }
+
+    pub fn bit_decomposition_bigint(input: &BigUint, ctx: &mut ComputingParty) -> Vec<u8> {
+        let bit_length = ctx.dt_training.bit_length as usize;
+        let prime = BINARY_PRIME as u8;
+        let mut input_shares = Vec::new();
+        let mut temp = input.to_bytes_le();
+        let mut temp0 = vec![0u8; bit_length as usize];
+        let diff = (abs(bit_length - temp.len())) as usize;
+        for i in 0..diff{
+            temp.push(0);
+        }
+
+        //todo add partyCount to ctx
+        for i in 0..2{
+            if i==ctx.party_id {
+                input_shares.push(temp);
+            }else{
+                input_shares.push(temp0);
+            }
+        }
+
+        let x_shares = generate_bit_decomposition(bit_length,&input_shares,ctx);
+        // pop bit_decomposition
+        ctx.thread_hierarchy.pop();
+        x_shares
+    }
+
+    fn generate_bit_decomposition(bit_length:usize,input_shares:&Vec<Vec<u8>>,ctx:&mut ComputingParty)->Vec<u8>{
+        let mut e_shares = vec![0u8;bit_length as usize];
+        let mut d_shares = vec![0u8;bit_length as usize];
+        let mut c_shares = vec![0u8;bit_length as usize];
+        let mut x_shares = Vec::new();
+        let mut y_shares = vec![0u8;bit_length as usize];
+
+        //initY
+        for i in 0..bit_length{
+            let y = input_shares[0][i]+input_shares[1][i];
+            y_shares[i] = mod_floor(y,prime);
+        }
+        x_shares[0] = y_shares[0] as u8;
+
+        //Initialize c[1]
         let first_c_share = multiplication_byte(input_shares[0][0], input_shares[1][0], ctx);
         increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
         c_shares[0] = mod_floor(first_c_share, BINARY_PRIME as u8);
@@ -63,7 +102,7 @@ pub mod bit_decomposition {
             let mut output_map = Arc::clone(&output_map);
             let to_index = min(i + ctx.batch_size, bit_length);
             let mut ctx_copied = ctx.clone();
-            ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
+            ctx_copied.thread_hierarchy.push(format!("{}", batch_count));
             let mut input_shares = input_shares.clone();
             thread_pool.execute(move || {
                 let mut batch_mul_result = batch_multiplication_byte(&input_shares[0][i..to_index].to_vec(), &input_shares[1][i..to_index].to_vec(), &mut ctx_copied);
@@ -99,9 +138,6 @@ pub mod bit_decomposition {
             c_shares[i] = mod_floor(c_result, BINARY_PRIME as u8);
         }
         // pop computeVariables
-        ctx.thread_hierarchy.pop();
-
-        // pop bit_decomposition
         ctx.thread_hierarchy.pop();
         x_shares
     }
