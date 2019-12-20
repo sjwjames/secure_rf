@@ -5,19 +5,22 @@ pub mod decision_tree {
     use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::big_uint_clone;
+    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
     //    use crate::dot_product::dot_product::dot_product;
-    use crate::field_change::field_change::change_binary_to_decimal_field;
+    use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
     use std::thread::sleep;
     use std::time::{Duration, SystemTime};
-    use crate::dot_product::dot_product::{dot_product, dot_product_integer};
+    use crate::dot_product::dot_product::{dot_product, dot_product_integer, dot_product_bigint};
     use crate::bit_decomposition::bit_decomposition::bit_decomposition;
-    use crate::protocol::protocol::arg_max;
+    use crate::protocol::protocol::{arg_max, equality_big_integer};
     use crate::constants::constants::BINARY_PRIME;
     use crate::message::message::{RFMessage, search_pop_message};
+    use crate::multiplication::multiplication::{batch_multiply_bigint, multiplication_bigint};
+    use num::{Zero, ToPrimitive, One};
+    use std::ops::Add;
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -58,6 +61,7 @@ pub mod decision_tree {
         pub current_binary_index: Arc<Mutex<usize>>,
     }
 
+
     #[derive(Serialize, Deserialize, Debug)]
     pub struct DecisionTreeTIShareMessage {
         pub additive_triples: String,
@@ -66,6 +70,17 @@ pub mod decision_tree {
         pub equality_shares: String,
     }
 
+    pub struct DecisionTreeResult {
+        pub result_list: Vec<String>
+    }
+
+    impl Clone for DecisionTreeResult {
+        fn clone(&self) -> Self {
+            DecisionTreeResult {
+                result_list: self.result_list.clone()
+            }
+        }
+    }
 
     impl Clone for DecisionTreeData {
         fn clone(&self) -> Self {
@@ -142,7 +157,7 @@ pub mod decision_tree {
     }
 
 
-    pub fn train(ctx: &mut ComputingParty) {
+    pub fn train(ctx: &mut ComputingParty, r: usize) {
         println!("start building model");
         ctx.thread_hierarchy.push("DT".to_string());
         let major_class_index = find_common_class_index(ctx);
@@ -150,22 +165,30 @@ pub mod decision_tree {
         // Share major class index
         ctx.thread_hierarchy.push("share_major_class_index".to_string());
 
-        let mut o_stream = ctx.o_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
-        let mut message = RFMessage {
-            message_id: ctx.thread_hierarchy.join(":"),
-            message_content: serde_json::to_string(&major_class_index).unwrap(),
-        };
+
+        let message_id = ctx.thread_hierarchy.join(":");
+        let message_content = serde_json::to_string(&major_class_index).unwrap();
+        push_message_to_queue(&ctx.local_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.remote_mq_address, &message_id, 1);
         let mut major_class_index_receive: Vec<u8> = Vec::new();
-        if ctx.asymmetric_bit == 1 {
-            o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
-            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-            major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
-        } else {
-            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-            major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
-            o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
-        }
+        major_class_index_receive = serde_json::from_str(&message_received[0]).unwrap();
+
+//        let mut o_stream = ctx.o_stream.try_clone()
+//            .expect("failed cloning tcp o_stream");
+//        let mut message = RFMessage {
+//            message_id: ctx.thread_hierarchy.join(":"),
+//            message_content: serde_json::to_string(&major_class_index).unwrap(),
+//        };
+//        let mut major_class_index_receive: Vec<u8> = Vec::new();
+//        if ctx.asymmetric_bit == 1 {
+//            o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
+//            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
+//            major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
+//        } else {
+//            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
+//            major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
+//            o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
+//        }
 //        o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
 //        let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
 //        major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
@@ -189,8 +212,91 @@ pub mod decision_tree {
             major_class_index_shared[i] = 0;
         }
 
-        println!("{:?}", major_class_index_shared);
+        println!("Major class {}", major_index);
+        println!("Major class OHE {:?}", major_class_index_shared);
         ctx.thread_hierarchy.pop();
+
+        // quit if reaching max depth
+        if r == 0 {
+            println!("Exited on base case: Recursion Level == 0");
+            ctx.dt_results.result_list.push(format!("class={}", major_index));
+            return;
+        }
+
+        let mut major_class_index_decimal = if ctx.asymmetric_bit == 1 {
+            let mut result = change_binary_to_bigint_field(&major_class_index_shared, ctx);
+            result
+        } else {
+            let mut result = change_binary_to_bigint_field(&vec![0u8; ctx.dt_data.class_value_count], ctx);
+            result
+        };
+        let mut subset_transaction = ctx.dt_training.subset_transaction_bit_vector.clone();
+        let mut transactions_decimal = change_binary_to_bigint_field(&subset_transaction, ctx);
+
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
+        let dataset_size = ctx.dt_data.instance_count;
+        ctx.thread_hierarchy.push("major_class_trans_count".to_string());
+        for i in 0..ctx.dt_data.class_value_count {
+            let mut dp_result = Arc::clone(&dp_result_map);
+            let mut transactions_decimal_cp = transactions_decimal.clone();
+            let mut dt_ctx = ctx.clone();
+            let major_class_index_value = big_uint_clone(&major_class_index_decimal[i]);
+            dt_ctx.thread_hierarchy.push(format!("{}", i));
+            thread_pool.execute(move || {
+                let mut result = dot_product_bigint(&transactions_decimal_cp, &vec![major_class_index_value; dataset_size], &mut dt_ctx);
+                let mut dp_result = dp_result.lock().unwrap();
+                (*dp_result).insert(i, result);
+            });
+        }
+
+        thread_pool.join();
+        ctx.thread_hierarchy.pop();
+        let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
+        let mut major_class_trans_count = BigUint::zero();
+        let mut dp_result_map = dp_result_map.lock().unwrap();
+        for i in 0..ctx.dt_data.class_value_count {
+            let mut dp_result = (*dp_result_map).get(&i).unwrap();
+            major_class_trans_count = major_class_trans_count.add(big_uint_clone(dp_result)).mod_floor(&bigint_prime);
+        }
+
+        println!("Majority Class Transaction Count: {}",major_class_trans_count.to_u64().unwrap());
+
+        let mut transaction_count = BigUint::zero();
+        let list = if ctx.asymmetric_bit==1{
+            vec![BigUint::one();dataset_size]
+        }else{
+            vec![BigUint::zero();dataset_size]
+        };
+        let transaction_count=dot_product_bigint(&transactions_decimal,&list,ctx);
+        println!("Transactions in current subset: {}",transaction_count.to_u64().unwrap());
+
+        let eq_test_result = equality_big_integer(&transaction_count,&major_class_trans_count,ctx);
+        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}",eq_test_result.to_u64().unwrap());
+
+        let mut compute_result = BigUint::one();
+        let stopping_bit = multiplication_bigint(&eq_test_result,&compute_result,ctx);
+
+        ctx.thread_hierarchy.push("stop_criteria".to_string());
+        let message_id = ctx.thread_hierarchy.join(":");
+        let message_content = serde_json::to_string(&(stopping_bit.to_bytes_le())).unwrap();
+        push_message_to_queue(&ctx.local_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.remote_mq_address, &message_id, 1);
+        ctx.thread_hierarchy.pop();
+        let stopping_bit_received:Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
+        let stopping_bit_received = BigUint::from_bytes_le(&stopping_bit_received);
+
+        let stopping_check = stopping_bit.add(&stopping_bit).mod_floor(&bigint_prime);
+        if stopping_check.eq(&BigUint::zero()){
+            println!("Exited on base case: All transactions predict same outcome");
+            ctx.dt_results.result_list.push(format!("class={}",major_index));
+            return;
+        }
+
+        println!("Base case not reached. Continuing.");
+        
+
+
     }
 
     fn find_common_class_index(ctx: &mut ComputingParty) -> Vec<u8> {

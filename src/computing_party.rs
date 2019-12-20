@@ -7,7 +7,7 @@ pub mod computing_party {
     use std::string::ToString;
     use std::io::{Write, Read, BufReader, BufRead};
     use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX};
-    use crate::decision_tree::decision_tree::{DecisionTreeData, DecisionTreeTraining, DecisionTreeShares, DecisionTreeTIShareMessage};
+    use crate::decision_tree::decision_tree::{DecisionTreeData, DecisionTreeTraining, DecisionTreeShares, DecisionTreeTIShareMessage, DecisionTreeResult};
     use num::bigint::{BigUint, BigInt, ToBigUint, ToBigInt};
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
@@ -62,6 +62,7 @@ pub mod computing_party {
         /* DT training*/
         pub dt_training: DecisionTreeTraining,
         pub dt_shares: DecisionTreeShares,
+        pub dt_results:DecisionTreeResult,
 
         /* random forest */
         pub thread_count: usize,
@@ -102,6 +103,7 @@ pub mod computing_party {
                 dt_data: self.dt_data.clone(),
                 dt_training: self.dt_training.clone(),
                 dt_shares: self.dt_shares.clone(),
+                dt_results:self.dt_results.clone(),
 
                 thread_count: self.thread_count,
                 tree_count: self.tree_count,
@@ -566,6 +568,9 @@ pub mod computing_party {
                 current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
                 current_equality_index: Arc::new(Mutex::new(0 as usize)),
                 current_binary_index: Arc::new(Mutex::new(0 as usize)),
+            },
+            dt_results:DecisionTreeResult{
+                result_list: vec![]
             },
             thread_hierarchy: vec![format!("{}", "main")],
             message_manager: Arc::new(Mutex::new(MessageManager {

@@ -99,7 +99,8 @@ pub mod random_forest {
 
             dt_ctx.dt_data.class_values = class_values;
             dt_ctx.dt_data.class_values_big_integer = class_values_bigint;
-            let dt_training = decision_tree::train(&mut dt_ctx);
+            let max_depth = (&dt_ctx.dt_training).max_depth;
+            let dt_training = decision_tree::train(&mut dt_ctx,max_depth);
 
             current_p0_port += 1;
             current_p1_port += 1;
