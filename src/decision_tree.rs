@@ -21,6 +21,7 @@ pub mod decision_tree {
     use crate::multiplication::multiplication::{batch_multiply_bigint, multiplication_bigint, batch_multiplication_byte, parallel_multiplication_big_integer};
     use num::{Zero, ToPrimitive, One};
     use std::ops::{Add, Mul};
+    use crate::comparison::comparison::compare_bigint;
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -220,6 +221,7 @@ pub mod decision_tree {
         if r == 0 {
             println!("Exited on base case: Recursion Level == 0");
             ctx.dt_results.result_list.push(format!("class={}", major_index));
+            ctx.thread_hierarchy.pop();
             return;
         }
 
@@ -292,6 +294,7 @@ pub mod decision_tree {
         if stopping_check.eq(&BigUint::zero()) {
             println!("Exited on base case: All transactions predict same outcome");
             ctx.dt_results.result_list.push(format!("class={}", major_index));
+            ctx.thread_hierarchy.pop();
             return;
         }
 
@@ -409,23 +412,67 @@ pub mod decision_tree {
         let mut gini_max_denominator = big_uint_clone(&gini_denominators[k]);
         let mut gini_argmax = BigUint::from(k);
         k += 1;
+        ctx.thread_hierarchy.push("gini_argmax_computation".to_string());
         while k < attr_count {
-            if attributes[k]==1{
+            if attributes[k] == 1 {
                 let mut left_operand = BigUint::zero();
                 let mut right_operand = BigUint::zero();
-                let mut gini_argmaxes = [if ctx.asymmetric_bit==1 {BigUint::from(k)}else{BigUint::zero()},&gini_argmax];
-                let mut numerators = [&gini_numerators[k],&gini_max_numerator];
-                let mut denominators = [&gini_denominators[k],&gini_max_denominator];
-                let mut new_assignments_bin = vec![BigUint::zero();2];
-                let mut new_assignments =  vec![BigUint::zero();2];
+                let mut gini_argmaxes = [if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero() }, &gini_argmax];
+                let mut numerators = [big_uint_clone(&gini_numerators[k]), big_uint_clone(&gini_max_numerator)];
+                let mut denominators = [big_uint_clone(&gini_denominators[k]), big_uint_clone(&gini_max_denominator)];
+                let mut new_assignments_bin = vec![BigUint::zero(); 2];
+                let mut new_assignments = vec![BigUint::zero(); 2];
 
 
-                let mult0 = multiplication_bigint(&numerators[0],denominators[1],ctx);
-                let mult1 = multiplication_bigint(&numerators[1],denominators[0],ctx);
+                let mult0 = multiplication_bigint(&numerators[0], &denominators[1], ctx);
+                let mult1 = multiplication_bigint(&numerators[1], &denominators[0], ctx);
 
-                new_assignments_bin[0] =
+                new_assignments_bin[0] = compare_bigint(&left_operand, &right_operand, ctx);
+                new_assignments_bin[1] = compare_bigint(&new_assignments_bin[0], &(if ctx.asymmetric_bit { BigUint::one() } else { BigUint::zero() }), ctx);
+
+                gini_argmax = dot_product_bigint(&new_assignments, &gini_argmaxes.to_vec(), ctx);
+                gini_max_numerator = dot_product_bigint(&new_assignments, &numerators.to_vec(), ctx);
+                gini_max_denominator = dot_product_bigint(&new_assignments, &denominators.to_vec(), ctx);
             }
             k += 1;
+        }
+        ctx.thread_hierarchy.pop();
+
+        ctx.thread_hierarchy.push("gini_argmax_public".to_string());
+        let message_id = ctx.thread_hierarchy.join(":");
+        let message_content = serde_json::to_string(&(gini_argmax.to_bytes_le())).unwrap();
+        push_message_to_queue(&ctx.local_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.remote_mq_address, &message_id, 1);
+        let mut argmax_received: Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
+        let argmax_received = BigUint::from_bytes_le(&argmax_received);
+        let shared_gini_argmax = gini_argmax.add(&argmax_received).mod_floor(&bigint_prime).to_u64();
+        attributes[shared_gini_argmax]=0;
+        ctx.dt_results.result_list.push(format!("attr={}",shared_gini_argmax));
+        ctx.thread_hierarchy.pop();
+
+
+        ctx.thread_hierarchy.push("update_transactions".to_string());
+        let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
+        let attr_values_bytes = &ctx.dt_data.attr_values_bytes;
+
+        for j in 0..attr_val_count{
+            let mut dt_ctx = ctx.clone();
+            let mut batch_multi_result_cp = Arc::clone(&batch_multi_result_map);
+            let mut subset_transaction_cp = subset_transaction.clone();
+            thread_pool.execute(move||{
+                let batch_multi = batch_multiplication_byte(&subset_transaction_cp,&attr_values_bytes[shared_gini_argmax][j],&mut dt_ctx);
+                let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
+                (*batch_multi_result_map).insert(j,batch_multi);
+            });
+        }
+        thread_pool.join();
+        ctx.thread_hierarchy.pop();
+        let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
+        let mut updated_transactions = Vec::new();
+        for j in 0..attr_val_count{
+            let mut dt_ctx = ctx.clone();
+            dt_ctx.dt_training.subset_transaction_bit_vector = (*batch_multi_result_map).get(&j).unwrap().clone();
+            train(&mut dt_ctx,r-1);
         }
 
         ctx.thread_hierarchy.pop();
