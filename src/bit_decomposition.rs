@@ -53,7 +53,7 @@ pub mod bit_decomposition {
         let mut input_shares = Vec::new();
         let mut temp = input.to_bytes_le();
         let mut temp0 = vec![0u8; bit_length as usize];
-        let diff = (abs(bit_length - temp.len())) as usize;
+        let diff = (abs((bit_length - temp.len()) as isize)) as usize;
         for i in 0..diff{
             temp.push(0);
         }
@@ -61,9 +61,9 @@ pub mod bit_decomposition {
         //todo add partyCount to ctx
         for i in 0..2{
             if i==ctx.party_id {
-                input_shares.push(temp);
+                input_shares.push(temp.clone());
             }else{
-                input_shares.push(temp0);
+                input_shares.push(temp0.clone());
             }
         }
 
@@ -83,7 +83,7 @@ pub mod bit_decomposition {
         //initY
         for i in 0..bit_length{
             let y = input_shares[0][i]+input_shares[1][i];
-            y_shares[i] = mod_floor(y,prime);
+            y_shares[i] = mod_floor(y, BINARY_PRIME as u8);
         }
         x_shares[0] = y_shares[0] as u8;
 

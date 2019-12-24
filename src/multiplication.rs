@@ -486,6 +486,7 @@ pub mod multiplication {
     }
 
     pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
+        ctx.thread_hierarchy.push("multiplication_bigint".to_string());
         let share = get_current_bigint_share(ctx);
 
         let mut diff_list = Vec::new();
@@ -519,13 +520,15 @@ pub mod multiplication {
         let mut product = big_uint_clone(&big_uint_clone(&share.2).add(&big_uint_clone(&d).mul(&big_uint_clone(&share.1)).mod_floor(prime)).mod_floor(prime));
         product = product.add(big_uint_clone(&e).mul(&big_uint_clone(&share.0)).mod_floor(prime)).mod_floor(prime);
         product = product.add(big_uint_clone(&d).mul(&big_uint_clone(&e)).mul(&BigUint::from(ctx.asymmetric_bit)).mod_floor(prime)).mod_floor(prime);
-
+        ctx.thread_hierarchy.pop();
         product
     }
 
     pub fn parallel_multiplication_big_integer(row: &Vec<BigUint>, ctx: &mut ComputingParty) -> BigUint {
+        ctx.thread_hierarchy.push("parallel_multiplication_bigint".to_string());
         let mut products = big_uint_vec_clone(row);
         let thread_pool = ThreadPool::new(ctx.thread_count);
+        let mut count = 0;
         while products.len() > 1 {
             let size = products.len();
             let mut push = BigInt::from_i32(-1).unwrap();
@@ -545,6 +548,7 @@ pub mod multiplication {
                 let mut output_map = Arc::clone(&output_map);
                 let mut ctx_copied = ctx.clone();
                 let mut products_slice = big_uint_vec_clone(&products[i1..temp_index1].to_vec());
+                ctx_copied.thread_hierarchy.push(format!("{}",count));
                 thread_pool.execute(move || {
                     let multi_result = batch_multiply_bigint(&products_slice, &products_slice, &mut ctx_copied);
                     let mut output_map = output_map.lock().unwrap();
@@ -553,6 +557,7 @@ pub mod multiplication {
                 i1 = temp_index1;
                 i2 = temp_index2;
                 batch_count += 1;
+                count+=1;
             }
             let mut new_products = Vec::new();
             let mut output_map = &*(output_map.lock().unwrap());
@@ -566,6 +571,7 @@ pub mod multiplication {
                 products.push(push.to_biguint().unwrap());
             }
         }
+        ctx.thread_hierarchy.pop();
         big_uint_clone(&products[0])
     }
 

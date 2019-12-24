@@ -398,7 +398,7 @@ pub mod computing_party {
                 panic!("Encountered a problem while parsing alpha: {:?}", error)
             }
         };
-        let alpha = alpha.to_bigint().unwrap();
+        let alpha = alpha.to_biguint().unwrap();
 
 
         let epsilon = match settings.get_float("epsilon") {

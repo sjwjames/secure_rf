@@ -9,6 +9,7 @@ pub mod comparison {
     use std::collections::HashMap;
     use num::{abs, BigUint};
     use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint};
+    use crate::utils::utils::big_uint_clone;
 
     pub fn comparison(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> u8 {
         ctx.thread_hierarchy.push("comparison".to_string());
@@ -145,34 +146,35 @@ pub mod comparison {
 
     pub fn compare_bigint(x:&BigUint,y:&BigUint,ctx:&mut ComputingParty)->BigUint{
         let thread_pool = ThreadPool::new(2);
-        let mut x_shares = Vec::new();
-        let mut y_shares = Vec::new();
+
         let bit_length = ctx.dt_training.bit_length;
 
         let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
         let mut bd_result_map_cp = Arc::clone(&bd_result_map);
         let mut ctx_cp = ctx.clone();
+        let x_cp = big_uint_clone(x);
         thread_pool.execute(move||{
-            let x_bits =  bit_decomposition_bigint(&x,&mut ctx_cp);
+            let x_bits =  bit_decomposition_bigint(&x_cp,&mut ctx_cp);
             let mut bd_result_map_cp = bd_result_map_cp.lock().unwrap();
             (*bd_result_map_cp).insert(0,x_bits);
         });
 
         let mut ctx_cp = ctx.clone();
         let mut bd_result_map_cp = Arc::clone(&bd_result_map);
+        let y_cp = big_uint_clone(y);
         thread_pool.execute(move||{
-            let y_bits =  bit_decomposition_bigint(&y,&mut ctx_cp);
+            let y_bits =  bit_decomposition_bigint(&y_cp,&mut ctx_cp);
             let mut bd_result_map_cp = bd_result_map_cp.lock().unwrap();
-            (*bd_result_map_cp).insert(1,x_bits);
+            (*bd_result_map_cp).insert(1,y_bits);
         });
 
         thread_pool.join();
 
         let bd_result_map = bd_result_map.lock().unwrap();
-        x_shares = bd_result_map.get(&0);
-        y_shares = bd_result_map.get(&1);
+        let x_shares = (*bd_result_map).get(&0).unwrap();
+        let y_shares = (*bd_result_map).get(&1).unwrap();
 
-        let result=comparison(&x_shares,&y_shares,ctx);
+        let result=comparison(x_shares,y_shares,ctx);
         BigUint::from(result)
     }
 
