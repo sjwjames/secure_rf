@@ -53,7 +53,6 @@ bit_length = 175
 #[BC-TCGA]
 
 x_input_path = "/Users/sjw/Projects/2019summer/idash2019/breast_cancer/shared_fold_1_train-0.csv"
-y_input_path = "/Users/sjw/Projects/2019summer/idash2019/breast_cancer/shared_fold_1_train-1.csv"
 output_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/weights/BC_TCGA_5_folds/fold_1_weights.csv"
 
 

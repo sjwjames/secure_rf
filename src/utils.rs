@@ -45,7 +45,7 @@ pub mod utils {
         EqualityShare,
     }
 
-    pub fn serialize_biguint_vec(biguint_vec: Vec<BigUint>) -> String {
+    pub fn serialize_biguint_vec(biguint_vec: &Vec<BigUint>) -> String {
         let mut str_vec = Vec::new();
         for item in biguint_vec.iter() {
             str_vec.push(serialize_biguint(item));

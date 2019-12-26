@@ -328,12 +328,6 @@ pub mod computing_party {
             }
         };
 
-        let y_input_path = match settings.get_str("y_input_path") {
-            Ok(string) => string,
-            Err(error) => {
-                panic!("Encountered a problem while parsing y_input_path: {:?}", error)
-            }
-        };
 
         let output_path = match settings.get_str("output_path") {
             Ok(string) => string,

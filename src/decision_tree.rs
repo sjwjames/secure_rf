@@ -5,7 +5,7 @@ pub mod decision_tree {
     use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone};
+    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
@@ -168,9 +168,10 @@ pub mod decision_tree {
 
 
         let message_id = ctx.thread_hierarchy.join(":");
+        println!("current message_id:{}",message_id);
         let message_content = serde_json::to_string(&major_class_index).unwrap();
-        push_message_to_queue(&ctx.local_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.remote_mq_address, &message_id, 1);
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut major_class_index_receive: Vec<u8> = Vec::new();
         major_class_index_receive = serde_json::from_str(&message_received[0]).unwrap();
 
@@ -233,8 +234,9 @@ pub mod decision_tree {
             result
         };
         let mut subset_transaction = ctx.dt_training.subset_transaction_bit_vector.clone();
+        ctx.thread_hierarchy.push("change_subset_trans".to_string());
         let mut transactions_decimal = change_binary_to_bigint_field(&subset_transaction, ctx);
-
+        ctx.thread_hierarchy.pop();
 
         let class_value_count = ctx.dt_data.class_value_count;
         let thread_pool = ThreadPool::new(ctx.thread_count);
@@ -261,10 +263,10 @@ pub mod decision_tree {
         let mut dp_result_map = dp_result_map.lock().unwrap();
         for i in 0..class_value_count {
             let mut dp_result = (*dp_result_map).get(&i).unwrap();
-            major_class_trans_count = major_class_trans_count.add(big_uint_clone(dp_result)).mod_floor(&bigint_prime);
+            major_class_trans_count = major_class_trans_count.add(dp_result).mod_floor(&bigint_prime);
         }
 
-        println!("Majority Class Transaction Count: {}", major_class_trans_count.to_u64().unwrap());
+        println!("Majority Class Transaction Count: {}", major_class_trans_count.to_string());
 
         let mut transaction_count = BigUint::zero();
         let list = if ctx.asymmetric_bit == 1 {
@@ -273,20 +275,19 @@ pub mod decision_tree {
             vec![BigUint::zero(); dataset_size]
         };
         let transaction_count = dot_product_bigint(&transactions_decimal, &list, ctx);
-        println!("Transactions in current subset: {}", transaction_count.to_u64().unwrap());
+        println!("Transactions in current subset: {}", transaction_count.to_string());
 
         let eq_test_result = equality_big_integer(&transaction_count, &major_class_trans_count, ctx);
-        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_result.to_u64().unwrap());
+        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_result.to_string());
 
+        ctx.thread_hierarchy.push("early_stop_criteria".to_string());
         let mut compute_result = BigUint::one();
         let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
 
-        ctx.thread_hierarchy.push("stop_criteria".to_string());
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serde_json::to_string(&(stopping_bit.to_bytes_le())).unwrap();
-        push_message_to_queue(&ctx.local_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.remote_mq_address, &message_id, 1);
-        ctx.thread_hierarchy.pop();
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let stopping_bit_received: Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
         let stopping_bit_received = BigUint::from_bytes_le(&stopping_bit_received);
 
@@ -297,6 +298,7 @@ pub mod decision_tree {
             ctx.thread_hierarchy.pop();
             return;
         }
+        ctx.thread_hierarchy.pop();
 
         println!("Base case not reached. Continuing.");
 
@@ -448,9 +450,9 @@ pub mod decision_tree {
 
         ctx.thread_hierarchy.push("gini_argmax_public".to_string());
         let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serde_json::to_string(&(gini_argmax.to_bytes_le())).unwrap();
-        push_message_to_queue(&ctx.local_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.remote_mq_address, &message_id, 1);
+        let message_content = serde_json::to_string(&serialize_biguint(&gini_argmax)).unwrap();
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut argmax_received: Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
         let argmax_received = BigUint::from_bytes_le(&argmax_received);
         let mut shared_gini_argmax = gini_argmax.add(&argmax_received).mod_floor(&bigint_prime).to_usize().unwrap();

@@ -75,10 +75,10 @@ pub mod or_xor{
             let to_index = min(i + ctx.batch_size, bit_length);
             let mut ctx_copied = ctx.clone();
             ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
-            let mut x_list = big_uint_vec_clone(x_list);
-            let mut y_list = big_uint_vec_clone(y_list);
+            let mut x_list_cp = big_uint_vec_clone(&x_list[i..to_index].to_vec());
+            let mut y_list_cp = big_uint_vec_clone(&y_list[i..to_index].to_vec());
             thread_pool.execute(move || {
-                let mut batch_mul_result = batch_multiply_bigint(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
+                let mut batch_mul_result = batch_multiply_bigint(&x_list_cp, &y_list_cp, &mut ctx_copied);
                 let mut output_map = output_map.lock().unwrap();
                 (*output_map).insert(batch_count, batch_mul_result);
             });

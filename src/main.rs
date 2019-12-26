@@ -33,9 +33,10 @@ fn test_mq() {
                 push_message_to_queue(&address,&routing_key,&message);
 
                 //subscribe
-                let address = "amqp://guest:guest@localhost:5673".to_string();
+                let sub_address = "amqp://guest:guest@localhost:5673".to_string();
                 let routing_key = "hello1".to_string();
-                let message_count = 10;
+                let message_count = 1;
+                receive_message_from_queue(&address,&routing_key,message_count);
                 receive_message_from_queue(&address,&routing_key,message_count);
             } else {
                 //publish
@@ -47,7 +48,8 @@ fn test_mq() {
                 //subscribe
                 let address = "amqp://guest:guest@localhost:5672".to_string();
                 let routing_key = "hello1".to_string();
-                let message_count = 10;
+                let message_count = 1;
+                receive_message_from_queue(&address,&routing_key,message_count);
                 receive_message_from_queue(&address,&routing_key,message_count);
             }
         }
@@ -58,7 +60,7 @@ fn test_mq() {
 }
 
 fn main() {
-    //test_mq();
+//    test_mq();
     run();
 }
 

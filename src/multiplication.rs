@@ -63,8 +63,8 @@ pub mod multiplication {
         let mut diff_list_message = String::new();
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serde_json::to_string(&diff_list_str_vec.join(";")).unwrap();
-        push_message_to_queue(&ctx.local_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.remote_mq_address,&message_id,1);
+        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
         diff_list_message = serde_json::from_str(&message_received[0]).unwrap();
 
         let mut diff_list_str_vec: Vec<&str> = diff_list_message.split(";").collect();
@@ -276,8 +276,8 @@ pub mod multiplication {
 
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serde_json::to_string(&diff_list).unwrap();
-        push_message_to_queue(&ctx.local_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.remote_mq_address,&message_id,1);
+        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
         let mut received_list: Vec<u8> = Vec::new();
         received_list = serde_json::from_str(&message_received[0]).unwrap();
 
@@ -334,8 +334,8 @@ pub mod multiplication {
 //        received_list = serde_json::from_str(&message_received.message_content).unwrap();
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serde_json::to_string(&diff_list).unwrap();
-        push_message_to_queue(&ctx.local_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.remote_mq_address,&message_id,1);
+        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
         let mut received_list: Vec<Vec<u8>> = Vec::new();
         received_list = serde_json::from_str(&message_received[0]).unwrap();
 
@@ -407,8 +407,8 @@ pub mod multiplication {
 
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serde_json::to_string(&diff_list).unwrap();
-        push_message_to_queue(&ctx.local_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.remote_mq_address,&message_id,1);
+        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
         let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
         received_list = serde_json::from_str(&message_received[0]).unwrap();
 
@@ -493,20 +493,27 @@ pub mod multiplication {
         diff_list.push(big_uint_subtract(x, &share.0, &ctx.dt_training.big_int_prime));
         diff_list.push(big_uint_subtract(y, &share.1, &ctx.dt_training.big_int_prime));
 
-        let mut in_stream = ctx.in_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
-
-        let mut o_stream = ctx.o_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
-
-        let mut message = serialize_biguint_vec(diff_list);
-        o_stream.write((message + "\n").as_bytes());
-
-        let mut reader = BufReader::new(in_stream);
+//        let mut in_stream = ctx.in_stream.try_clone()
+//            .expect("failed cloning tcp o_stream");
+//
+//        let mut o_stream = ctx.o_stream.try_clone()
+//            .expect("failed cloning tcp o_stream");
+//
+//        let mut message = serialize_biguint_vec(diff_list);
+//        o_stream.write((message + "\n").as_bytes());
+//
+//        let mut reader = BufReader::new(in_stream);
+//        let mut diff_list_message = String::new();
+//        reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
+//
+//        let mut diff_list = deserialize_biguint_vec(diff_list_message);
         let mut diff_list_message = String::new();
-        reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
+        let message_id = ctx.thread_hierarchy.join(":");
+        let message_content = serde_json::to_string(&serialize_biguint_vec(&diff_list)).unwrap();
+        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
+        diff_list_message = serde_json::from_str(&message_received[0]).unwrap();
 
-        let mut diff_list = deserialize_biguint_vec(diff_list_message);
         let mut d = BigUint::zero();
         let mut e = BigUint::zero();
         let prime = &ctx.dt_training.big_int_prime;

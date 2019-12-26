@@ -87,6 +87,7 @@ pub mod dot_product {
     }
 
     pub fn dot_product_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty) -> BigUint {
+        ctx.thread_hierarchy.push("dot_product_bigint".to_string());
         let mut dot_product = BigUint::zero();
         let vector_length = x_list.len();
         let thread_pool = ThreadPool::new(ctx.thread_count);
@@ -97,6 +98,7 @@ pub mod dot_product {
             let to_index = min(i + ctx.batch_size, vector_length);
             let mut output_map = Arc::clone(&output_map);
             let mut ctx_copied = ctx.clone();
+            ctx_copied.thread_hierarchy.push(format!("batch:{}",batch_count));
             let mut x_list_copied = big_uint_vec_clone(&x_list[i..to_index].to_vec());
             let mut y_list_copied = big_uint_vec_clone(&y_list[i..to_index].to_vec());
             thread_pool.execute(move || {
@@ -107,6 +109,7 @@ pub mod dot_product {
             batch_count += 1;
             i = to_index;
         }
+        thread_pool.join();
 
         let output_map = &*(output_map.lock().unwrap());
         for i in 0..batch_count {
@@ -115,6 +118,7 @@ pub mod dot_product {
                 dot_product = dot_product.add(item).mod_floor(&ctx.dt_training.big_int_prime);
             }
         }
+        ctx.thread_hierarchy.pop();
         dot_product
     }
 }

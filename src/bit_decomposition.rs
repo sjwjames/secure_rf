@@ -77,7 +77,7 @@ pub mod bit_decomposition {
         let mut e_shares = vec![0u8;bit_length as usize];
         let mut d_shares = vec![0u8;bit_length as usize];
         let mut c_shares = vec![0u8;bit_length as usize];
-        let mut x_shares = Vec::new();
+        let mut x_shares = vec![0u8;bit_length as usize];
         let mut y_shares = vec![0u8;bit_length as usize];
 
         //initY
