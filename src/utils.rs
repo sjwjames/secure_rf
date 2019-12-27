@@ -5,9 +5,11 @@ pub mod utils {
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
     use std::sync::{Mutex, Arc};
-    use amiquip::{Connection, Exchange, Publish, Channel, QueueDeclareOptions, ConsumerOptions, ConsumerMessage};
+    use amiquip::{Connection, Exchange, Publish, Channel, QueueDeclareOptions, ConsumerOptions, ConsumerMessage, ExchangeDeclareOptions, ExchangeType, FieldTable};
     use std::collections::HashMap;
     use std::process::exit;
+    use std::{thread, time};
+    use std::time::Duration;
 
 
     pub fn big_uint_subtract(x: &BigUint, y: &BigUint, big_int_prime: &BigUint) -> BigUint {
@@ -60,7 +62,7 @@ pub mod utils {
             tuple_vec.push(serialize_biguint(&item.0));
             tuple_vec.push(serialize_biguint(&item.1));
             tuple_vec.push(serialize_biguint(&item.2));
-            str_vec.push(format!("({})", tuple_vec.join(",")));
+            str_vec.push(tuple_vec.join("&"));
         }
         str_vec.join(";")
     }
@@ -144,9 +146,19 @@ pub mod utils {
     }
 
     pub fn receive_message_from_queue(address: &String, routing_key: &String, message_count: usize) -> Vec<String> {
+//        thread::sleep(Duration::from_millis(10));
         let mut connection = Connection::insecure_open(address).unwrap();
         let channel = connection.open_channel(None).unwrap();
+//        let exchange = channel.exchange_declare(ExchangeType::Direct,"direct",ExchangeDeclareOptions::default()).unwrap();
+//        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
+//            durable: false,
+//            exclusive: false,
+//            auto_delete: true,
+//            arguments: FieldTable::default()
+//        }).unwrap();
+//        queue.bind(&exchange,routing_key,FieldTable::default());
         let queue = channel.queue_declare(routing_key, QueueDeclareOptions::default()).unwrap();
+
         let consumer = queue.consume(ConsumerOptions::default()).unwrap();
         let mut count = 0;
         let mut result = Vec::new();
@@ -176,7 +188,9 @@ pub mod utils {
     pub fn push_message_to_queue(address: &String, routing_key: &String, message: &String) {
         let mut connection = Connection::insecure_open(address).unwrap();
         let channel = connection.open_channel(None).unwrap();
-        let exchange = Exchange::direct(&channel);
+        let exchange = channel.exchange_declare(ExchangeType::Direct,"direct",ExchangeDeclareOptions::default()).unwrap();
+        let queue = channel.queue_declare(routing_key, QueueDeclareOptions::default()).unwrap();
+        queue.bind(&exchange,routing_key,FieldTable::default());
         exchange.publish(Publish::new(message.as_bytes(), routing_key)).unwrap();
         connection.close();
     }

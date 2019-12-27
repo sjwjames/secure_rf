@@ -385,7 +385,7 @@ pub mod ti {
             tuples.push(serde_json::to_string(&(item.1.to_bytes_le())).unwrap());
             tuples.push(serde_json::to_string(&(item.2.to_bytes_le())).unwrap());
 
-            additive_bigint_str_vec.push(format!("({})", tuples.join(",")));
+            additive_bigint_str_vec.push(tuples.join("&"));
         }
 
         //////////////////////// EQUALITY BIGINT ////////////////////////

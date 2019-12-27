@@ -14,6 +14,7 @@ use serde::{Serialize, Deserialize, Serializer};
 use num::integer::*;
 use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOptions, ConsumerMessage};
 use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue};
+use threadpool::ThreadPool;
 
 fn test_mq() {
     let args: Vec<String> = env::args().collect();
@@ -23,40 +24,74 @@ fn test_mq() {
     settings
         .merge(config::File::with_name(&settings_file.as_str())).unwrap()
         .merge(config::Environment::with_prefix("APP")).unwrap();
-
+    let thread_pool = ThreadPool::new(10);
     match settings.get_int("party_id") {
         Ok(party_id) => {
             if party_id == 1 {
-                let address = "amqp://guest:guest@localhost:5672".to_string();
-                let routing_key = "hello1".to_string();
-                let message = "hello party 0, from party 1".to_string();
-                push_message_to_queue(&address,&routing_key,&message);
+                for i in 0..40 {
+                    thread_pool.execute(move || {
+                        let address = "amqp://guest:guest@localhost:5672".to_string();
+                        let routing_key = format!("hello{}",i);
+                        let message = format!("hello party 0, greetings from party 1, message {}", i);
+                        push_message_to_queue(&address, &routing_key, &message);
 
-                //subscribe
-                let sub_address = "amqp://guest:guest@localhost:5673".to_string();
-                let routing_key = "hello1".to_string();
-                let message_count = 1;
-                receive_message_from_queue(&address,&routing_key,message_count);
-                receive_message_from_queue(&address,&routing_key,message_count);
+                        //subscribe
+                        let address = "amqp://guest:guest@localhost:5673".to_string();
+                        let routing_key = format!("hello{}",i);
+                        let message_count = 1;
+                        receive_message_from_queue(&address, &routing_key, message_count);
+                    });
+
+//                    let address = "amqp://guest:guest@localhost:5672".to_string();
+//                    let routing_key = format!("hello{}",i);
+//                    let message = format!("hello party 0, greetings from party 1, message {}", i);
+//                    push_message_to_queue(&address, &routing_key, &message);
+//
+//                    //subscribe
+//                    let address = "amqp://guest:guest@localhost:5673".to_string();
+//                    let routing_key = format!("hello{}",i);
+//                    let message_count = 1;
+//                    receive_message_from_queue(&address, &routing_key, message_count);
+                }
+
+
             } else {
                 //publish
-                let address = "amqp://guest:guest@localhost:5673".to_string();
-                let routing_key = "hello1".to_string();
-                let message = "hello party 1,from party 0".to_string();
-                push_message_to_queue(&address,&routing_key,&message);
+                for i in 0..40 {
+                    thread_pool.execute(move || {
+                        let address = "amqp://guest:guest@localhost:5673".to_string();
+                        let routing_key = format!("hello{}",i);
+                        let message = format!("hello party 1, greetings from party 0, message {}", i);
+                        push_message_to_queue(&address, &routing_key, &message);
 
-                //subscribe
-                let address = "amqp://guest:guest@localhost:5672".to_string();
-                let routing_key = "hello1".to_string();
-                let message_count = 1;
-                receive_message_from_queue(&address,&routing_key,message_count);
-                receive_message_from_queue(&address,&routing_key,message_count);
+                        //subscribe
+                        let address = "amqp://guest:guest@localhost:5672".to_string();
+                        let routing_key = format!("hello{}",i);
+                        let message_count = 1;
+                        receive_message_from_queue(&address, &routing_key, message_count);
+                    });
+
+//                    let address = "amqp://guest:guest@localhost:5673".to_string();
+//                    let routing_key = format!("hello{}",i);
+//                    let message = format!("hello party 1, greetings from party 0, message {}", i);
+//                    push_message_to_queue(&address, &routing_key, &message);
+//
+//                    //subscribe
+//                    let address = "amqp://guest:guest@localhost:5672".to_string();
+//                    let routing_key = format!("hello{}",i);
+//                    let message_count = 1;
+//                    receive_message_from_queue(&address, &routing_key, message_count);
+                }
+
+
             }
         }
         Err(error) => {
-            panic!("{}",error);
+            panic!("{}", error);
         }
     };
+
+    thread_pool.join();
 }
 
 fn main() {

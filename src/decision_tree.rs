@@ -391,6 +391,7 @@ pub mod decision_tree {
                 gini_denominators[k] = p_multi;
 
                 gini_numerators[k] = BigUint::zero();
+                ctx.thread_hierarchy.push("gini_numerators_computation".to_string());
                 for j in 0..attr_val_count {
                     let mut y_without_j = Vec::new();
                     for l in 0..y[k].len() {
@@ -409,6 +410,7 @@ pub mod decision_tree {
                     let mut temp_gini_numerator = & gini_numerators[k];
                     gini_numerators[k] = temp_gini_numerator.add(&multi0).mod_floor(&bigint_prime);
                 }
+                ctx.thread_hierarchy.pop();
             }
         }
         ctx.thread_hierarchy.pop();
@@ -432,7 +434,6 @@ pub mod decision_tree {
                 let mut denominators = [big_uint_clone(&gini_denominators[k]), big_uint_clone(&gini_max_denominator)];
                 let mut new_assignments_bin = vec![BigUint::zero(); 2];
                 let mut new_assignments = vec![BigUint::zero(); 2];
-
 
                 let mult0 = multiplication_bigint(&numerators[0], &denominators[1], ctx);
                 let mult1 = multiplication_bigint(&numerators[1], &denominators[0], ctx);

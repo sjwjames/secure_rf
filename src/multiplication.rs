@@ -39,7 +39,7 @@ pub mod multiplication {
             let mut tuple = Vec::new();
             tuple.push(serde_json::to_string(&(item.0.to_bytes_le())).unwrap());
             tuple.push(serde_json::to_string(&(item.1.to_bytes_le())).unwrap());
-            diff_list_str_vec.push(format!("({})", tuple.join(",")));
+            diff_list_str_vec.push(tuple.join("&"));
         }
 //        let message = RFMessage {
 //            message_id: ctx.thread_hierarchy.join(":"),
@@ -71,7 +71,7 @@ pub mod multiplication {
         let mut diff_list = Vec::new();
         for item in diff_list_str_vec {
             let temp_str = &item[1..item.len()];
-            let str_vec: Vec<&str> = temp_str.split(",").collect();
+            let str_vec: Vec<&str> = temp_str.split("&").collect();
             diff_list.push(
                 (
                     BigUint::from_bytes_le(str_vec[0].as_bytes()),
@@ -555,9 +555,10 @@ pub mod multiplication {
                 let mut output_map = Arc::clone(&output_map);
                 let mut ctx_copied = ctx.clone();
                 let mut products_slice = big_uint_vec_clone(&products[i1..temp_index1].to_vec());
+                let mut products_slice2 = big_uint_vec_clone(&products[i2..temp_index2].to_vec());
                 ctx_copied.thread_hierarchy.push(format!("{}",count));
                 thread_pool.execute(move || {
-                    let multi_result = batch_multiply_bigint(&products_slice, &products_slice, &mut ctx_copied);
+                    let multi_result = batch_multiply_bigint(&products_slice, &products_slice2, &mut ctx_copied);
                     let mut output_map = output_map.lock().unwrap();
                     (*output_map).insert(batch_count, multi_result);
                 });
@@ -566,8 +567,9 @@ pub mod multiplication {
                 batch_count += 1;
                 count+=1;
             }
+            thread_pool.join();
             let mut new_products = Vec::new();
-            let mut output_map = &*(output_map.lock().unwrap());
+            let mut output_map = output_map.lock().unwrap();
             for i in 0..batch_count {
                 let mut multi_result = (*output_map.get(&i).unwrap()).clone();
                 new_products.append(&mut multi_result);

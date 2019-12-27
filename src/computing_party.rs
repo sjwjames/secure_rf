@@ -671,7 +671,7 @@ pub mod computing_party {
         let additive_bigint_triple_str_vec: Vec<&str> = ti_shares_message.additive_bigint_triples.split(";").collect();
         for item in additive_bigint_triple_str_vec {
             let temp_str = &item[1..item.len()];
-            let str_vec: Vec<&str> = temp_str.split(",").collect();
+            let str_vec: Vec<&str> = temp_str.split("&").collect();
             additive_bigint_triples.push(
                 (
                     BigUint::from_bytes_le(str_vec[0].as_bytes()),
