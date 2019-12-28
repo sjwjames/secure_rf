@@ -5,7 +5,7 @@ pub mod decision_tree {
     use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint};
+    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
@@ -422,7 +422,7 @@ pub mod decision_tree {
 
         let mut gini_max_numerator = big_uint_clone(&gini_numerators[k]);
         let mut gini_max_denominator = big_uint_clone(&gini_denominators[k]);
-        let mut gini_argmax = BigUint::from(k);
+        let mut gini_argmax = if ctx.asymmetric_bit==1 {BigUint::from(k)}else{BigUint::zero()};
         k += 1;
         ctx.thread_hierarchy.push("gini_argmax_computation".to_string());
         while k < attr_count {
@@ -454,8 +454,7 @@ pub mod decision_tree {
         let message_content = serde_json::to_string(&serialize_biguint(&gini_argmax)).unwrap();
         push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
-        let mut argmax_received: Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
-        let argmax_received = BigUint::from_bytes_le(&argmax_received);
+        let mut argmax_received = deserialize_biguint(&message_received[0]);
         let mut shared_gini_argmax = gini_argmax.add(&argmax_received).mod_floor(&bigint_prime).to_usize().unwrap();
         attributes[shared_gini_argmax]=0;
         ctx.dt_results.result_list.push(format!("attr={}",shared_gini_argmax));
