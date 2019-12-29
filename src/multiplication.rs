@@ -253,14 +253,13 @@ pub mod multiplication {
         let ti_share_triple = get_current_binary_share(&ctx_copied);
         diff_list.push(mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0)).0, BINARY_PRIME as u8));
         diff_list.push(mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1)).0, BINARY_PRIME as u8));
-        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
 
-        let mut o_stream = ctx.o_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
-        let mut message = RFMessage {
-            message_id: ctx.thread_hierarchy.join(":"),
-            message_content: serde_json::to_string(&diff_list).unwrap(),
-        };
+//        let mut o_stream = ctx.o_stream.try_clone()
+//            .expect("failed cloning tcp o_stream");
+//        let mut message = RFMessage {
+//            message_id: ctx.thread_hierarchy.join(":"),
+//            message_content: serde_json::to_string(&diff_list).unwrap(),
+//        };
 //        if ctx.asymmetric_bit == 1 {
 //            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
 //            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();

@@ -4,7 +4,7 @@ extern crate serde;
 use std::time::{SystemTime, Duration};
 use std::{env, thread};
 use random_forest_rust::ti::ti::{TI, initialize_ti_context, run_ti_module};
-use random_forest_rust::computing_party::computing_party::initialize_party_context;
+use random_forest_rust::computing_party::computing_party::{initialize_party_context, ti_receive};
 use random_forest_rust::random_forest::random_forest;
 use num::BigUint;
 use std::net::{TcpListener, TcpStream, SocketAddr};
@@ -15,6 +15,8 @@ use num::integer::*;
 use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOptions, ConsumerMessage};
 use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue};
 use threadpool::ThreadPool;
+use random_forest_rust::multiplication::multiplication::multiplication_byte;
+use random_forest_rust::protocol_test::protocol_test::test_multi_byte;
 
 fn test_mq() {
     let args: Vec<String> = env::args().collect();
@@ -94,9 +96,43 @@ fn test_mq() {
     thread_pool.join();
 }
 
+fn test_protocols(){
+    let prefix = "main:      ";
+
+    println!("{} runtime count starting...", &prefix);
+    let now = SystemTime::now();
+    let args: Vec<String> = env::args().collect();
+    let settings_file = args[1].clone();
+
+    let mut settings = config::Config::default();
+    settings
+        .merge(config::File::with_name(&settings_file.as_str())).unwrap()
+        .merge(config::Environment::with_prefix("APP")).unwrap();
+
+    match settings.get_bool("ti") {
+        Ok(is_ti) => {
+            if is_ti {
+                let mut ti_context = initialize_ti_context(settings_file.clone());
+                run_ti_module(&mut ti_context);
+            } else {
+                let mut party_context = initialize_party_context(settings_file.clone());
+                let dt_shares = ti_receive(
+                    party_context.ti_stream.try_clone().expect("failed to clone ti recvr"));
+                party_context.dt_shares = dt_shares;
+                test_multi_byte(&mut party_context);
+            }
+        }
+        Err(error) => {
+            panic!(
+                format!("{} encountered a problem while parsing settings: {:?}", &prefix, error))
+        }
+    };
+}
+
 fn main() {
 //    test_mq();
-    run();
+//    run();
+    test_protocols();
 }
 
 

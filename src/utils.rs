@@ -141,7 +141,7 @@ pub mod utils {
         let shares = &ctx.dt_shares.binary_triples;
         let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
         let result = &shares[current_index];
-//        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
+        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
         result
     }
 
@@ -157,7 +157,12 @@ pub mod utils {
 //            arguments: FieldTable::default()
 //        }).unwrap();
 //        queue.bind(&exchange,routing_key,FieldTable::default());
-        let queue = channel.queue_declare(routing_key, QueueDeclareOptions::default()).unwrap();
+        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
+            durable: false,
+            exclusive: false,
+            auto_delete: true,
+            arguments: Default::default()
+        }).unwrap();
 
         let consumer = queue.consume(ConsumerOptions::default()).unwrap();
         let mut count = 0;
@@ -166,7 +171,7 @@ pub mod utils {
             match message {
                 ConsumerMessage::Delivery(delivery) => {
                     let body = String::from_utf8_lossy(&delivery.body).to_string();
-                    print!("queue:{} ",routing_key);
+                    print!("queue:{} ", routing_key);
                     println!("({:>3}) Received [{}]", i, body);
                     result.push(body.clone());
                     consumer.ack(delivery).unwrap();
@@ -188,10 +193,25 @@ pub mod utils {
     pub fn push_message_to_queue(address: &String, routing_key: &String, message: &String) {
         let mut connection = Connection::insecure_open(address).unwrap();
         let channel = connection.open_channel(None).unwrap();
-        let exchange = channel.exchange_declare(ExchangeType::Direct,"direct",ExchangeDeclareOptions::default()).unwrap();
-        let queue = channel.queue_declare(routing_key, QueueDeclareOptions::default()).unwrap();
-        queue.bind(&exchange,routing_key,FieldTable::default());
+        let exchange = channel.exchange_declare(ExchangeType::Direct, "direct", ExchangeDeclareOptions::default()).unwrap();
+        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
+            durable: false,
+            exclusive: false,
+            auto_delete: true,
+            arguments: Default::default()
+        }).unwrap();
+        queue.bind(&exchange, routing_key, FieldTable::default());
         exchange.publish(Publish::new(message.as_bytes(), routing_key)).unwrap();
         connection.close();
+    }
+
+    pub fn reveal_byte_result(x: u8, ctx: &mut ComputingParty) -> u8 {
+        let message_id = "reveal".to_string();
+        let message_content = serde_json::to_string(&x).unwrap();
+        println!("party{} sending {}", ctx.party_id, x);
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+        let mut message_rec: u8 = message_received[0].parse().unwrap();
+        x ^ message_rec
     }
 }

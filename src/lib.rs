@@ -12,3 +12,4 @@ pub mod dot_product;
 pub mod comparison;
 pub mod bit_decomposition;
 pub mod message;
+pub mod protocol_test;
