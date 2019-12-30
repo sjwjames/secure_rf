@@ -16,7 +16,7 @@ use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOption
 use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue};
 use threadpool::ThreadPool;
 use random_forest_rust::multiplication::multiplication::multiplication_byte;
-use random_forest_rust::protocol_test::protocol_test::test_multi_byte;
+use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte};
 
 fn test_mq() {
     let args: Vec<String> = env::args().collect();
@@ -119,7 +119,8 @@ fn test_protocols(){
                 let dt_shares = ti_receive(
                     party_context.ti_stream.try_clone().expect("failed to clone ti recvr"));
                 party_context.dt_shares = dt_shares;
-                test_multi_byte(&mut party_context);
+//                test_multi_byte(&mut party_context);
+                test_batch_multiplication_byte(&mut party_context);
             }
         }
         Err(error) => {

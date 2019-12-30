@@ -335,8 +335,8 @@ pub mod multiplication {
         let message_content = serde_json::to_string(&diff_list).unwrap();
         push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
-        let mut received_list: Vec<Vec<u8>> = Vec::new();
-        received_list = serde_json::from_str(&message_received[0]).unwrap();
+        let mut diff_list: Vec<Vec<u8>> = Vec::new();
+        diff_list = serde_json::from_str(&message_received[0]).unwrap();
 
         let mut d_list = vec![0u8; batch_size];
         let mut e_list = vec![0u8; batch_size];

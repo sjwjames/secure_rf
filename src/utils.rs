@@ -214,4 +214,18 @@ pub mod utils {
         let mut message_rec: u8 = message_received[0].parse().unwrap();
         x ^ message_rec
     }
+
+    pub fn reveal_byte_vec_result(x: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
+        let message_id = "reveal".to_string();
+        let message_content = serde_json::to_string(x).unwrap();
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+        let mut message_rec: Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
+        let mut result = Vec::new();
+        for i in 0..x.len(){
+            result.push(x[i]^message_rec[i]);
+        }
+        result
+    }
+
 }
