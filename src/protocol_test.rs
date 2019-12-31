@@ -1,7 +1,7 @@
 pub mod protocol_test {
     use crate::computing_party::computing_party::ComputingParty;
     use std::num::Wrapping;
-    use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte, batch_multiplication_integer, multiplication_bigint, multi_thread_batch_mul_byte};
+    use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte, batch_multiplication_integer, multiplication_bigint, multi_thread_batch_mul_byte, parallel_multiplication};
     use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result};
     use rand::{random, Rng};
     use num::integer::*;
@@ -126,7 +126,19 @@ pub mod protocol_test {
         }
     }
 
-    pub fn test_parallel_multiplication(ctx: &mut ComputingParty) {}
+    pub fn test_parallel_multiplication(ctx: &mut ComputingParty) {
+        let mut row = Vec::new();
+        for i in 0..100 {
+            if ctx.party_id == 0 {
+                row.push(1);
+            } else {
+                row.push(0);
+            }
+        }
+        let result = parallel_multiplication(&row, ctx);
+        let result_revealed = reveal_byte_result(result, ctx);
+        assert_eq!(result_revealed, 1, "we are testing parallel_multiplication with 100 ones");
+    }
 
     pub fn test_batch_multiply_bigint(ctx: &mut ComputingParty) {}
 
@@ -157,15 +169,14 @@ pub mod protocol_test {
         println!("x_pub_vec {:?}", x_pub_vec);
         println!("y_pub_vec {:?}", y_pub_vec);
         println!("result_vec {:?}", result_vec);
-        let (batch_count,result_map) = multi_thread_batch_mul_byte(&x_vec, &y_vec, ctx, 100);
+        let (batch_count, result_map) = multi_thread_batch_mul_byte(&x_vec, &y_vec, ctx, 100);
 
         let mut revealed_all = Vec::new();
-        for i in 0..batch_count{
+        for i in 0..batch_count {
             let result = result_map.get(&i).unwrap();
             let mut result_revealed = reveal_byte_vec_result(result, ctx);
             revealed_all.append(&mut result_revealed);
         }
         assert!(result_vec.iter().zip(revealed_all.iter()).all(|(a, b)| a == b), "Arrays are not equal");
-
     }
 }

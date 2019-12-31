@@ -16,7 +16,7 @@ use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOption
 use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue};
 use threadpool::ThreadPool;
 use random_forest_rust::multiplication::multiplication::multiplication_byte;
-use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte};
+use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication};
 
 fn test_mq() {
     let args: Vec<String> = env::args().collect();
@@ -123,7 +123,8 @@ fn test_protocols(){
 //                test_batch_multiplication_byte(&mut party_context);
 //                test_batch_multiplication_integer(&mut party_context);
 //                test_multiplication_bigint(&mut party_context);
-                test_multi_thread_batch_mul_byte(&mut party_context);
+//                test_multi_thread_batch_mul_byte(&mut party_context);
+                test_parallel_multiplication(&mut party_context);
             }
         }
         Err(error) => {
