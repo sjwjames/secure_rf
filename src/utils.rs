@@ -1,7 +1,7 @@
 pub mod utils {
     use num::bigint::{BigUint, ToBigUint, ToBigInt, RandBigInt};
     use num::integer::*;
-    use std::ops::Sub;
+    use std::ops::{Sub, Add};
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
     use std::sync::{Mutex, Arc};
@@ -240,6 +240,15 @@ pub mod utils {
             result.push((x[i].0 + message_rec[i].0).mod_floor(&ctx.dt_training.dataset_size_prime));
         }
         result
+    }
+
+    pub fn reveal_bigint_result(x: &BigUint, ctx: &mut ComputingParty) -> BigUint {
+        let message_id = "reveal".to_string();
+        let message_content = serialize_biguint(x);
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+        let mut message_rec: BigUint = deserialize_biguint(&message_received[0]);
+        x.add(&message_rec).mod_floor(&ctx.dt_training.big_int_prime)
     }
 
 }
