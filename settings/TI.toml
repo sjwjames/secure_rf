@@ -8,24 +8,39 @@ ti_ip     = "127.0.0.1"
 ti_port0  = 4000
 ti_port1  = 8000
 
-
+#[random forest]
 tree_count = 100
-batch_size = 176
 tree_training_batch_size = 20
 thread_count = 40
-add_shares_per_tree = 100000
+
+
+#[breast Cancer]
+#batch_size = 176
+#add_shares_per_tree = 100000
+#add_shares_bigint_per_tree = 1000
+#equality_shares_per_tree = 1000
+#binary_shares_per_tree = 100000
+#big_int_prime = "47890485652059026823698344598447161988085597568237568"
+#prime = 512
+#bigint_bit_size = 175
+
+
+
+#[random data]
+batch_size = 34
+add_shares_per_tree = 1000
 add_shares_bigint_per_tree = 1000
 equality_shares_per_tree = 1000
-binary_shares_per_tree = 100000
-big_int_prime = "47890485652059026823698344598447161988085597568237568"
-prime = 512
-bigint_bit_size = 175
+binary_shares_per_tree = 1000
+big_int_prime = "8589934592"
+prime = 8
+bigint_bit_size = 33
 
 #[BC-TCGA]
 
-iterations = 10
-add_shares_per_iter = 13368000
-xor_shares_per_iter = 7512
+#iterations = 10
+#add_shares_per_iter = 13368000
+#xor_shares_per_iter = 7512
 
 #[GSE2034]
 

@@ -468,7 +468,7 @@ pub mod ti {
         for i in 0..ctx.add_shares_per_tree {
             let share0_item = share0_map.get(&i).unwrap().clone();
             share0.push((Wrapping(share0_item.0), Wrapping(share0_item.1), Wrapping(share0_item.2)));
-            let share1_item = share0_map.get(&i).unwrap().clone();
+            let share1_item = share1_map.get(&i).unwrap().clone();
             share1.push((Wrapping(share1_item.0), Wrapping(share1_item.1), Wrapping(share1_item.2)));
         }
         (share0, share1)

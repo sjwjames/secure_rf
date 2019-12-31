@@ -117,7 +117,7 @@ pub mod utils {
         let bigint_shares = &ctx.dt_shares.additive_bigint_triples;
         let current_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
         let result = &bigint_shares[current_index];
-        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_bigint_index));
+//        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_bigint_index));
         result
     }
 
@@ -125,7 +125,7 @@ pub mod utils {
         let shares = &ctx.dt_shares.equality_shares;
         let current_index = *(ctx.dt_shares.current_equality_index.lock().unwrap());
         let result = &shares[current_index];
-        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_equality_index));
+//        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_equality_index));
         result
     }
 
@@ -141,7 +141,7 @@ pub mod utils {
         let shares = &ctx.dt_shares.binary_triples;
         let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
         let result = &shares[current_index];
-        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
+//        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
         result
     }
 
@@ -157,13 +157,13 @@ pub mod utils {
 //            arguments: FieldTable::default()
 //        }).unwrap();
 //        queue.bind(&exchange,routing_key,FieldTable::default());
-        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
-            durable: false,
-            exclusive: false,
-            auto_delete: true,
-            arguments: Default::default()
-        }).unwrap();
-
+//        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
+//            durable: false,
+//            exclusive: false,
+//            auto_delete: false,
+//            arguments: Default::default()
+//        }).unwrap();
+        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
         let consumer = queue.consume(ConsumerOptions::default()).unwrap();
         let mut count = 0;
         let mut result = Vec::new();
@@ -194,12 +194,13 @@ pub mod utils {
         let mut connection = Connection::insecure_open(address).unwrap();
         let channel = connection.open_channel(None).unwrap();
         let exchange = channel.exchange_declare(ExchangeType::Direct, "direct", ExchangeDeclareOptions::default()).unwrap();
-        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
-            durable: false,
-            exclusive: false,
-            auto_delete: true,
-            arguments: Default::default()
-        }).unwrap();
+//        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
+//            durable: false,
+//            exclusive: false,
+//            auto_delete: false,
+//            arguments: Default::default()
+//        }).unwrap();
+        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
         queue.bind(&exchange, routing_key, FieldTable::default());
         exchange.publish(Publish::new(message.as_bytes(), routing_key)).unwrap();
         connection.close();
@@ -224,6 +225,19 @@ pub mod utils {
         let mut result = Vec::new();
         for i in 0..x.len(){
             result.push(x[i]^message_rec[i]);
+        }
+        result
+    }
+
+    pub fn reveal_int_vec_result(x: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty) -> Vec<u64> {
+        let message_id = "reveal".to_string();
+        let message_content = serde_json::to_string(x).unwrap();
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+        let mut message_rec: Vec<Wrapping<u64>> = serde_json::from_str(&message_received[0]).unwrap();
+        let mut result = Vec::new();
+        for i in 0..x.len(){
+            result.push((x[i].0 + message_rec[i].0).mod_floor(&ctx.dt_training.dataset_size_prime));
         }
         result
     }

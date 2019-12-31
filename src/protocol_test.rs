@@ -1,8 +1,10 @@
 pub mod protocol_test {
     use crate::computing_party::computing_party::ComputingParty;
     use std::num::Wrapping;
-    use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte};
-    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result};
+    use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte, batch_multiplication_integer};
+    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result};
+    use rand::{random, Rng};
+    use num::integer::*;
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -59,4 +61,42 @@ pub mod protocol_test {
 
         assert!(result_vec.iter().zip(result_revealed.iter()).all(|(a,b)| a == b), "Arrays are not equal");
     }
+
+    pub fn test_batch_multiplication_integer(ctx: &mut ComputingParty){
+        let mut x_vec:Vec<Wrapping<u64>> = Vec::new();
+        let mut y_vec:Vec<Wrapping<u64>> = Vec::new();
+        let mut x_vec_pub:Vec<Wrapping<u64>> = Vec::new();
+        let mut y_vec_pub:Vec<Wrapping<u64>> = Vec::new();
+        let mut result_pub:Vec<Wrapping<u64>> = Vec::new();
+        let mut rng = rand::thread_rng();
+
+
+
+        for i in 0..3{
+            x_vec_pub.push(Wrapping(i));
+            y_vec_pub.push(Wrapping(i));
+            if ctx.party_id==0 {
+                x_vec.push(Wrapping(1));
+                y_vec.push(Wrapping(1));
+            }else{
+                x_vec.push(Wrapping((Wrapping(i)-Wrapping(1)).0.mod_floor(&ctx.dt_training.dataset_size_prime)));
+                y_vec.push(Wrapping((Wrapping(i)-Wrapping(1)).0.mod_floor(&ctx.dt_training.dataset_size_prime)));
+            }
+
+            result_pub.push(Wrapping((i*i).mod_floor(&ctx.dt_training.dataset_size_prime)));
+        }
+        println!("result_pub {:?}",&result_pub);
+        let result = batch_multiplication_integer(&x_vec,&y_vec,ctx);
+        println!("result computed {:?}",&result);
+
+        let result_revealed = reveal_int_vec_result(&result,ctx);
+        println!("result_revealed {:?}",&result_revealed);
+        assert!(result_pub.iter().zip(result_revealed.iter()).all(|(a,b)| a.0 == *b), "Arrays are not equal");
+
+    }
+
+    pub fn test_or_xor(ctx: &mut ComputingParty){
+
+    }
+
 }

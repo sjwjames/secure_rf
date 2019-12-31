@@ -16,6 +16,7 @@ pub mod computing_party {
     use std::thread;
     use amiquip::{Connection, Channel, Exchange};
     use threadpool::ThreadPool;
+    use std::f64::consts::E;
 
 
     union Xbuffer {
@@ -62,7 +63,7 @@ pub mod computing_party {
         /* DT training*/
         pub dt_training: DecisionTreeTraining,
         pub dt_shares: DecisionTreeShares,
-        pub dt_results:DecisionTreeResult,
+        pub dt_results: DecisionTreeResult,
 
         /* random forest */
         pub thread_count: usize,
@@ -103,7 +104,7 @@ pub mod computing_party {
                 dt_data: self.dt_data.clone(),
                 dt_training: self.dt_training.clone(),
                 dt_shares: self.dt_shares.clone(),
-                dt_results:self.dt_results.clone(),
+                dt_results: self.dt_results.clone(),
 
                 thread_count: self.thread_count,
                 tree_count: self.tree_count,
@@ -432,9 +433,9 @@ pub mod computing_party {
 
         let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
 
-        let dataset_size_prime = (instance_count as f64).log2().ceil() as u64;
+        let dataset_size_bit_length = ((instance_count as f64).log(E)/(2 as f64).log(E)).ceil() as u64;
 
-        let dataset_size_bit_length = (dataset_size_prime as f64).powf(2.0) as u64;
+        let dataset_size_prime = dataset_size_bit_length * dataset_size_bit_length as u64;
 
         let mut internal_addr; //= String::new();
         let mut external_addr; //= String::new();
@@ -563,13 +564,13 @@ pub mod computing_party {
                 current_equality_index: Arc::new(Mutex::new(0 as usize)),
                 current_binary_index: Arc::new(Mutex::new(0 as usize)),
             },
-            dt_results:DecisionTreeResult{
+            dt_results: DecisionTreeResult {
                 result_list: vec![]
             },
             thread_hierarchy: vec![format!("{}", "main")],
             message_manager: Arc::new(Mutex::new(MessageManager {
                 map: HashMap::new()
-            }))
+            })),
         }
     }
 

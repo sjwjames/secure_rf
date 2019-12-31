@@ -371,8 +371,8 @@ pub mod multiplication {
             let mut new_row = Vec::new();
             let ti_share_triple = get_current_additive_share(&ctx_copied);
             ti_shares.push(ti_share_triple.clone());
-            new_row.push(mod_floor((x_list[i] - ti_share_triple.0).0, ctx.dt_training.prime));
-            new_row.push(mod_floor((y_list[i] - ti_share_triple.1).0, ctx.dt_training.prime));
+            new_row.push(mod_floor((x_list[i] - ti_share_triple.0).0, ctx.dt_training.dataset_size_prime));
+            new_row.push(mod_floor((y_list[i] - ti_share_triple.1).0, ctx.dt_training.dataset_size_prime));
             diff_list.push(new_row);
         }
 
@@ -415,17 +415,17 @@ pub mod multiplication {
         let mut e_list = vec![Wrapping(0u64); batch_size];
 
         for i in 0..batch_size {
-            d_list[i] = (d_list[i] + received_list[i][0]);
-            e_list[i] = (e_list[i] + received_list[i][1]);
+            d_list[i] = Wrapping(mod_floor((d_list[i] + received_list[i][0]).0,ctx.dt_training.dataset_size_prime));
+            e_list[i] = Wrapping(mod_floor((e_list[i] + received_list[i][1]).0,ctx.dt_training.dataset_size_prime));
         }
 
         for i in 0..batch_size {
             let ti_share_triple = ti_shares[i];
-            let d = mod_floor((x_list[i] - ti_share_triple.0 + d_list[i]).0, ctx.dt_training.prime);
-            let e = mod_floor((y_list[i] - ti_share_triple.1 + e_list[i]).0, ctx.dt_training.prime);
+            let d = mod_floor((x_list[i] - ti_share_triple.0 + d_list[i]).0, ctx.dt_training.dataset_size_prime);
+            let e = mod_floor((y_list[i] - ti_share_triple.1 + e_list[i]).0, ctx.dt_training.dataset_size_prime);
             let mut result: u64 = (ti_share_triple.2 + (Wrapping(d) * ti_share_triple.1) + (ti_share_triple.0 * Wrapping(e))
                 + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u64))).0;
-            result = mod_floor(result, ctx.dt_training.prime);
+            result = mod_floor(result, ctx.dt_training.dataset_size_prime);
             output.push(Wrapping(result));
         }
         ctx.thread_hierarchy.pop();
