@@ -16,7 +16,7 @@ use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOption
 use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue};
 use threadpool::ThreadPool;
 use random_forest_rust::multiplication::multiplication::multiplication_byte;
-use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication, test_batch_multiply_bigint};
+use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication, test_batch_multiply_bigint, test_parallel_multiplication_big_integer};
 
 fn test_mq() {
     let args: Vec<String> = env::args().collect();
@@ -33,13 +33,13 @@ fn test_mq() {
                 for i in 0..40 {
                     thread_pool.execute(move || {
                         let address = "amqp://guest:guest@localhost:5672".to_string();
-                        let routing_key = format!("hello{}",i);
+                        let routing_key = format!("hello{}", i);
                         let message = format!("hello party 0, greetings from party 1, message {}", i);
                         push_message_to_queue(&address, &routing_key, &message);
 
                         //subscribe
                         let address = "amqp://guest:guest@localhost:5673".to_string();
-                        let routing_key = format!("hello{}",i);
+                        let routing_key = format!("hello{}", i);
                         let message_count = 1;
                         receive_message_from_queue(&address, &routing_key, message_count);
                     });
@@ -55,20 +55,18 @@ fn test_mq() {
 //                    let message_count = 1;
 //                    receive_message_from_queue(&address, &routing_key, message_count);
                 }
-
-
             } else {
                 //publish
                 for i in 0..40 {
                     thread_pool.execute(move || {
                         let address = "amqp://guest:guest@localhost:5673".to_string();
-                        let routing_key = format!("hello{}",i);
+                        let routing_key = format!("hello{}", i);
                         let message = format!("hello party 1, greetings from party 0, message {}", i);
                         push_message_to_queue(&address, &routing_key, &message);
 
                         //subscribe
                         let address = "amqp://guest:guest@localhost:5672".to_string();
-                        let routing_key = format!("hello{}",i);
+                        let routing_key = format!("hello{}", i);
                         let message_count = 1;
                         receive_message_from_queue(&address, &routing_key, message_count);
                     });
@@ -84,8 +82,6 @@ fn test_mq() {
 //                    let message_count = 1;
 //                    receive_message_from_queue(&address, &routing_key, message_count);
                 }
-
-
             }
         }
         Err(error) => {
@@ -96,7 +92,7 @@ fn test_mq() {
     thread_pool.join();
 }
 
-fn test_protocols(){
+fn test_protocols() {
     let prefix = "main:      ";
 
     println!("{} runtime count starting...", &prefix);
@@ -125,7 +121,8 @@ fn test_protocols(){
 //                test_multiplication_bigint(&mut party_context);
 //                test_multi_thread_batch_mul_byte(&mut party_context);
 //                test_parallel_multiplication(&mut party_context);
-                test_batch_multiply_bigint(&mut party_context);
+//                test_batch_multiply_bigint(&mut party_context);
+                test_parallel_multiplication_big_integer(&mut party_context);
             }
         }
         Err(error) => {

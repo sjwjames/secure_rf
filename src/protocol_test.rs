@@ -1,7 +1,7 @@
 pub mod protocol_test {
     use crate::computing_party::computing_party::ComputingParty;
     use std::num::Wrapping;
-    use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte, batch_multiplication_integer, multiplication_bigint, multi_thread_batch_mul_byte, parallel_multiplication, batch_multiply_bigint};
+    use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte, batch_multiplication_integer, multiplication_bigint, multi_thread_batch_mul_byte, parallel_multiplication, batch_multiply_bigint, parallel_multiplication_big_integer};
     use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result};
     use rand::{random, Rng};
     use num::integer::*;
@@ -161,12 +161,26 @@ pub mod protocol_test {
         }
 
         let result_computed = batch_multiply_bigint(&x_vec, &y_vec, ctx);
-        let result_revealed = reveal_bigint_vec_result(&result_computed,ctx);
+        let result_revealed = reveal_bigint_vec_result(&result_computed, ctx);
         assert!(result_pub.iter().zip(result_revealed.iter()).all(|(a, b)| a.eq(b)), "Arrays are not equal");
     }
 
     pub fn test_parallel_multiplication_big_integer(ctx: &mut ComputingParty) {
-        
+        let mut row = Vec::new();
+        let mut row_pub = Vec::new();
+        let mut result = Wrapping(1);
+        for i in 1..100 {
+            row_pub.push(BigUint::from_u32(i).unwrap());
+            if ctx.party_id == 0 {
+                row.push(BigUint::from_u32(i / 2).unwrap());
+            } else {
+                row.push(BigUint::from_u32(i - i / 2).unwrap());
+            }
+            result = result * Wrapping(i);
+        }
+        let result_computed = parallel_multiplication_big_integer(&row, ctx);
+        let result_revealed = reveal_bigint_result(&result_computed, ctx);
+        assert_eq!(result_revealed.to_u32().unwrap(), result.0, "we are testing parallel_multiplication with 100 ones");
     }
 
     pub fn test_multi_thread_batch_mul_byte(ctx: &mut ComputingParty) {
