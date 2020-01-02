@@ -15,8 +15,8 @@ pub mod ti {
     use std::sync::{Arc, Mutex, Barrier};
     use num::bigint::{BigUint, ToBigUint, ToBigInt, RandBigInt};
     use num::integer::*;
-    use self::num::{One, Zero, BigInt};
-    use std::ops::{Add, Sub};
+    use self::num::{One, Zero, BigInt, checked_pow, Num};
+    use std::ops::{Add, Sub, Mul};
     use crate::constants::constants::BINARY_PRIME;
     use crate::decision_tree::decision_tree::{DecisionTreeShares, DecisionTreeTIShareMessage};
     use serde::{Serialize, Deserialize, Serializer};
@@ -24,6 +24,7 @@ pub mod ti {
     use threadpool::ThreadPool;
     use std::collections::HashMap;
     use crate::utils::utils::big_uint_subtract;
+
 
     pub struct TI {
         pub ti_ip: String,
@@ -150,15 +151,14 @@ pub mod ti {
             }
         };
 
-        let big_int_prime = match settings.get_str("big_int_prime") {
+        let big_int_prime_str = match settings.get_str("big_int_prime") {
             Ok(num) => num as String,
             Err(error) => {
                 panic!("Encountered a problem while parsing big_int_prime: {:?}", error)
             }
         };
 
-
-        let big_int_prime = BigUint::from_str(&big_int_prime).unwrap();
+        let big_int_prime = BigUint::from_str_radix(&big_int_prime_str,10).unwrap();
 
 
         let prime = match settings.get_int("prime") {
@@ -381,9 +381,13 @@ pub mod ti {
         let mut additive_bigint_str_vec = Vec::new();
         for item in additive_bigint_triples.iter() {
             let mut tuples = Vec::new();
-            tuples.push(serde_json::to_string(&(item.0.to_bytes_le())).unwrap());
-            tuples.push(serde_json::to_string(&(item.1.to_bytes_le())).unwrap());
-            tuples.push(serde_json::to_string(&(item.2.to_bytes_le())).unwrap());
+//            tuples.push(serde_json::to_string(&(item.0.to_bytes_le())).unwrap());
+//            tuples.push(serde_json::to_string(&(item.1.to_bytes_le())).unwrap());
+//            tuples.push(serde_json::to_string(&(item.2.to_bytes_le())).unwrap());
+
+            tuples.push(item.0.to_string());
+            tuples.push(item.1.to_string());
+            tuples.push(item.2.to_string());
 
             additive_bigint_str_vec.push(tuples.join("&"));
         }
@@ -392,7 +396,7 @@ pub mod ti {
         let mut equality_bigint_triples = shares.equality_shares;
         let mut equality_bigint_str_vec = Vec::new();
         for item in equality_bigint_triples.iter() {
-            equality_bigint_str_vec.push(serde_json::to_string(&(item.to_bytes_le())).unwrap());
+            equality_bigint_str_vec.push(item.to_string());
         }
 
         let dt_share_message = DecisionTreeTIShareMessage {
@@ -611,6 +615,12 @@ pub mod ti {
         let u1 = big_uint_subtract(&u, &u0, big_int_prime);
         let v1 = big_uint_subtract(&v, &v0, big_int_prime);
         let w1 = big_uint_subtract(&w, &w0, big_int_prime);
+
+        let computed = u0.clone().add(&u1).mod_floor(&big_int_prime).mul(v0.clone().add(&v1).mod_floor(&big_int_prime)).mod_floor(&big_int_prime);
+        let computed_w = w0.clone().add(&w1).mod_floor(&big_int_prime);
+        assert_eq!(computed_w,computed);
+        assert_eq!(computed_w,w.clone());
+
         ((u0, v0, w0), (u1, v1, w1))
     }
 

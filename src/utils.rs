@@ -10,6 +10,7 @@ pub mod utils {
     use std::process::exit;
     use std::{thread, time};
     use std::time::Duration;
+    use std::str::FromStr;
 
 
     pub fn big_uint_subtract(x: &BigUint, y: &BigUint, big_int_prime: &BigUint) -> BigUint {
@@ -69,11 +70,11 @@ pub mod utils {
 
 
     pub fn serialize_biguint(num: &BigUint) -> String {
-        serde_json::to_string(&(num.to_bytes_le())).unwrap()
+        num.to_string().clone()
     }
 
     pub fn deserialize_biguint(message: &str) -> BigUint {
-        BigUint::from_bytes_le(message.as_bytes())
+        BigUint::from_str(&message).unwrap()
     }
 
     pub fn deserialize_biguint_vec(message: String) -> Vec<BigUint> {

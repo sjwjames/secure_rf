@@ -22,6 +22,7 @@ pub mod decision_tree {
     use num::{Zero, ToPrimitive, One};
     use std::ops::{Add, Mul};
     use crate::comparison::comparison::compare_bigint;
+    use std::str::FromStr;
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -285,11 +286,10 @@ pub mod decision_tree {
         let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
 
         let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serde_json::to_string(&(stopping_bit.to_bytes_le())).unwrap();
+        let message_content = stopping_bit.to_string();
         push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
-        let stopping_bit_received: Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
-        let stopping_bit_received = BigUint::from_bytes_le(&stopping_bit_received);
+        let stopping_bit_received = BigUint::from_str(&message_received[0]).unwrap();
 
         let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
         if stopping_check.eq(&BigUint::zero()) {

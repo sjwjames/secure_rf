@@ -70,10 +70,8 @@ pub mod protocol_test {
         let mut x_vec_pub: Vec<Wrapping<u64>> = Vec::new();
         let mut y_vec_pub: Vec<Wrapping<u64>> = Vec::new();
         let mut result_pub: Vec<Wrapping<u64>> = Vec::new();
-        let mut rng = rand::thread_rng();
 
-
-        for i in 0..3 {
+        for i in 0..10 {
             x_vec_pub.push(Wrapping(i));
             y_vec_pub.push(Wrapping(i));
             if ctx.party_id == 0 {
@@ -123,6 +121,8 @@ pub mod protocol_test {
             let result = multiplication_bigint(&x_vec[i], &y_vec[i], ctx);
             let result_revealed = reveal_bigint_result(&result, ctx);
             println!("result_revealed: {}", result_revealed.to_usize().unwrap());
+            assert_eq!(result_pub[i].to_u64().unwrap(),result_revealed.to_u64().unwrap());
+
         }
     }
 

@@ -15,6 +15,7 @@ pub mod multiplication {
     use std::net::TcpStream;
     use std::ops::{Add, Mul};
     use crate::message::message::{RFMessage, search_pop_message};
+    use std::str::FromStr;
 
     union Xbuffer {
         u64_buf: [u64; U64S_PER_TX],
@@ -37,8 +38,8 @@ pub mod multiplication {
         let mut diff_list_str_vec = Vec::new();
         for item in diff_list.iter() {
             let mut tuple = Vec::new();
-            tuple.push(serde_json::to_string(&(item.0.to_bytes_le())).unwrap());
-            tuple.push(serde_json::to_string(&(item.1.to_bytes_le())).unwrap());
+            tuple.push(item.0.to_string());
+            tuple.push(item.1.to_string());
             diff_list_str_vec.push(tuple.join("&"));
         }
 //        let message = RFMessage {
@@ -70,12 +71,11 @@ pub mod multiplication {
         let mut diff_list_str_vec: Vec<&str> = diff_list_message.split(";").collect();
         let mut diff_list = Vec::new();
         for item in diff_list_str_vec {
-            let temp_str = &item[1..item.len()];
-            let str_vec: Vec<&str> = temp_str.split("&").collect();
+            let str_vec: Vec<&str> = item.split("&").collect();
             diff_list.push(
                 (
-                    BigUint::from_bytes_le(str_vec[0].as_bytes()),
-                    BigUint::from_bytes_le(str_vec[1].as_bytes())
+                    BigUint::from_str(&str_vec[0]).unwrap(),
+                    BigUint::from_str(&str_vec[1]).unwrap()
                 )
             );
         }
@@ -487,7 +487,9 @@ pub mod multiplication {
     pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
         ctx.thread_hierarchy.push("multiplication_bigint".to_string());
         let share = get_current_bigint_share(ctx);
-
+        println!("{}",share.0);
+        println!("{}",share.1);
+        println!("{}",share.2);
         let mut diff_list = Vec::new();
         diff_list.push(big_uint_subtract(x, &share.0, &ctx.dt_training.big_int_prime));
         diff_list.push(big_uint_subtract(y, &share.1, &ctx.dt_training.big_int_prime));

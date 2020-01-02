@@ -671,13 +671,13 @@ pub mod computing_party {
         let mut additive_bigint_triples = Vec::new();
         let additive_bigint_triple_str_vec: Vec<&str> = ti_shares_message.additive_bigint_triples.split(";").collect();
         for item in additive_bigint_triple_str_vec {
-            let temp_str = &item[1..item.len()];
-            let str_vec: Vec<&str> = temp_str.split("&").collect();
+            let str_vec: Vec<&str> = item.split("&").collect();
+
             additive_bigint_triples.push(
                 (
-                    BigUint::from_bytes_le(str_vec[0].as_bytes()),
-                    BigUint::from_bytes_le(str_vec[1].as_bytes()),
-                    BigUint::from_bytes_le(str_vec[2].as_bytes())
+                    BigUint::from_str(&str_vec[0]).unwrap(),
+                    BigUint::from_str(&str_vec[1]).unwrap(),
+                    BigUint::from_str(&str_vec[2]).unwrap()
                 )
             );
         }
@@ -692,7 +692,7 @@ pub mod computing_party {
         let equality_share_vec: Vec<&str> = ti_shares_message.equality_shares.split(";").collect();
         for item in equality_share_vec {
             equality_shares.push(
-                BigUint::from_bytes_le(item.as_bytes())
+                BigUint::from_str(item).unwrap()
             );
         }
 
