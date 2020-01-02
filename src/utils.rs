@@ -77,7 +77,7 @@ pub mod utils {
         BigUint::from_str(&message).unwrap()
     }
 
-    pub fn deserialize_biguint_vec(message: String) -> Vec<BigUint> {
+    pub fn deserialize_biguint_vec(message: &str) -> Vec<BigUint> {
         let mut result = Vec::new();
         let str_vec: Vec<&str> = message.split(";").collect();
         for item in str_vec {
@@ -252,4 +252,16 @@ pub mod utils {
         x.add(&message_rec).mod_floor(&ctx.dt_training.big_int_prime)
     }
 
+    pub fn reveal_bigint_vec_result(x: &Vec<BigUint>, ctx: &mut ComputingParty) -> Vec<BigUint> {
+        let message_id = "reveal".to_string();
+        let message_content = serialize_biguint_vec(x);
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+        let mut message_rec: Vec<BigUint> = deserialize_biguint_vec(&message_received[0].as_str());
+        let mut result = Vec::new();
+        for i in 0..x.len(){
+            result.push((&x[i]).add(&message_rec[i]).mod_floor(&ctx.dt_training.big_int_prime));
+        }
+        result
+    }
 }

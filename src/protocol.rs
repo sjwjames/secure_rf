@@ -123,12 +123,12 @@ pub mod protocol {
 
         let mut diff_list_message = String::new();
         let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serde_json::to_string(&serialize_biguint_vec(&diff_list)).unwrap();
+        let message_content = serialize_biguint_vec(&diff_list);
         push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
-        diff_list_message = serde_json::from_str(&message_received[0]).unwrap();
+        diff_list_message = message_received[0].clone();
 
-        let mut diff_list = deserialize_biguint_vec(diff_list_message);
+        let mut diff_list = deserialize_biguint_vec(&diff_list_message.as_str());
 
         let d = big_uint_subtract(&diff, &bigint_share.0, prime).add(&diff_list[0]).mod_floor(prime);
         let e = big_uint_subtract(&diff, &bigint_share.0, prime).add(&diff_list[0]).mod_floor(prime);

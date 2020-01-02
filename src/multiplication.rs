@@ -511,7 +511,7 @@ pub mod multiplication {
         push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
         diff_list_message = message_received[0].clone();
-        let diff_received = deserialize_biguint_vec(diff_list_message);
+        let diff_received = deserialize_biguint_vec(&diff_list_message.as_str());
 
         let mut d = BigUint::zero();
         let mut e = BigUint::zero();
