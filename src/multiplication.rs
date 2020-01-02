@@ -487,9 +487,6 @@ pub mod multiplication {
     pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
         ctx.thread_hierarchy.push("multiplication_bigint".to_string());
         let share = get_current_bigint_share(ctx);
-        println!("{}",share.0);
-        println!("{}",share.1);
-        println!("{}",share.2);
         let mut diff_list = Vec::new();
         diff_list.push(big_uint_subtract(x, &share.0, &ctx.dt_training.big_int_prime));
         diff_list.push(big_uint_subtract(y, &share.1, &ctx.dt_training.big_int_prime));
@@ -510,24 +507,28 @@ pub mod multiplication {
 //        let mut diff_list = deserialize_biguint_vec(diff_list_message);
         let mut diff_list_message = String::new();
         let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serde_json::to_string(&serialize_biguint_vec(&diff_list)).unwrap();
+        let message_content = serialize_biguint_vec(&diff_list);
         push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
-        diff_list_message = serde_json::from_str(&message_received[0]).unwrap();
+        diff_list_message = message_received[0].clone();
+        let diff_received = deserialize_biguint_vec(diff_list_message);
 
         let mut d = BigUint::zero();
         let mut e = BigUint::zero();
         let prime = &ctx.dt_training.big_int_prime;
-        d = d.add(&diff_list[0]).mod_floor(prime);
-        e = e.add(&diff_list[1]).mod_floor(prime);
+        d = d.add(&diff_received[0]).mod_floor(prime);
+        e = e.add(&diff_received[1]).mod_floor(prime);
         let share = get_current_bigint_share(ctx);
-        d = big_uint_subtract(x, &share.0, prime).add(&d).mod_floor(&ctx.dt_training.big_int_prime);
-        e = big_uint_subtract(y, &share.1, prime).add(&e).mod_floor(&ctx.dt_training.big_int_prime);
+        d = big_uint_subtract(x, &share.0, prime).add(&d).mod_floor(prime);
+        e = big_uint_subtract(y, &share.1, prime).add(&e).mod_floor(prime);
 
+        let u = &share.0;
+        let v = &share.1;
+        let w = &share.2;
 
-        let mut product = big_uint_clone(&big_uint_clone(&share.2).add(&big_uint_clone(&d).mul(&big_uint_clone(&share.1)).mod_floor(prime)).mod_floor(prime));
-        product = product.add(big_uint_clone(&e).mul(&big_uint_clone(&share.0)).mod_floor(prime)).mod_floor(prime);
-        product = product.add(big_uint_clone(&d).mul(&big_uint_clone(&e)).mul(&BigUint::from(ctx.asymmetric_bit)).mod_floor(prime)).mod_floor(prime);
+        let mut product = w.add((&d).mul(v).mod_floor(prime)).mod_floor(prime);
+        product = product.add((&e).mul(u).mod_floor(prime)).mod_floor(prime);
+        product = product.add((&d).mul(&e).mod_floor(prime).mul(BigUint::from_u8(ctx.asymmetric_bit).unwrap()).mod_floor(prime)).mod_floor(prime);
         ctx.thread_hierarchy.pop();
         product
     }

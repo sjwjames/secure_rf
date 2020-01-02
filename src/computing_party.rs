@@ -17,6 +17,7 @@ pub mod computing_party {
     use amiquip::{Connection, Channel, Exchange};
     use threadpool::ThreadPool;
     use std::f64::consts::E;
+    use self::num::Num;
 
 
     union Xbuffer {
@@ -412,7 +413,7 @@ pub mod computing_party {
         };
 
 
-        let big_int_prime = BigUint::from_str(&big_int_prime).unwrap();
+        let big_int_prime = BigUint::from_str_radix(&big_int_prime,10).unwrap();
 
 
         let prime = match settings.get_int("prime") {
