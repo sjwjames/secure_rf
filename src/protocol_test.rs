@@ -5,8 +5,9 @@ pub mod protocol_test {
     use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result};
     use rand::{random, Rng};
     use num::integer::*;
-    use num::{BigUint, FromPrimitive, ToPrimitive};
+    use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
     use std::cmp::max;
+    use crate::protocol::protocol::equality_big_integer;
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -217,5 +218,21 @@ pub mod protocol_test {
             revealed_all.append(&mut result_revealed);
         }
         assert!(result_vec.iter().zip(revealed_all.iter()).all(|(a, b)| a == b), "Arrays are not equal");
+    }
+
+    pub fn test_equality_big_integer(ctx: &mut ComputingParty) {
+        let mut result = BigUint::zero();
+        if ctx.party_id == 0 {
+            let x = BigUint::from_u32(5).unwrap();
+            let y = BigUint::from_u32(3).unwrap();
+            result = equality_big_integer(&x, &y, ctx);
+        } else {
+            let x = BigUint::from_u32(5).unwrap();
+            let y = BigUint::from_u32(7).unwrap();
+            result = equality_big_integer(&x, &y, ctx);
+        }
+        let result_revealed = reveal_bigint_result(&result, ctx);
+        println!("{}",result_revealed.to_string());
+        assert_eq!(result_revealed,BigUint::zero());
     }
 }

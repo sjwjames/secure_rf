@@ -128,12 +128,11 @@ pub mod protocol {
         let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
         diff_list_message = message_received[0].clone();
 
-        let mut diff_list = deserialize_biguint_vec(&diff_list_message.as_str());
+        let mut diff_list_received = deserialize_biguint_vec(&diff_list_message.as_str());
 
-        let d = big_uint_subtract(&diff, &bigint_share.0, prime).add(&diff_list[0]).mod_floor(prime);
-        let e = big_uint_subtract(&diff, &bigint_share.0, prime).add(&diff_list[0]).mod_floor(prime);
-        let product = big_uint_clone(&bigint_share.2).add(&big_uint_clone(&d).mul(&big_uint_clone(&bigint_share.1)))
-            .add(big_uint_clone(&bigint_share.0).mul(big_uint_clone(&e))).add(big_uint_clone(&d).mul(&big_uint_clone(&e)).mul(BigUint::from(ctx.asymmetric_bit)));
+        let d = big_uint_subtract(&diff, &bigint_share.0, prime).add(&diff_list_received[0]).mod_floor(prime);
+        let e = big_uint_subtract(&equality_share, &bigint_share.1, prime).add(&diff_list_received[1]).mod_floor(prime);
+        let product = (&bigint_share.2).add((&d).mul(&bigint_share.1)).add((&bigint_share.0).mul(&e)).add((&d).mul(&e).mul(BigUint::from_u8(ctx.asymmetric_bit).unwrap())).mod_floor(prime);
         ctx.thread_hierarchy.pop();
         product
     }

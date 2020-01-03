@@ -625,12 +625,12 @@ pub mod ti {
     }
 
     fn new_equality_bigint_shares(rng: &mut rand::ThreadRng, big_int_prime: &BigUint, bigint_bit_size: usize) -> (BigUint, BigUint) {
-        let mut r = rng.gen_biguint(bigint_bit_size);
-        r = r + BigUint::one();
+        let mut r = rng.gen_biguint(bigint_bit_size).add(BigUint::one());
         let mut rsum = BigUint::zero();
+        //hard-coded for two parties
         let r0 = rng.gen_biguint(bigint_bit_size);
-        rsum = rsum + &r0;
-        let r1 = BigInt::mod_floor(&(r.to_bigint().unwrap() - rsum.to_bigint().unwrap()), &(big_int_prime.to_bigint().unwrap())).to_biguint().unwrap();
+        rsum = rsum.add(&r0);
+        let r1 = big_uint_subtract(&r,&rsum,big_int_prime);
         (r0, r1)
     }
 
