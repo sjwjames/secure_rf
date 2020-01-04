@@ -112,6 +112,8 @@ pub mod comparison {
         let bit_length = max(x_list.len(), y_list.len());
         let prime = BINARY_PRIME;
         let ti_shares = get_current_binary_share(ctx);
+        let e_shares = compute_e_shares(x_list,y_list,ctx);
+
         let thread_pool = ThreadPool::new(2);
         let mut output_map = Arc::new(Mutex::new(HashMap::new()));
         let mut x_list_cp = x_list.clone();
@@ -127,18 +129,17 @@ pub mod comparison {
         let mut x_list_cp = x_list.clone();
         let mut y_list_cp = y_list.clone();
         let mut ctx_cloned = ctx.clone();
+        let mut e_shares_cp = e_shares.clone();
         let mut output_map_cp = Arc::clone(&output_map);
         thread_pool.execute(move||{
-            let mut e_shares_computed = compute_e_shares(&x_list_cp, &y_list_cp, &mut ctx_cloned);
+            let mut e_shares_computed = compute_multi_e_parallel(&x_list_cp, &y_list_cp, &mut ctx_cloned,&e_shares_cp);
             let mut output_map_cp = output_map_cp.lock().unwrap();
             (*output_map_cp).insert(1,e_shares_computed);
         });
         thread_pool.join();
         let mut output_map = output_map.lock().unwrap();
         let mut d_shares = (*output_map).get(&0).unwrap();
-        let mut e_shares = (*output_map).get(&1).unwrap();
-
-        let mut multiplication_e = compute_multi_e_parallel(x_list, y_list, ctx, &e_shares);
+        let mut multiplication_e = (*output_map).get(&1).unwrap();
         //compute c shares
         let mut c_shares = compute_c_shares(bit_length,&multiplication_e,&d_shares,ctx);
         //compute w shares
