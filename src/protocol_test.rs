@@ -8,6 +8,8 @@ pub mod protocol_test {
     use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
     use std::cmp::max;
     use crate::protocol::protocol::equality_big_integer;
+    use crate::comparison::comparison::{compare_bigint, comparison};
+    use std::ops::BitAnd;
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -234,5 +236,37 @@ pub mod protocol_test {
         let result_revealed = reveal_bigint_result(&result, ctx);
         println!("{}",result_revealed.to_string());
         assert_eq!(result_revealed,BigUint::zero());
+    }
+    pub fn test_comparison(ctx:&mut ComputingParty){
+        let mut result = 0;
+        if ctx.party_id == 0 {
+            let x:Vec<u8> = vec![0,0,0,1];
+            let y:Vec<u8> = vec![0,0,1,0];
+            result = comparison(&x, &y, ctx);
+        } else {
+            let x:Vec<u8> = vec![0,0,1,0];
+            let y:Vec<u8> = vec![0,0,1,1];
+            result = comparison(&x, &y, ctx);
+        }
+        let result_revealed = reveal_byte_result(result, ctx);
+        println!("{}",result_revealed);
+        assert_eq!(result_revealed,1);
+    }
+
+
+    pub fn test_comparison_bigint(ctx:&mut ComputingParty){
+        let mut result = BigUint::zero();
+        if ctx.party_id == 0 {
+            let x = BigUint::from_u32(10).unwrap();
+            let y = BigUint::from_u32(3).unwrap();
+            result = compare_bigint(&x, &y, ctx);
+        } else {
+            let x = BigUint::from_u32(5).unwrap();
+            let y = BigUint::from_u32(7).unwrap();
+            result = compare_bigint(&x, &y, ctx);
+        }
+        let result_revealed = reveal_bigint_result(&result, ctx);
+        println!("{}",result_revealed.to_string());
+        assert_eq!(result_revealed,BigUint::one());
     }
 }
