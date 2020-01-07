@@ -335,15 +335,15 @@ pub mod multiplication {
         let message_content = serde_json::to_string(&diff_list).unwrap();
         push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
-        let mut diff_list: Vec<Vec<u8>> = Vec::new();
-        diff_list = serde_json::from_str(&message_received[0]).unwrap();
+        let mut diff_list_received: Vec<Vec<u8>> = Vec::new();
+        diff_list_received = serde_json::from_str(&message_received[0]).unwrap();
 
         let mut d_list = vec![0u8; batch_size];
         let mut e_list = vec![0u8; batch_size];
 
         for i in 0..batch_size {
-            d_list[i] = (Wrapping(d_list[i]) + Wrapping(diff_list[i][0])).0;
-            e_list[i] = (Wrapping(e_list[i]) + Wrapping(diff_list[i][1])).0;
+            d_list[i] = (Wrapping(d_list[i]) + Wrapping(diff_list_received[i][0])).0;
+            e_list[i] = (Wrapping(e_list[i]) + Wrapping(diff_list_received[i][1])).0;
         }
 
         for i in 0..batch_size {

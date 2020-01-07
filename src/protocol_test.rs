@@ -8,8 +8,9 @@ pub mod protocol_test {
     use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
     use std::cmp::max;
     use crate::protocol::protocol::equality_big_integer;
-    use crate::comparison::comparison::{compare_bigint, comparison};
+    use crate::comparison::comparison::{compare_bigint, comparison, compute_e_shares, compute_d_shares, compute_multi_e_parallel, compute_c_shares};
     use std::ops::BitAnd;
+    use crate::bit_decomposition::bit_decomposition::bit_decomposition;
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -234,27 +235,57 @@ pub mod protocol_test {
             result = equality_big_integer(&x, &y, ctx);
         }
         let result_revealed = reveal_bigint_result(&result, ctx);
-        println!("{}",result_revealed.to_string());
-        assert_eq!(result_revealed,BigUint::zero());
+        println!("{}", result_revealed.to_string());
+        assert_eq!(result_revealed, BigUint::zero());
     }
-    pub fn test_comparison(ctx:&mut ComputingParty){
+
+    pub fn test_comparison(ctx: &mut ComputingParty) {
         let mut result = 0;
-        if ctx.party_id == 0 {
-            let x:Vec<u8> = vec![0,0,0,1];
-            let y:Vec<u8> = vec![0,0,1,0];
-            result = comparison(&x, &y, ctx);
-        } else {
-            let x:Vec<u8> = vec![0,0,1,0];
-            let y:Vec<u8> = vec![0,0,1,1];
-            result = comparison(&x, &y, ctx);
+        for i in 0..10 {
+            if ctx.party_id == 0 {
+                let x: Vec<u8> = vec![1, 0, 1, 0];
+                let y: Vec<u8> = vec![0, 1, 0, 0];
+//            let e_shares = compute_e_shares(&x, &y, ctx);
+//            assert_eq!(e_shares, [1, 0, 1, 0]);
+//            let d_shares = compute_d_shares(&x, &y, ctx);
+//            let revealed_d_shares = reveal_byte_vec_result(&d_shares, ctx);
+//            assert_eq!(revealed_d_shares, [1, 1, 0, 0]);
+//            let e_reverse = compute_multi_e_parallel(&x, &y, ctx, &e_shares);
+//            let e_reverse_revealed = reveal_byte_vec_result(&e_reverse, ctx);
+//            println!("{:?}",e_reverse);
+//            assert_eq!(e_reverse_revealed, [0, 1, 0, 1]);
+//            let c_share = compute_c_shares(x.len(), &e_reverse, &d_shares, ctx);
+//            println!("c_share:{:?}",c_share);
+//            let c_share_revealed = reveal_byte_vec_result(&c_share, ctx);
+//            assert_eq!(c_share_revealed,[0,0,0,0]);
+                result = comparison(&x, &y, ctx);
+            } else {
+                let x: Vec<u8> = vec![0, 0, 0, 0];
+                let y: Vec<u8> = vec![1, 0, 0, 0];
+//            let e_shares = compute_e_shares(&x, &y, ctx);
+//            assert_eq!(e_shares, [1, 0, 0, 1]);
+//            let d_shares = compute_d_shares(&x, &y, ctx);
+//            let revealed_d_shares = reveal_byte_vec_result(&d_shares, ctx);
+//            assert_eq!(revealed_d_shares, [1, 1, 0, 0]);
+//            let e_reverse = compute_multi_e_parallel(&x, &y, ctx, &e_shares);
+//            let e_reverse_revealed = reveal_byte_vec_result(&e_reverse, ctx);
+//            println!("{:?}",e_reverse);
+//            assert_eq!(e_reverse_revealed, [0, 1, 1, 0]);
+//            let c_share = compute_c_shares(x.len(), &e_reverse, &d_shares, ctx);
+//            println!("c_share:{:?}",c_share);
+//            let c_share_revealed = reveal_byte_vec_result(&c_share, ctx);
+//            assert_eq!(c_share_revealed,[0,0,0,0]);
+                result = comparison(&x, &y, ctx);
+            }
+
+            let result_revealed = reveal_byte_result(result, ctx);
+            println!("{}", result_revealed);
+            assert_eq!(result_revealed, 0);
         }
-        let result_revealed = reveal_byte_result(result, ctx);
-        println!("{}",result_revealed);
-        assert_eq!(result_revealed,1);
     }
 
 
-    pub fn test_comparison_bigint(ctx:&mut ComputingParty){
+    pub fn test_comparison_bigint(ctx: &mut ComputingParty) {
         let mut result = BigUint::zero();
         if ctx.party_id == 0 {
             let x = BigUint::from_u32(10).unwrap();
@@ -266,7 +297,14 @@ pub mod protocol_test {
             result = compare_bigint(&x, &y, ctx);
         }
         let result_revealed = reveal_bigint_result(&result, ctx);
-        println!("{}",result_revealed.to_string());
-        assert_eq!(result_revealed,BigUint::one());
+        println!("{}", result_revealed.to_string());
+        assert_eq!(result_revealed, BigUint::one());
+    }
+
+    pub fn test_bit_decomposition(ctx: &mut ComputingParty) {
+        let input = 4;
+        let bit_decomposed = bit_decomposition(input, ctx);
+        let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
+        println!("{:?}", bit_decomposed_revealed);
     }
 }

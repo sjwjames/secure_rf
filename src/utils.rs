@@ -158,13 +158,13 @@ pub mod utils {
 //            arguments: FieldTable::default()
 //        }).unwrap();
 //        queue.bind(&exchange,routing_key,FieldTable::default());
-//        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
-//            durable: false,
-//            exclusive: false,
-//            auto_delete: false,
-//            arguments: Default::default()
-//        }).unwrap();
-        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
+        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
+            durable: false,
+            exclusive: false,
+            auto_delete: true,
+            arguments: Default::default()
+        }).unwrap();
+//        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
         let consumer = queue.consume(ConsumerOptions::default()).unwrap();
         let mut count = 0;
         let mut result = Vec::new();
@@ -195,13 +195,13 @@ pub mod utils {
         let mut connection = Connection::insecure_open(address).unwrap();
         let channel = connection.open_channel(None).unwrap();
         let exchange = channel.exchange_declare(ExchangeType::Direct, "direct", ExchangeDeclareOptions::default()).unwrap();
-//        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
-//            durable: false,
-//            exclusive: false,
-//            auto_delete: false,
-//            arguments: Default::default()
-//        }).unwrap();
-        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
+        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
+            durable: false,
+            exclusive: false,
+            auto_delete: true,
+            arguments: Default::default()
+        }).unwrap();
+//        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
         queue.bind(&exchange, routing_key, FieldTable::default());
         exchange.publish(Publish::new(message.as_bytes(), routing_key)).unwrap();
         connection.close();
