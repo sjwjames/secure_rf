@@ -313,13 +313,19 @@ pub mod protocol_test {
             let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
             println!("{:?}", bit_decomposed_revealed);
         }
-
     }
 
     pub fn test_bit_decomposition_bigint(ctx: &mut ComputingParty) {
-        let input = BigUint::from_u32(4).unwrap();
-        let bit_decomposed = bit_decomposition_bigint(&input, ctx);
-        let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
-        println!("{:?}", bit_decomposed_revealed);
+        if ctx.party_id == 0 {
+            let input = BigUint::from_u32(2).unwrap();
+            let bit_decomposed = bit_decomposition_bigint(&input, ctx);
+            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
+            println!("{:?}", bit_decomposed_revealed);
+        } else {
+            let input = BigUint::from_u32(4).unwrap();
+            let bit_decomposed = bit_decomposition_bigint(&input, ctx);
+            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
+            println!("{:?}", bit_decomposed_revealed);
+        }
     }
 }

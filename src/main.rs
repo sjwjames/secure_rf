@@ -130,8 +130,8 @@ fn test_protocols() {
 //                test_equality_big_integer(&mut party_context);
 //                test_comparison(&mut party_context);
 //                test_comparison_bigint(&mut party_context);
-                test_bit_decomposition(&mut party_context);
-//                test_bit_decomposition_bigint(&mut party_context);
+//                test_bit_decomposition(&mut party_context);
+                test_bit_decomposition_bigint(&mut party_context);
             }
         }
         Err(error) => {

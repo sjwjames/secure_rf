@@ -1,6 +1,6 @@
 pub mod bit_decomposition {
     use crate::computing_party::computing_party::ComputingParty;
-    use num::{abs, BigUint};
+    use num::{abs, BigUint, FromPrimitive, Zero, ToPrimitive};
     use num::integer::*;
     use crate::constants::constants::BINARY_PRIME;
     use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte};
@@ -10,6 +10,7 @@ pub mod bit_decomposition {
     use std::collections::HashMap;
     use std::cmp::min;
     use std::num::Wrapping;
+    use std::ops::Div;
 
     pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty) -> Vec<u8> {
         ctx.thread_hierarchy.push("bit_decomposition".to_string());
@@ -52,7 +53,14 @@ pub mod bit_decomposition {
         let bit_length = ctx.dt_training.bit_length as usize;
         let prime = BINARY_PRIME as u8;
         let mut input_shares = Vec::new();
-        let mut temp = input.to_bytes_le();
+        //convert bigint to bit vector
+        let two = BigUint::from_u32(2).unwrap();
+        let mut temp = Vec::new();
+        let mut bigint_val = big_uint_clone(&input);
+        while !bigint_val.eq(&BigUint::zero()) {
+            temp.push(bigint_val.mod_floor(&two).to_u8().unwrap());
+            bigint_val = bigint_val.div_floor(&two);
+        }
         let mut temp0 = vec![0u8; bit_length as usize];
         let diff = (abs((bit_length - temp.len()) as isize)) as usize;
         for i in 0..diff{
