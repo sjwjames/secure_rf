@@ -243,7 +243,7 @@ pub mod protocol_test {
         let mut result = 0;
         for i in 0..10 {
             if ctx.party_id == 0 {
-                let x: Vec<u8> = vec![0, 0, 1, 0];
+                let x: Vec<u8> = vec![1, 0, 0, 0];
                 let y: Vec<u8> = vec![0, 1, 0, 0];
 //            let e_shares = compute_e_shares(&x, &y, ctx);
 //            assert_eq!(e_shares, [1, 0, 1, 0]);
@@ -260,7 +260,7 @@ pub mod protocol_test {
 //            assert_eq!(c_share_revealed,[0,0,0,0]);
                 result = comparison(&x, &y, ctx);
             } else {
-                let x: Vec<u8> = vec![0, 0, 0, 0];
+                let x: Vec<u8> = vec![0, 0, 1, 0];
                 let y: Vec<u8> = vec![1, 0, 0, 0];
 //            let e_shares = compute_e_shares(&x, &y, ctx);
 //            assert_eq!(e_shares, [1, 0, 0, 1]);
@@ -280,7 +280,7 @@ pub mod protocol_test {
 
             let result_revealed = reveal_byte_result(result, ctx);
             println!("{}", result_revealed);
-            assert_eq!(result_revealed, 0);
+            assert_eq!(result_revealed, 1);
         }
     }
 
@@ -288,17 +288,17 @@ pub mod protocol_test {
     pub fn test_comparison_bigint(ctx: &mut ComputingParty) {
         let mut result = BigUint::zero();
         if ctx.party_id == 0 {
-            let x = BigUint::from_u32(10).unwrap();
-            let y = BigUint::from_u32(3).unwrap();
+            let x = BigUint::from_u32(4).unwrap();
+            let y = BigUint::from_u32(2).unwrap();
             result = compare_bigint(&x, &y, ctx);
         } else {
-            let x = BigUint::from_u32(5).unwrap();
-            let y = BigUint::from_u32(7).unwrap();
+            let x = BigUint::from_u32(4).unwrap();
+            let y = BigUint::from_u32(3).unwrap();
             result = compare_bigint(&x, &y, ctx);
         }
         let result_revealed = reveal_bigint_result(&result, ctx);
         println!("{}", result_revealed.to_string());
-        assert_eq!(result_revealed, BigUint::one());
+        assert_eq!(result_revealed.mod_floor(&BigUint::from_u32(2).unwrap()), BigUint::one());
     }
 
     pub fn test_bit_decomposition(ctx: &mut ComputingParty) {

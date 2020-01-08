@@ -27,11 +27,10 @@ pub mod comparison {
         let mut d_shares = vec![0u8; bit_length];
         ctx.thread_hierarchy.push("compute_D_shares".to_string());
         let (batch_count, output_map) = multi_thread_batch_mul_byte(&x_list, &y_list, ctx, bit_length);
-        let mut global_index = 0;
         for i in 0..batch_count {
             let product_result = output_map.get(&i).unwrap();
             for j in 0..product_result.len() {
-                global_index = i as usize * ctx.batch_size + j;
+                let global_index = i as usize * ctx.batch_size + j;
                 let local_diff = Wrapping(y_list[global_index]) - Wrapping(product_result[j]);
                 d_shares[global_index] = mod_floor(local_diff.0, BINARY_PRIME as u8);
             }
@@ -45,8 +44,8 @@ pub mod comparison {
         let mut multiplication_e = vec![0u8; bit_length];
         ctx.thread_hierarchy.push("compute_E_parallel".to_string());
         let mut main_index = bit_length - 1;
-        main_index -= 1;
         multiplication_e[main_index] = e_shares[bit_length - 1];
+        main_index -= 1;
         let mut temp_mul_e = e_shares.clone();
 
         let thread_pool = ThreadPool::new(ctx.thread_count);
@@ -84,8 +83,8 @@ pub mod comparison {
             temp_mul_e.clear();
             temp_mul_e = products;
             if main_index > 0 {
-                main_index -= 1;
                 multiplication_e[main_index] = *temp_mul_e.last().unwrap();
+                main_index -= 1;
             }
         }
         multiplication_e[0] = 0;
@@ -162,6 +161,9 @@ pub mod comparison {
         let mut output_map = output_map.lock().unwrap();
         let mut d_shares = (*output_map).get(&0).unwrap();
         let mut multiplication_e = (*output_map).get(&1).unwrap();
+        println!("d_shares {:?}",d_shares);
+        println!("multiplication_e {:?}",multiplication_e);
+
         //compute c shares
         let mut c_shares = compute_c_shares(bit_length, &multiplication_e, &d_shares, ctx);
         //compute w shares
@@ -177,6 +179,7 @@ pub mod comparison {
     }
 
     pub fn compare_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
+        ctx.thread_hierarchy.push("bigint_comparison".to_string());
         let thread_pool = ThreadPool::new(2);
 
         let bit_length = ctx.dt_training.bit_length;
@@ -185,6 +188,7 @@ pub mod comparison {
         let mut bd_result_map_cp = Arc::clone(&bd_result_map);
         let mut ctx_cp = ctx.clone();
         let x_cp = big_uint_clone(x);
+        ctx_cp.thread_hierarchy.push("decompose_x".to_string());
         thread_pool.execute(move || {
             let x_bits = bit_decomposition_bigint(&x_cp, &mut ctx_cp);
             let mut bd_result_map_cp = bd_result_map_cp.lock().unwrap();
@@ -194,6 +198,7 @@ pub mod comparison {
         let mut ctx_cp = ctx.clone();
         let mut bd_result_map_cp = Arc::clone(&bd_result_map);
         let y_cp = big_uint_clone(y);
+        ctx_cp.thread_hierarchy.push("decompose_y".to_string());
         thread_pool.execute(move || {
             let y_bits = bit_decomposition_bigint(&y_cp, &mut ctx_cp);
             let mut bd_result_map_cp = bd_result_map_cp.lock().unwrap();
@@ -207,6 +212,7 @@ pub mod comparison {
         let y_shares = (*bd_result_map).get(&1).unwrap();
 
         let result = comparison(x_shares, y_shares, ctx);
+        ctx.thread_hierarchy.pop();
         BigUint::from(result)
     }
 }

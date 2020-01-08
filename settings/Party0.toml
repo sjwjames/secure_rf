@@ -61,6 +61,7 @@ attr_value_count = 2
 class_value_count = 2
 attribute_count = 3
 instance_count = 5
+asymmetric_bit = 0
 prime = 8
 big_int_prime = "8589934592"
 dataset_size_prime = 8

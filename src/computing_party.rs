@@ -244,6 +244,13 @@ pub mod computing_party {
             }
         };
 
+        let asymmetric_bit = match settings.get_int("asymmetric_bit") {
+            Ok(num) => num as u8,
+            Err(error) => {
+                panic!("Encountered a problem while parsing asymmetric_bit: {:?}", error)
+            }
+        };
+
         let ti_ip = match settings.get_str("ti_ip") {
             Ok(num) => num as String,
             Err(error) => {
@@ -538,7 +545,7 @@ pub mod computing_party {
             party0_port,
             party1_ip,
             party1_port,
-            asymmetric_bit: party_id,
+            asymmetric_bit,
             output_path,
             ti_stream,
             local_mq_ip,
