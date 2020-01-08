@@ -17,10 +17,11 @@ pub mod bit_decomposition {
         let bit_length = ctx.dt_training.bit_length as usize;
 
         let binary_str = format!("{:b}", input);
-        let input_binary_str_vec: Vec<&str> = binary_str.split("").collect();
+        let reversed_binary_vec:Vec<char> = binary_str.chars().rev().collect();
         let mut temp: Vec<u8> = Vec::new();
-        for item in binary_str.chars() {
-            temp.push(item as u8);
+        for item in reversed_binary_vec {
+            let item_parsed:u8 = format!("{}",item).parse().unwrap();
+            temp.push(item_parsed);
         }
         let mut temp0 = vec![0u8; bit_length];
         let diff = abs(bit_length as isize - temp.len() as isize);

@@ -10,7 +10,7 @@ pub mod protocol_test {
     use crate::protocol::protocol::equality_big_integer;
     use crate::comparison::comparison::{compare_bigint, comparison, compute_e_shares, compute_d_shares, compute_multi_e_parallel, compute_c_shares};
     use std::ops::BitAnd;
-    use crate::bit_decomposition::bit_decomposition::bit_decomposition;
+    use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint};
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -243,7 +243,7 @@ pub mod protocol_test {
         let mut result = 0;
         for i in 0..10 {
             if ctx.party_id == 0 {
-                let x: Vec<u8> = vec![1, 0, 1, 0];
+                let x: Vec<u8> = vec![0, 0, 1, 0];
                 let y: Vec<u8> = vec![0, 1, 0, 0];
 //            let e_shares = compute_e_shares(&x, &y, ctx);
 //            assert_eq!(e_shares, [1, 0, 1, 0]);
@@ -302,8 +302,23 @@ pub mod protocol_test {
     }
 
     pub fn test_bit_decomposition(ctx: &mut ComputingParty) {
-        let input = 4;
-        let bit_decomposed = bit_decomposition(input, ctx);
+        if ctx.party_id == 0 {
+            let input = 4;
+            let bit_decomposed = bit_decomposition(input, ctx);
+            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
+            println!("{:?}", bit_decomposed_revealed);
+        } else {
+            let input = 4;
+            let bit_decomposed = bit_decomposition(input, ctx);
+            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
+            println!("{:?}", bit_decomposed_revealed);
+        }
+
+    }
+
+    pub fn test_bit_decomposition_bigint(ctx: &mut ComputingParty) {
+        let input = BigUint::from_u32(4).unwrap();
+        let bit_decomposed = bit_decomposition_bigint(&input, ctx);
         let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
         println!("{:?}", bit_decomposed_revealed);
     }

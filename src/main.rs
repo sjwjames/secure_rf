@@ -16,7 +16,7 @@ use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOption
 use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue};
 use threadpool::ThreadPool;
 use random_forest_rust::multiplication::multiplication::multiplication_byte;
-use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication, test_batch_multiply_bigint, test_parallel_multiplication_big_integer, test_equality_big_integer, test_comparison, test_comparison_bigint, test_bit_decomposition};
+use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication, test_batch_multiply_bigint, test_parallel_multiplication_big_integer, test_equality_big_integer, test_comparison, test_comparison_bigint, test_bit_decomposition, test_bit_decomposition_bigint};
 use rand::ThreadRng;
 use num::bigint::RandBigInt;
 use std::sync::{Arc, Mutex};
@@ -128,10 +128,10 @@ fn test_protocols() {
 //                test_batch_multiply_bigint(&mut party_context);
 //                test_parallel_multiplication_big_integer(&mut party_context);
 //                test_equality_big_integer(&mut party_context);
-                test_comparison(&mut party_context);
-//                test_bit_decomposition(&mut party_context);
+//                test_comparison(&mut party_context);
 //                test_comparison_bigint(&mut party_context);
-
+                test_bit_decomposition(&mut party_context);
+//                test_bit_decomposition_bigint(&mut party_context);
             }
         }
         Err(error) => {
