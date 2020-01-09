@@ -7,10 +7,13 @@ pub mod protocol_test {
     use num::integer::*;
     use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
     use std::cmp::max;
-    use crate::protocol::protocol::equality_big_integer;
+    use crate::protocol::protocol::{equality_big_integer, arg_max};
     use crate::comparison::comparison::{compare_bigint, comparison, compute_e_shares, compute_d_shares, compute_multi_e_parallel, compute_c_shares};
     use std::ops::BitAnd;
     use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint};
+    use crate::dot_product::dot_product::dot_product_bigint;
+    use crate::or_xor::or_xor::or_xor;
+    use crate::field_change::field_change::change_binary_to_decimal_field;
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -96,8 +99,6 @@ pub mod protocol_test {
         println!("result_revealed {:?}", &result_revealed);
         assert!(result_pub.iter().zip(result_revealed.iter()).all(|(a, b)| a.0 == *b), "Arrays are not equal");
     }
-
-    pub fn test_or_xor(ctx: &mut ComputingParty) {}
 
     pub fn test_multiplication_bigint(ctx: &mut ComputingParty) {
         let mut x_vec_pub = Vec::new();
@@ -326,6 +327,66 @@ pub mod protocol_test {
             let bit_decomposed = bit_decomposition_bigint(&input, ctx);
             let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
             println!("{:?}", bit_decomposed_revealed);
+        }
+    }
+
+    pub fn test_dot_product_bigint(ctx: &mut ComputingParty) {
+        if ctx.party_id == 0 {
+            let x = vec![BigUint::from_u32(1).unwrap(), BigUint::from_u32(2).unwrap(), BigUint::from_u32(3).unwrap(), BigUint::from_u32(4).unwrap()];
+            let y = vec![BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap()];
+            let result = dot_product_bigint(&x, &y, ctx);
+            let result_revealed = reveal_bigint_result(&result, ctx);
+            println!("{}", result_revealed.to_string());
+        } else {
+            let x = vec![BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap()];
+            let y = vec![BigUint::from_u32(1).unwrap(), BigUint::from_u32(1).unwrap(), BigUint::from_u32(1).unwrap(), BigUint::from_u32(1).unwrap()];
+            let result = dot_product_bigint(&x, &y, ctx);
+            let result_revealed = reveal_bigint_result(&result, ctx);
+            println!("{}", result_revealed.to_string());
+        }
+    }
+
+    pub fn test_or_xor(ctx: &mut ComputingParty) {
+        if ctx.party_id == 0 {
+            let x = vec![Wrapping(1), Wrapping(1), Wrapping(0), Wrapping(1)];
+            let y = vec![Wrapping(0), Wrapping(0), Wrapping(0), Wrapping(1)];
+            let result = or_xor(&x, &y, ctx, 2);
+            println!("{:?}", result);
+//            let result_revealed = reveal_byte_vec_result(&result,ctx);
+//            println!("{}",result_revealed.to_string());
+        } else {
+            let x = vec![Wrapping(0), Wrapping(1), Wrapping(0), Wrapping(0)];
+            let y = vec![Wrapping(1), Wrapping(0), Wrapping(0), Wrapping(0)];
+            let result = or_xor(&x, &y, ctx, 2);
+            println!("{:?}", result);
+//            let result_revealed = reveal_bigint_result(&result,ctx);
+//            println!("{}",result_revealed.to_string());
+        }
+    }
+
+    pub fn test_change_binary_to_decimal_field(ctx: &mut ComputingParty){
+        if ctx.party_id == 0 {
+            let input = vec![1,0,0,1];
+            let result = change_binary_to_decimal_field(&input,ctx);
+            println!("{:?}",result);
+        } else {
+            let input = vec![0,1,1,1];
+            let result = change_binary_to_decimal_field(&input,ctx);
+            println!("{:?}",result);
+        }
+    }
+
+    pub fn test_argmax(ctx: &mut ComputingParty){
+        if ctx.party_id == 0 {
+            let input = vec![vec![0,0,0,0],vec![1,0,0,0],vec![1,0,1,0],vec![0,0,0,1]];
+            let result = arg_max(&input,ctx);
+            let result_revealed = reveal_byte_vec_result(&result,ctx);
+            println!("{:?}",result_revealed);
+        } else {
+            let input = vec![vec![0,0,0,0],vec![0,0,0,0],vec![0,0,0,0],vec![0,0,0,0]];
+            let result = arg_max(&input,ctx);
+            let result_revealed = reveal_byte_vec_result(&result,ctx);
+            println!("{:?}",result_revealed);
         }
     }
 }

@@ -40,7 +40,6 @@ pub mod protocol {
                 w_intermediate.insert(i, list);
             }
             //computeComparisons in JAVA Lynx
-            let ti_count = 2 * bit_length + (bit_length * (bit_length - 1) / 2);
             let thread_pool = ThreadPool::new(ctx.thread_count);
             let mut output_map = Arc::new(Mutex::new((HashMap::new())));
             let mut key = 0;

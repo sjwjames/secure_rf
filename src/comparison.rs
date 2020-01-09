@@ -161,8 +161,6 @@ pub mod comparison {
         let mut output_map = output_map.lock().unwrap();
         let mut d_shares = (*output_map).get(&0).unwrap();
         let mut multiplication_e = (*output_map).get(&1).unwrap();
-        println!("d_shares {:?}",d_shares);
-        println!("multiplication_e {:?}",multiplication_e);
 
         //compute c shares
         let mut c_shares = compute_c_shares(bit_length, &multiplication_e, &d_shares, ctx);
