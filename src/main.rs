@@ -21,6 +21,7 @@ use rand::ThreadRng;
 use num::bigint::RandBigInt;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::str::FromStr;
 
 fn test_mq() {
     let args: Vec<String> = env::args().collect();
@@ -148,7 +149,9 @@ fn test_protocols() {
 fn main() {
 //    test_mq();
 //    run();
-    test_protocols();
+//    test_protocols();
+    let a:Vec<u8> = vec![1,0,0,1];
+
 }
 
 

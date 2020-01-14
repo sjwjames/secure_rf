@@ -5,7 +5,7 @@ pub mod decision_tree {
     use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint};
+    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint, reveal_bigint_result};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
@@ -159,9 +159,9 @@ pub mod decision_tree {
     }
 
 
-    pub fn train(ctx: &mut ComputingParty, r: usize) {
+    pub fn train(ctx: &mut ComputingParty, r: usize) -> DecisionTreeResult {
         println!("start building model");
-        ctx.thread_hierarchy.push("DT".to_string());
+        ctx.thread_hierarchy.push(format!("DT_level_{}", r));
         let major_class_index = find_common_class_index(ctx);
         // Make majority class index one-hot encoding public
         // Share major class index
@@ -169,7 +169,7 @@ pub mod decision_tree {
 
 
         let message_id = ctx.thread_hierarchy.join(":");
-        println!("current message_id:{}",message_id);
+        println!("current message_id:{}", message_id);
         let message_content = serde_json::to_string(&major_class_index).unwrap();
         push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
@@ -224,7 +224,7 @@ pub mod decision_tree {
             println!("Exited on base case: Recursion Level == 0");
             ctx.dt_results.result_list.push(format!("class={}", major_index));
             ctx.thread_hierarchy.pop();
-            return;
+            return ctx.dt_results.clone();
         }
 
         let mut major_class_index_decimal = if ctx.asymmetric_bit == 1 {
@@ -279,6 +279,7 @@ pub mod decision_tree {
         println!("Transactions in current subset: {}", transaction_count.to_string());
 
         let eq_test_result = equality_big_integer(&transaction_count, &major_class_trans_count, ctx);
+        let eq_test_revealed = reveal_bigint_result(&eq_test_result, ctx);
         println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_result.to_string());
 
         ctx.thread_hierarchy.push("early_stop_criteria".to_string());
@@ -290,13 +291,13 @@ pub mod decision_tree {
         push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let stopping_bit_received = BigUint::from_str(&message_received[0]).unwrap();
-
+        println!("Stopping bit received:{}", stopping_bit_received.to_string());
         let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
-        if stopping_check.eq(&BigUint::zero()) {
+        if stopping_check.eq(&BigUint::one()) {
             println!("Exited on base case: All transactions predict same outcome");
             ctx.dt_results.result_list.push(format!("class={}", major_index));
             ctx.thread_hierarchy.pop();
-            return;
+            return ctx.dt_results.clone();
         }
         ctx.thread_hierarchy.pop();
 
@@ -407,7 +408,7 @@ pub mod decision_tree {
                     }
                     let mut ctx = ctx.clone();
                     let mut multi0 = multiplication_bigint(&sum_x2, &y_prod_without_j, &mut ctx);
-                    let mut temp_gini_numerator = & gini_numerators[k];
+                    let mut temp_gini_numerator = &gini_numerators[k];
                     gini_numerators[k] = temp_gini_numerator.add(&multi0).mod_floor(&bigint_prime);
                 }
                 ctx.thread_hierarchy.pop();
@@ -422,7 +423,7 @@ pub mod decision_tree {
 
         let mut gini_max_numerator = big_uint_clone(&gini_numerators[k]);
         let mut gini_max_denominator = big_uint_clone(&gini_denominators[k]);
-        let mut gini_argmax = if ctx.asymmetric_bit==1 {BigUint::from(k)}else{BigUint::zero()};
+        let mut gini_argmax = if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero() };
         k += 1;
         ctx.thread_hierarchy.push("gini_argmax_computation".to_string());
         while k < attr_count {
@@ -439,7 +440,7 @@ pub mod decision_tree {
                 let mult1 = multiplication_bigint(&numerators[1], &denominators[0], ctx);
 
                 new_assignments_bin[0] = compare_bigint(&left_operand, &right_operand, ctx);
-                new_assignments_bin[1] = compare_bigint(&new_assignments_bin[0], &(if ctx.asymmetric_bit==1 { BigUint::one() } else { BigUint::zero() }), ctx);
+                new_assignments_bin[1] = compare_bigint(&new_assignments_bin[0], &(if ctx.asymmetric_bit == 1 { BigUint::one() } else { BigUint::zero() }), ctx);
 
                 gini_argmax = dot_product_bigint(&new_assignments, &gini_argmaxes.to_vec(), ctx);
                 gini_max_numerator = dot_product_bigint(&new_assignments, &numerators.to_vec(), ctx);
@@ -451,41 +452,41 @@ pub mod decision_tree {
 
         ctx.thread_hierarchy.push("gini_argmax_public".to_string());
         let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serde_json::to_string(&serialize_biguint(&gini_argmax)).unwrap();
+        let message_content = serialize_biguint(&gini_argmax);
         push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut argmax_received = deserialize_biguint(&message_received[0]);
         let mut shared_gini_argmax = gini_argmax.add(&argmax_received).mod_floor(&bigint_prime).to_usize().unwrap();
-        attributes[shared_gini_argmax]=0;
-        ctx.dt_results.result_list.push(format!("attr={}",shared_gini_argmax));
+        attributes[shared_gini_argmax] = 0;
+        ctx.dt_results.result_list.push(format!("attr={}", shared_gini_argmax));
         ctx.thread_hierarchy.pop();
 
 
         ctx.thread_hierarchy.push("update_transactions".to_string());
         let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
 
-        for j in 0..attr_val_count{
+        for j in 0..attr_val_count {
             let mut dt_ctx = ctx.clone();
             let mut batch_multi_result_cp = Arc::clone(&batch_multi_result_map);
             let mut subset_transaction_cp = subset_transaction.clone();
-            thread_pool.execute(move||{
+            thread_pool.execute(move || {
                 let attr_values_bytes = &dt_ctx.dt_data.attr_values_bytes;
                 let temp_value = attr_values_bytes[shared_gini_argmax][j].clone();
-                let batch_multi = batch_multiplication_byte(&subset_transaction_cp,&temp_value,&mut dt_ctx);
+                let batch_multi = batch_multiplication_byte(&subset_transaction_cp, &temp_value, &mut dt_ctx);
                 let mut batch_multi_result_cp = batch_multi_result_cp.lock().unwrap();
-                (*batch_multi_result_cp).insert(j,batch_multi);
+                (*batch_multi_result_cp).insert(j, batch_multi);
             });
         }
         thread_pool.join();
         ctx.thread_hierarchy.pop();
         let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
-        for j in 0..attr_val_count{
-            let mut dt_ctx = ctx.clone();
-            dt_ctx.dt_training.subset_transaction_bit_vector = (*batch_multi_result_map).get(&j).unwrap().clone();
-            train(&mut dt_ctx,r-1);
+        for j in 0..attr_val_count {
+            ctx.dt_training.subset_transaction_bit_vector = (*batch_multi_result_map).get(&j).unwrap().clone();
+            train(ctx, r - 1);
         }
 
         ctx.thread_hierarchy.pop();
+        ctx.dt_results.clone()
     }
 
     fn find_common_class_index(ctx: &mut ComputingParty) -> Vec<u8> {

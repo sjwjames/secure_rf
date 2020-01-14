@@ -21,7 +21,7 @@ pub mod random_forest {
                 ctx.ti_stream.try_clone().expect("failed to clone ti recvr"));
             let mut dt_ctx = ctx.clone();
             dt_ctx.dt_shares = dt_shares;
-
+//
 //            thread_pool.execute(move || {
 //                dt_ctx.party0_port = current_p0_port;
 //                dt_ctx.party1_port = current_p1_port;
@@ -59,7 +59,9 @@ pub mod random_forest {
 //
 //                dt_ctx.dt_data.class_values = class_values;
 //                dt_ctx.dt_data.class_values_big_integer = class_values_bigint;
-//                let dt_training = decision_tree::train(&mut dt_ctx);
+//                let depth = dt_ctx.dt_training.max_depth;
+//                let dt_training = decision_tree::train(&mut dt_ctx,depth);
+//                println!("{:?}",dt_training.result_list);
 //            });
 
             dt_ctx.party0_port = current_p0_port;
@@ -104,6 +106,7 @@ pub mod random_forest {
 
             current_p0_port += 1;
             current_p1_port += 1;
+            println!("tree {} result {:?}",current_tree_index,dt_training.result_list);
         }
 
         thread_pool.join();

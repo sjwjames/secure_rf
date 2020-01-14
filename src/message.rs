@@ -1,3 +1,4 @@
+//Deprecated
 pub mod message {
     use std::collections::HashMap;
     use serde::{Serialize, Deserialize, Serializer};

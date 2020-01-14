@@ -118,7 +118,7 @@ pub mod utils {
         let bigint_shares = &ctx.dt_shares.additive_bigint_triples;
         let current_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
         let result = &bigint_shares[current_index];
-//        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_bigint_index));
+        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_bigint_index));
         result
     }
 
@@ -126,7 +126,7 @@ pub mod utils {
         let shares = &ctx.dt_shares.equality_shares;
         let current_index = *(ctx.dt_shares.current_equality_index.lock().unwrap());
         let result = &shares[current_index];
-//        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_equality_index));
+        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_equality_index));
         result
     }
 
@@ -142,7 +142,7 @@ pub mod utils {
         let shares = &ctx.dt_shares.binary_triples;
         let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
         let result = &shares[current_index];
-//        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
+        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
         result
     }
 
@@ -161,7 +161,7 @@ pub mod utils {
         let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
             durable: false,
             exclusive: false,
-            auto_delete: true,
+            auto_delete: false,
             arguments: Default::default()
         }).unwrap();
 //        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
@@ -198,7 +198,7 @@ pub mod utils {
         let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
             durable: false,
             exclusive: false,
-            auto_delete: true,
+            auto_delete: false,
             arguments: Default::default()
         }).unwrap();
 //        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
@@ -210,7 +210,7 @@ pub mod utils {
     pub fn reveal_byte_result(x: u8, ctx: &mut ComputingParty) -> u8 {
         let message_id = "reveal".to_string();
         let message_content = serde_json::to_string(&x).unwrap();
-        println!("party{} sending {}", ctx.party_id, x);
+//        println!("party{} sending {}", ctx.party_id, x);
         push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
         let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut message_rec: u8 = message_received[0].parse().unwrap();
