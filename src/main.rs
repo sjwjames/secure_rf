@@ -129,14 +129,14 @@ fn test_protocols() {
 //                test_batch_multiply_bigint(&mut party_context);
 //                test_parallel_multiplication_big_integer(&mut party_context);
 //                test_equality_big_integer(&mut party_context);
-//                test_comparison(&mut party_context);
+                test_comparison(&mut party_context);
 //                test_bit_decomposition(&mut party_context);
 //                test_bit_decomposition_bigint(&mut party_context);
 //                test_comparison_bigint(&mut party_context);
 //                test_dot_product_bigint(&mut party_context);
 //                test_or_xor(&mut party_context);
 //                test_change_binary_to_decimal_field(&mut party_context);
-                test_argmax(&mut party_context);
+//                test_argmax(&mut party_context);
             }
         }
         Err(error) => {
@@ -149,8 +149,7 @@ fn test_protocols() {
 fn main() {
 //    test_mq();
 //    run();
-//    test_protocols();
-    let a:Vec<u8> = vec![1,0,0,1];
+    test_protocols();
 
 }
 

@@ -64,8 +64,8 @@ pub mod multiplication {
         let mut diff_list_message = String::new();
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serde_json::to_string(&diff_list_str_vec.join(";")).unwrap();
-        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         diff_list_message = serde_json::from_str(&message_received[0]).unwrap();
 
         let mut diff_list_str_vec: Vec<&str> = diff_list_message.split(";").collect();
@@ -275,8 +275,8 @@ pub mod multiplication {
 
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serde_json::to_string(&diff_list).unwrap();
-        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut received_list: Vec<u8> = Vec::new();
         received_list = serde_json::from_str(&message_received[0]).unwrap();
 
@@ -333,8 +333,8 @@ pub mod multiplication {
 //        received_list = serde_json::from_str(&message_received.message_content).unwrap();
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serde_json::to_string(&diff_list).unwrap();
-        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut diff_list_received: Vec<Vec<u8>> = Vec::new();
         diff_list_received = serde_json::from_str(&message_received[0]).unwrap();
 
@@ -377,8 +377,6 @@ pub mod multiplication {
         }
 
 
-
-
 //        let mut o_stream = ctx.o_stream.try_clone()
 //            .expect("failed cloning tcp o_stream");
 //        let message_id = ctx.thread_hierarchy.join(":");
@@ -406,8 +404,8 @@ pub mod multiplication {
 
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serde_json::to_string(&diff_list).unwrap();
-        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
         received_list = serde_json::from_str(&message_received[0]).unwrap();
 
@@ -415,8 +413,8 @@ pub mod multiplication {
         let mut e_list = vec![Wrapping(0u64); batch_size];
 
         for i in 0..batch_size {
-            d_list[i] = Wrapping(mod_floor((d_list[i] + received_list[i][0]).0,ctx.dt_training.dataset_size_prime));
-            e_list[i] = Wrapping(mod_floor((e_list[i] + received_list[i][1]).0,ctx.dt_training.dataset_size_prime));
+            d_list[i] = Wrapping(mod_floor((d_list[i] + received_list[i][0]).0, ctx.dt_training.dataset_size_prime));
+            e_list[i] = Wrapping(mod_floor((e_list[i] + received_list[i][1]).0, ctx.dt_training.dataset_size_prime));
         }
 
         for i in 0..batch_size {
@@ -508,8 +506,8 @@ pub mod multiplication {
         let mut diff_list_message = String::new();
         let message_id = ctx.thread_hierarchy.join(":");
         let message_content = serialize_biguint_vec(&diff_list);
-        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         diff_list_message = message_received[0].clone();
         let diff_received = deserialize_biguint_vec(&diff_list_message.as_str());
 
@@ -558,7 +556,7 @@ pub mod multiplication {
                 let mut ctx_copied = ctx.clone();
                 let mut products_slice = big_uint_vec_clone(&products[i1..temp_index1].to_vec());
                 let mut products_slice2 = big_uint_vec_clone(&products[i2..temp_index2].to_vec());
-                ctx_copied.thread_hierarchy.push(format!("{}",count));
+                ctx_copied.thread_hierarchy.push(format!("{}", count));
                 thread_pool.execute(move || {
                     let multi_result = batch_multiply_bigint(&products_slice, &products_slice2, &mut ctx_copied);
                     let mut output_map = output_map.lock().unwrap();
@@ -567,7 +565,7 @@ pub mod multiplication {
                 i1 = temp_index1;
                 i2 = temp_index2;
                 batch_count += 1;
-                count+=1;
+                count += 1;
             }
             thread_pool.join();
             let mut new_products = Vec::new();
@@ -591,25 +589,36 @@ pub mod multiplication {
         let inner_pool = ThreadPool::new(ctx.thread_count);
         let mut i = 0;
         let mut batch_count = 0;
-        let mut output_map = Arc::new(Mutex::new(HashMap::new()));
-        while i < bit_length {
-            let mut output_map = Arc::clone(&output_map);
-            let to_index = min(i + ctx.batch_size, bit_length);
-            let mut ctx_copied = ctx.clone();
-            let mut x_list = x_list.clone();
-            let mut y_list = y_list.clone();
-            ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
-            inner_pool.execute(move || {
-                let mut batch_mul_result = batch_multiplication_byte(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
-                let mut output_map = output_map.lock().unwrap();
-                (*output_map).insert(batch_count, batch_mul_result);
-            });
-            i = to_index;
-            batch_count += 1;
+        let mut result_map: HashMap<u32, Vec<u8>> = HashMap::new();
+        if ctx.raw_tcp_communication {
+            while i < bit_length {
+                let to_index = min(i + ctx.batch_size, bit_length);
+                let mut batch_mul_result = batch_multiplication_byte(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), ctx);
+                result_map.insert(i as u32, batch_mul_result);
+                i = to_index;
+                batch_count += 1;
+            }
+        } else {
+            let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+            while i < bit_length {
+                let mut output_map = Arc::clone(&output_map);
+                let to_index = min(i + ctx.batch_size, bit_length);
+                let mut ctx_copied = ctx.clone();
+                let mut x_list = x_list.clone();
+                let mut y_list = y_list.clone();
+                ctx_copied.thread_hierarchy.push(format!("{}", batch_count));
+                inner_pool.execute(move || {
+                    let mut batch_mul_result = batch_multiplication_byte(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), &mut ctx_copied);
+                    let mut output_map = output_map.lock().unwrap();
+                    (*output_map).insert(batch_count, batch_mul_result);
+                });
+                i = to_index;
+                batch_count += 1;
+            }
+            inner_pool.join();
+            result_map = (*output_map.lock().unwrap()).clone();
         }
-        inner_pool.join();
-        let output_map = (*output_map.lock().unwrap()).clone();
         ctx.thread_hierarchy.pop();
-        (batch_count, output_map)
+        (batch_count, result_map)
     }
 }

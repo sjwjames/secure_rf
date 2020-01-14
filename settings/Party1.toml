@@ -6,6 +6,7 @@ party_id = 1
 #[option]
 
 debug_output = true
+raw_tcp_communication = false
 
 #[network]
 
@@ -40,37 +41,37 @@ alpha = 8
 epsilon = 0.1
 
 #[BREAST CANCER]
-batch_size = 176
-tree_training_batch_size = 20
-attr_value_count = 10
-class_value_count = 2
-attribute_count = 30
-instance_count = 100
-asymmetric_bit = 0
-prime = 512
-big_int_prime = "47890485652059026823698344598447161988085597568237568"
-dataset_size_prime = 512
-big_int_ti_index = 0
-bit_length = 175
-x_input_path = "/Users/sjw/Projects/2019summer/idash2019/breast_cancer/shared_fold_1_train-1.csv"
-output_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/weights/BC_TCGA_5_folds/fold_1_weights.csv"
+#batch_size = 176
+#tree_training_batch_size = 20
+#attr_value_count = 10
+#class_value_count = 2
+#attribute_count = 30
+#instance_count = 100
+#asymmetric_bit = 0
+#prime = 512
+#big_int_prime = "47890485652059026823698344598447161988085597568237568"
+#dataset_size_prime = 512
+#big_int_ti_index = 0
+#bit_length = 175
+#x_input_path = "/Users/sjw/Projects/2019summer/idash2019/breast_cancer/shared_fold_1_train-1.csv"
+#output_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/weights/BC_TCGA_5_folds/fold_1_weights.csv"
 
 
 #[RANDOM DATA]
-#batch_size = 34
-#tree_training_batch_size = 20
-#attr_value_count = 2
-#class_value_count = 2
-#attribute_count = 3
-#instance_count = 5
-#asymmetric_bit = 1
-#prime = 8
-#big_int_prime = "8589934592"
-#dataset_size_prime = 8
-#big_int_ti_index = 0
-#bit_length = 33
-#x_input_path = "/Users/sjw/Desktop/PPML/preprocess/james/shared_fold_1_train-1.csv"
-#output_path = "/Users/sjw/Desktop/PPML/preprocess/james/fold_1_trees.csv"
+batch_size = 34
+tree_training_batch_size = 20
+attr_value_count = 2
+class_value_count = 2
+attribute_count = 3
+instance_count = 5
+asymmetric_bit = 1
+prime = 8
+big_int_prime = "8589934592"
+dataset_size_prime = 8
+big_int_ti_index = 0
+bit_length = 33
+x_input_path = "/Users/sjw/Desktop/PPML/preprocess/james/shared_fold_1_train-1.csv"
+output_path = "/Users/sjw/Desktop/PPML/preprocess/james/fold_1_trees.csv"
 
 
 #[GSE2034]

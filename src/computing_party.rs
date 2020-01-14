@@ -30,7 +30,7 @@ pub mod computing_party {
         /* options */
         pub debug_output: bool,
         pub decimal_precision: u32,
-
+        pub raw_tcp_communication: bool,
         /* network */
         pub party_id: u8,
         pub ti_ip: String,
@@ -81,6 +81,7 @@ pub mod computing_party {
         fn clone(&self) -> Self {
             ComputingParty {
                 debug_output: self.debug_output,
+                raw_tcp_communication: self.raw_tcp_communication,
                 decimal_precision: self.decimal_precision,
                 party_id: self.party_id,
                 ti_ip: self.ti_ip.clone(),
@@ -234,6 +235,13 @@ pub mod computing_party {
             Ok(num) => num as bool,
             Err(error) => {
                 panic!("Encountered a problem while parsing debug_output: {:?}", error)
+            }
+        };
+
+        let raw_tcp_communication = match settings.get_bool("raw_tcp_communication") {
+            Ok(num) => num as bool,
+            Err(error) => {
+                panic!("Encountered a problem while parsing raw_tcp_communication: {:?}", error)
             }
         };
 
@@ -420,7 +428,7 @@ pub mod computing_party {
         };
 
 
-        let big_int_prime = BigUint::from_str_radix(&big_int_prime,10).unwrap();
+        let big_int_prime = BigUint::from_str_radix(&big_int_prime, 10).unwrap();
 
 
         let prime = match settings.get_int("prime") {
@@ -441,7 +449,7 @@ pub mod computing_party {
 
         let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
 
-        let dataset_size_bit_length = ((instance_count as f64).log(E)/(2 as f64).log(E)).ceil() as u64;
+        let dataset_size_bit_length = ((instance_count as f64).log(E) / (2 as f64).log(E)).ceil() as u64;
 
         let dataset_size_prime = dataset_size_bit_length * dataset_size_bit_length as u64;
 
@@ -536,6 +544,7 @@ pub mod computing_party {
 
         ComputingParty {
             debug_output,
+            raw_tcp_communication,
             decimal_precision,
             party_id,
             ti_ip,
