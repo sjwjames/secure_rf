@@ -11,6 +11,8 @@ pub mod utils {
     use std::{thread, time};
     use std::time::Duration;
     use std::str::FromStr;
+    use std::net::TcpStream;
+    use std::io::Write;
 
 
     pub fn big_uint_subtract(x: &BigUint, y: &BigUint, big_int_prime: &BigUint) -> BigUint {
@@ -158,11 +160,11 @@ pub mod utils {
 //            arguments: FieldTable::default()
 //        }).unwrap();
 //        queue.bind(&exchange,routing_key,FieldTable::default());
-        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
+        let queue = channel.queue_declare(routing_key, QueueDeclareOptions {
             durable: false,
             exclusive: false,
             auto_delete: false,
-            arguments: Default::default()
+            arguments: Default::default(),
         }).unwrap();
 //        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
         let consumer = queue.consume(ConsumerOptions::default()).unwrap();
@@ -195,17 +197,18 @@ pub mod utils {
         let mut connection = Connection::insecure_open(address).unwrap();
         let channel = connection.open_channel(None).unwrap();
         let exchange = channel.exchange_declare(ExchangeType::Direct, "direct", ExchangeDeclareOptions::default()).unwrap();
-        let queue = channel.queue_declare(routing_key, QueueDeclareOptions{
+        let queue = channel.queue_declare(routing_key, QueueDeclareOptions {
             durable: false,
             exclusive: false,
             auto_delete: false,
-            arguments: Default::default()
+            arguments: Default::default(),
         }).unwrap();
 //        let queue = channel.queue_declare(routing_key,QueueDeclareOptions::default()).unwrap();
         queue.bind(&exchange, routing_key, FieldTable::default());
         exchange.publish(Publish::new(message.as_bytes(), routing_key)).unwrap();
         connection.close();
     }
+
 
     pub fn reveal_byte_result(x: u8, ctx: &mut ComputingParty) -> u8 {
         let message_id = "reveal".to_string();
@@ -224,8 +227,8 @@ pub mod utils {
         let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut message_rec: Vec<u8> = serde_json::from_str(&message_received[0]).unwrap();
         let mut result = Vec::new();
-        for i in 0..x.len(){
-            result.push(x[i]^message_rec[i]);
+        for i in 0..x.len() {
+            result.push(x[i] ^ message_rec[i]);
         }
         result
     }
@@ -237,7 +240,7 @@ pub mod utils {
         let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut message_rec: Vec<Wrapping<u64>> = serde_json::from_str(&message_received[0]).unwrap();
         let mut result = Vec::new();
-        for i in 0..x.len(){
+        for i in 0..x.len() {
             result.push((x[i].0 + message_rec[i].0).mod_floor(&ctx.dt_training.dataset_size_prime));
         }
         result
@@ -259,7 +262,7 @@ pub mod utils {
         let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut message_rec: Vec<BigUint> = deserialize_biguint_vec(&message_received[0].as_str());
         let mut result = Vec::new();
-        for i in 0..x.len(){
+        for i in 0..x.len() {
             result.push((&x[i]).add(&message_rec[i]).mod_floor(&ctx.dt_training.big_int_prime));
         }
         result

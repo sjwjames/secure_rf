@@ -331,13 +331,30 @@ pub mod multiplication {
 //        o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
 //        let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
 //        received_list = serde_json::from_str(&message_received.message_content).unwrap();
-        let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serde_json::to_string(&diff_list).unwrap();
-        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut diff_list_received: Vec<Vec<u8>> = Vec::new();
-        diff_list_received = serde_json::from_str(&message_received[0]).unwrap();
+        if ctx.raw_tcp_communication {
+            let mut o_stream = ctx.o_stream.try_clone()
+                .expect("failed cloning tcp o_stream");
+            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+            let mut reader = BufReader::new(in_stream);
+            let mut share_message = String::new();
+            if ctx.asymmetric_bit == 1 {
+                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                diff_list_received = serde_json::from_str(&share_message).unwrap();
+            } else {
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                diff_list_received = serde_json::from_str(&share_message).unwrap();
+                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+            }
+        } else {
+            let message_id = ctx.thread_hierarchy.join(":");
+            let message_content = serde_json::to_string(&diff_list).unwrap();
+            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+            diff_list_received = serde_json::from_str(&message_received[0]).unwrap();
 
+        }
         let mut d_list = vec![0u8; batch_size];
         let mut e_list = vec![0u8; batch_size];
 

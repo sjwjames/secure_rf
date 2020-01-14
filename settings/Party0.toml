@@ -6,7 +6,7 @@ party_id = 0
 #[option]
 
 debug_output = true
-raw_tcp_communication = false
+raw_tcp_communication = true
 
 #[network]
 

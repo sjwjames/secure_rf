@@ -6,7 +6,7 @@ party_id = 1
 #[option]
 
 debug_output = true
-raw_tcp_communication = false
+raw_tcp_communication = true
 
 #[network]
 
@@ -47,7 +47,7 @@ epsilon = 0.1
 #class_value_count = 2
 #attribute_count = 30
 #instance_count = 100
-#asymmetric_bit = 0
+#asymmetric_bit = 1
 #prime = 512
 #big_int_prime = "47890485652059026823698344598447161988085597568237568"
 #dataset_size_prime = 512

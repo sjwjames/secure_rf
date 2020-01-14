@@ -538,7 +538,6 @@ pub mod computing_party {
             bit_length,
             big_int_ti_index: 0,
         };
-        let mut in_stream_copied = in_stream.try_clone().unwrap();
         let local_mq_address = format!("amqp://guest:guest@{}:{}", local_mq_ip.clone(), local_mq_port);
         let remote_mq_address = format!("amqp://guest:guest@{}:{}", remote_mq_ip.clone(), remote_mq_port);
 
