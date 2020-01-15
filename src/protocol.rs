@@ -24,11 +24,12 @@ pub mod protocol {
         println!("arg_max starts");
         ctx.thread_hierarchy.push("arg_max".to_string());
         let number_count = bit_shares.len();
-
+        // denote result shares of pairwise comparisons
         let mut result = vec![0u8;number_count];
         if number_count == 1 {
             result[0]=1;
         } else {
+            // all the comparisons should happen in the same size of bit length
             let mut bit_length = 0;
             for item in bit_shares.iter() {
                 bit_length = max(bit_length, item.len());

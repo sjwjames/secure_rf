@@ -383,10 +383,10 @@ pub mod multiplication {
         let mut output = Vec::new();
 
         let mut ti_shares = Vec::new();
-        let ctx_copied = ctx.clone();
+        let mut ctx_copied = ctx.clone();
         for i in 0..batch_size {
             let mut new_row = Vec::new();
-            let ti_share_triple = get_current_additive_share(&ctx_copied);
+            let ti_share_triple = get_current_additive_share(&mut ctx_copied);
             ti_shares.push(ti_share_triple.clone());
             new_row.push(mod_floor((x_list[i] - ti_share_triple.0).0, ctx.dt_training.dataset_size_prime));
             new_row.push(mod_floor((y_list[i] - ti_share_triple.1).0, ctx.dt_training.dataset_size_prime));
@@ -418,13 +418,31 @@ pub mod multiplication {
 //        o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
 //        let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
 //        received_list = serde_json::from_str(&message_received.message_content).unwrap();
-
-        let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serde_json::to_string(&diff_list).unwrap();
-        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
-        received_list = serde_json::from_str(&message_received[0]).unwrap();
+        if ctx.raw_tcp_communication{
+            let mut o_stream = ctx.o_stream.try_clone()
+                .expect("failed cloning tcp o_stream");
+            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+            let mut reader = BufReader::new(in_stream);
+            let mut share_message = String::new();
+            if ctx.asymmetric_bit == 1 {
+                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                received_list = serde_json::from_str(&share_message).unwrap();
+            } else {
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                received_list = serde_json::from_str(&share_message).unwrap();
+                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+            }
+        }else{
+            let message_id = ctx.thread_hierarchy.join(":");
+            let message_content = serde_json::to_string(&diff_list).unwrap();
+            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+            received_list = serde_json::from_str(&message_received[0]).unwrap();
+        }
+
+
 
         let mut d_list = vec![Wrapping(0u64); batch_size];
         let mut e_list = vec![Wrapping(0u64); batch_size];

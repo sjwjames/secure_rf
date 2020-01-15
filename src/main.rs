@@ -122,14 +122,18 @@ fn test_protocols() {
                 party_context.dt_shares = dt_shares;
 //                test_multi_byte(&mut party_context);
 //                test_batch_multiplication_byte(&mut party_context);
+//                party_context.raw_tcp_communication = true;
 //                test_batch_multiplication_integer(&mut party_context);
+                party_context.raw_tcp_communication = false;
+                test_batch_multiplication_integer(&mut party_context);
+
 //                test_multiplication_bigint(&mut party_context);
 //                test_multi_thread_batch_mul_byte(&mut party_context);
 //                test_parallel_multiplication(&mut party_context);
 //                test_batch_multiply_bigint(&mut party_context);
 //                test_parallel_multiplication_big_integer(&mut party_context);
 //                test_equality_big_integer(&mut party_context);
-                test_comparison(&mut party_context);
+//                test_comparison(&mut party_context);
 //                test_bit_decomposition(&mut party_context);
 //                test_bit_decomposition_bigint(&mut party_context);
 //                test_comparison_bigint(&mut party_context);
@@ -150,7 +154,6 @@ fn main() {
 //    test_mq();
 //    run();
     test_protocols();
-
 }
 
 

@@ -302,6 +302,10 @@ pub mod ti {
                     current_additive_bigint_index: Arc::new(Mutex::new(0)),
                     current_equality_index: Arc::new(Mutex::new(0)),
                     current_binary_index: Arc::new(Mutex::new(0)),
+                    sequential_additive_index: 0,
+                    sequential_additive_bigint_index: 0,
+                    sequential_equality_index: 0,
+                    sequential_binary_index: 0
                 };
 
                 let mut share1 = DecisionTreeShares {
@@ -313,6 +317,10 @@ pub mod ti {
                     current_additive_bigint_index: Arc::new(Mutex::new(0)),
                     current_equality_index: Arc::new(Mutex::new(0)),
                     current_binary_index: Arc::new(Mutex::new(0)),
+                    sequential_additive_index: 0,
+                    sequential_additive_bigint_index: 0,
+                    sequential_equality_index: 0,
+                    sequential_binary_index: 0
                 };
                 let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
                 let sender_thread0 = thread::spawn(move || {

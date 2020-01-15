@@ -14,6 +14,7 @@ pub mod protocol_test {
     use crate::dot_product::dot_product::dot_product_bigint;
     use crate::or_xor::or_xor::or_xor;
     use crate::field_change::field_change::change_binary_to_decimal_field;
+    use std::time::SystemTime;
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -78,26 +79,33 @@ pub mod protocol_test {
         let mut y_vec_pub: Vec<Wrapping<u64>> = Vec::new();
         let mut result_pub: Vec<Wrapping<u64>> = Vec::new();
 
-        for i in 0..10 {
-            x_vec_pub.push(Wrapping(i));
-            y_vec_pub.push(Wrapping(i));
-            if ctx.party_id == 0 {
-                x_vec.push(Wrapping(1));
-                y_vec.push(Wrapping(1));
-            } else {
-                x_vec.push(Wrapping((Wrapping(i) - Wrapping(1)).0.mod_floor(&ctx.dt_training.dataset_size_prime)));
-                y_vec.push(Wrapping((Wrapping(i) - Wrapping(1)).0.mod_floor(&ctx.dt_training.dataset_size_prime)));
+        for i in 0..100000 {
+            for j in 0..10 {
+                x_vec_pub.push(Wrapping(j));
+                y_vec_pub.push(Wrapping(j));
+                if ctx.party_id == 0 {
+                    x_vec.push(Wrapping(1));
+                    y_vec.push(Wrapping(1));
+                } else {
+                    x_vec.push(Wrapping((Wrapping(j) - Wrapping(1)).0.mod_floor(&ctx.dt_training.dataset_size_prime)));
+                    y_vec.push(Wrapping((Wrapping(j) - Wrapping(1)).0.mod_floor(&ctx.dt_training.dataset_size_prime)));
+                }
+
+                result_pub.push(Wrapping((j * j).mod_floor(&ctx.dt_training.dataset_size_prime)));
             }
-
-            result_pub.push(Wrapping((i * i).mod_floor(&ctx.dt_training.dataset_size_prime)));
         }
-        println!("result_pub {:?}", &result_pub);
-        let result = batch_multiplication_integer(&x_vec, &y_vec, ctx);
-        println!("result computed {:?}", &result);
+//        println!("result_pub {:?}", &result_pub);
+        let mut time = 0;
+        for i in 0..5 {
+            let mut now = SystemTime::now();
+            let result = batch_multiplication_integer(&x_vec, &y_vec, ctx);
+            time += now.elapsed().unwrap().as_millis();
+//            let result_revealed = reveal_int_vec_result(&result, ctx);
+//            assert!(result_pub.iter().zip(result_revealed.iter()).all(|(a, b)| a.0 == *b), "Arrays are not equal");
+        }
 
-        let result_revealed = reveal_int_vec_result(&result, ctx);
-        println!("result_revealed {:?}", &result_revealed);
-        assert!(result_pub.iter().zip(result_revealed.iter()).all(|(a, b)| a.0 == *b), "Arrays are not equal");
+        println!("batch_multiplication completed in {}ms", (time as f64/5.0));
+
     }
 
     pub fn test_multiplication_bigint(ctx: &mut ComputingParty) {
@@ -364,29 +372,29 @@ pub mod protocol_test {
         }
     }
 
-    pub fn test_change_binary_to_decimal_field(ctx: &mut ComputingParty){
+    pub fn test_change_binary_to_decimal_field(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
-            let input = vec![1,0,0,1];
-            let result = change_binary_to_decimal_field(&input,ctx);
-            println!("{:?}",result);
+            let input = vec![1, 0, 0, 1];
+            let result = change_binary_to_decimal_field(&input, ctx);
+            println!("{:?}", result);
         } else {
-            let input = vec![0,1,1,1];
-            let result = change_binary_to_decimal_field(&input,ctx);
-            println!("{:?}",result);
+            let input = vec![0, 1, 1, 1];
+            let result = change_binary_to_decimal_field(&input, ctx);
+            println!("{:?}", result);
         }
     }
 
-    pub fn test_argmax(ctx: &mut ComputingParty){
+    pub fn test_argmax(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
-            let input = vec![vec![0,0,0,0],vec![1,0,0,0],vec![1,0,1,0],vec![0,0,0,1]];
-            let result = arg_max(&input,ctx);
-            let result_revealed = reveal_byte_vec_result(&result,ctx);
-            println!("{:?}",result_revealed);
+            let input = vec![vec![0, 0, 0, 0], vec![1, 0, 0, 0], vec![1, 0, 1, 0], vec![0, 0, 0, 1]];
+            let result = arg_max(&input, ctx);
+            let result_revealed = reveal_byte_vec_result(&result, ctx);
+            println!("{:?}", result_revealed);
         } else {
-            let input = vec![vec![0,0,0,0],vec![0,0,0,0],vec![0,0,0,0],vec![0,0,0,0]];
-            let result = arg_max(&input,ctx);
-            let result_revealed = reveal_byte_vec_result(&result,ctx);
-            println!("{:?}",result_revealed);
+            let input = vec![vec![0, 0, 0, 0], vec![0, 0, 0, 0], vec![0, 0, 0, 0], vec![0, 0, 0, 0]];
+            let result = arg_max(&input, ctx);
+            let result_revealed = reveal_byte_vec_result(&result, ctx);
+            println!("{:?}", result_revealed);
         }
     }
 }

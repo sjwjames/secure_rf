@@ -61,6 +61,10 @@ pub mod decision_tree {
         pub current_additive_bigint_index: Arc<Mutex<usize>>,
         pub current_equality_index: Arc<Mutex<usize>>,
         pub current_binary_index: Arc<Mutex<usize>>,
+        pub sequential_additive_index:usize,
+        pub sequential_additive_bigint_index:usize,
+        pub sequential_equality_index:usize,
+        pub sequential_binary_index:usize
     }
 
 
@@ -154,6 +158,10 @@ pub mod decision_tree {
                 current_additive_bigint_index: Arc::clone(&self.current_additive_bigint_index),
                 current_equality_index: Arc::clone(&self.current_equality_index),
                 current_binary_index: Arc::clone(&self.current_binary_index),
+                sequential_additive_index: self.sequential_additive_index,
+                sequential_additive_bigint_index: self.sequential_additive_bigint_index,
+                sequential_equality_index: self.sequential_equality_index,
+                sequential_binary_index: self.sequential_binary_index
             }
         }
     }

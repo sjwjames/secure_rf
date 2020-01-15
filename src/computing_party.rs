@@ -579,6 +579,10 @@ pub mod computing_party {
                 current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
                 current_equality_index: Arc::new(Mutex::new(0 as usize)),
                 current_binary_index: Arc::new(Mutex::new(0 as usize)),
+                sequential_additive_index: 0,
+                sequential_additive_bigint_index: 0,
+                sequential_equality_index: 0,
+                sequential_binary_index: 0
             },
             dt_results: DecisionTreeResult {
                 result_list: vec![]
@@ -721,6 +725,10 @@ pub mod computing_party {
             current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
             current_equality_index: Arc::new(Mutex::new(0 as usize)),
             current_binary_index: Arc::new(Mutex::new(0 as usize)),
+            sequential_additive_index: 0,
+            sequential_additive_bigint_index: 0,
+            sequential_equality_index: 0,
+            sequential_binary_index: 0
         }
 //
 //

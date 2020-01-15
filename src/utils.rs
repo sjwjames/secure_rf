@@ -132,12 +132,18 @@ pub mod utils {
         result
     }
 
-    pub fn get_current_additive_share(ctx: &ComputingParty) -> &(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) {
+    pub fn get_current_additive_share(ctx: &mut ComputingParty) -> &(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) {
         let shares = &ctx.dt_shares.additive_triples;
-        let current_index = *(ctx.dt_shares.current_additive_index.lock().unwrap());
-        let result = &shares[current_index];
-        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_index));
-        result
+        if ctx.raw_tcp_communication{
+            let current_index = ctx.dt_shares.sequential_additive_index;
+            ctx.dt_shares.sequential_additive_index+=1;
+            return &shares[current_index];
+        }else{
+            let current_index = *(ctx.dt_shares.current_additive_index.lock().unwrap());
+            let result = &shares[current_index];
+            increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_index));
+            return result;
+        }
     }
 
     pub fn get_current_binary_share(ctx: &ComputingParty) -> &(u8, u8, u8) {
@@ -174,8 +180,8 @@ pub mod utils {
             match message {
                 ConsumerMessage::Delivery(delivery) => {
                     let body = String::from_utf8_lossy(&delivery.body).to_string();
-                    print!("queue:{} ", routing_key);
-                    println!("({:>3}) Received [{}]", i, body);
+//                    print!("queue:{} ", routing_key);
+//                    println!("({:>3}) Received [{}]", i, body);
                     result.push(body.clone());
                     consumer.ack(delivery).unwrap();
                 }
