@@ -98,39 +98,52 @@ pub mod bit_decomposition {
 
         //Initialize c[1]
         let first_c_share = multiplication_byte(input_shares[0][0], input_shares[1][0], ctx);
-        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
         c_shares[0] = mod_floor(first_c_share, BINARY_PRIME as u8);
 
         //computeDShares in Java Lynx
-        let thread_pool = ThreadPool::new(ctx.thread_count);
         let mut i = 0;
-        let mut output_map = Arc::new(Mutex::new(HashMap::new()));
-        let mut batch_count = 0;
-        ctx.thread_hierarchy.push("compute_d_shares".to_string());
-        while i < bit_length {
-            let mut output_map = Arc::clone(&output_map);
-            let to_index = min(i + ctx.batch_size, bit_length);
-            let mut ctx_copied = ctx.clone();
-            ctx_copied.thread_hierarchy.push(format!("{}", batch_count));
-            let mut input_shares = input_shares.clone();
-            thread_pool.execute(move || {
-                let mut batch_mul_result = batch_multiplication_byte(&input_shares[0][i..to_index].to_vec(), &input_shares[1][i..to_index].to_vec(), &mut ctx_copied);
-                let mut output_map = output_map.lock().unwrap();
-                (*output_map).insert(batch_count, batch_mul_result);
-            });
-            i = to_index;
-            batch_count += 1;
-        }
-        thread_pool.join();
-        ctx.thread_hierarchy.pop();
 
-        let output_map = &(*(output_map.lock().unwrap()));
-        let mut global_index = 0;
-        for i in 0..batch_count {
-            let batch_result = output_map.get(&i).unwrap();
-            for item in batch_result.iter() {
-                d_shares[global_index] = mod_floor(item + ctx.asymmetric_bit, BINARY_PRIME as u8);
-                global_index += 1;
+        if ctx.raw_tcp_communication{
+            let mut global_index = 0;
+            while i < bit_length {
+                let to_index = min(i + ctx.batch_size, bit_length);
+                let mut batch_mul_result = batch_multiplication_byte(&input_shares[0][i..to_index].to_vec(), &input_shares[1][i..to_index].to_vec(), ctx);
+                for item in batch_mul_result.iter() {
+                    d_shares[global_index] = mod_floor(item + ctx.asymmetric_bit, BINARY_PRIME as u8);
+                    global_index += 1;
+                }
+                i = to_index;
+            }
+        }else{
+            let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+            let mut batch_count = 0;
+            let thread_pool = ThreadPool::new(ctx.thread_count);
+            ctx.thread_hierarchy.push("compute_d_shares".to_string());
+            while i < bit_length {
+                let to_index = min(i + ctx.batch_size, bit_length);
+                let mut output_map = Arc::clone(&output_map);
+                let mut ctx_copied = ctx.clone();
+                ctx_copied.thread_hierarchy.push(format!("{}", batch_count));
+                let mut input_shares = input_shares.clone();
+                thread_pool.execute(move || {
+                    let mut batch_mul_result = batch_multiplication_byte(&input_shares[0][i..to_index].to_vec(), &input_shares[1][i..to_index].to_vec(), &mut ctx_copied);
+                    let mut output_map = output_map.lock().unwrap();
+                    (*output_map).insert(batch_count, batch_mul_result);
+                });
+                i = to_index;
+                batch_count += 1;
+            }
+            thread_pool.join();
+            ctx.thread_hierarchy.pop();
+
+            let output_map = &(*(output_map.lock().unwrap()));
+            let mut global_index = 0;
+            for i in 0..batch_count {
+                let batch_result = output_map.get(&i).unwrap();
+                for item in batch_result.iter() {
+                    d_shares[global_index] = mod_floor(item + ctx.asymmetric_bit, BINARY_PRIME as u8);
+                    global_index += 1;
+                }
             }
         }
         let mut e_shares = vec![0u8; bit_length];
