@@ -394,6 +394,61 @@ pub mod multiplication {
         output
     }
 
+
+
+    pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
+        ctx.thread_hierarchy.push("multiplication_bigint".to_string());
+        let share = get_current_bigint_share(ctx);
+        let mut diff_list = Vec::new();
+        diff_list.push(big_uint_subtract(x, &share.0, &ctx.dt_training.big_int_prime));
+        diff_list.push(big_uint_subtract(y, &share.1, &ctx.dt_training.big_int_prime));
+
+        let mut diff_received = Vec::new();
+        if ctx.raw_tcp_communication{
+            let mut o_stream = ctx.o_stream.try_clone()
+                .expect("failed cloning tcp o_stream");
+            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+            let mut reader = BufReader::new(in_stream);
+            let mut share_message = String::new();
+            if ctx.asymmetric_bit == 1 {
+                o_stream.write((serialize_biguint_vec(&diff_list)+ "\n").as_bytes());
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                diff_received = deserialize_biguint_vec(&share_message.as_str());
+            } else {
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                diff_received = deserialize_biguint_vec(&share_message.as_str());
+                o_stream.write((serialize_biguint_vec(&diff_list)+ "\n").as_bytes());
+            }
+        }else{
+            let mut diff_list_message = String::new();
+            let message_id = ctx.thread_hierarchy.join(":");
+            let message_content = serialize_biguint_vec(&diff_list);
+            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+            diff_list_message = message_received[0].clone();
+            diff_received = deserialize_biguint_vec(&diff_list_message.as_str());
+        }
+
+
+        let mut d = BigUint::zero();
+        let mut e = BigUint::zero();
+        let prime = big_uint_clone(&ctx.dt_training.big_int_prime);
+        d = d.add(&diff_received[0]).mod_floor(&prime);
+        e = e.add(&diff_received[1]).mod_floor(&prime);
+        d = big_uint_subtract(x, &share.0, &prime).add(&d).mod_floor(&prime);
+        e = big_uint_subtract(y, &share.1, &prime).add(&e).mod_floor(&prime);
+
+        let u = &share.0;
+        let v = &share.1;
+        let w = &share.2;
+
+        let mut product = w.add((&d).mul(v).mod_floor(&prime)).mod_floor(&prime);
+        product = product.add((&e).mul(u).mod_floor(&prime)).mod_floor(&prime);
+        product = product.add((&d).mul(&e).mod_floor(&prime).mul(BigUint::from_u8(ctx.asymmetric_bit).unwrap()).mod_floor(&prime)).mod_floor(&prime);
+        ctx.thread_hierarchy.pop();
+        product
+    }
+
     pub fn parallel_multiplication(row: &Vec<u8>, ctx: &mut ComputingParty) -> u8 {
         ctx.thread_hierarchy.push("parallel_multiplication".to_string());
         let mut products = row.clone();
@@ -461,59 +516,6 @@ pub mod multiplication {
         products[0]
     }
 
-    pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
-        ctx.thread_hierarchy.push("multiplication_bigint".to_string());
-        let share = get_current_bigint_share(ctx);
-        let mut diff_list = Vec::new();
-        diff_list.push(big_uint_subtract(x, &share.0, &ctx.dt_training.big_int_prime));
-        diff_list.push(big_uint_subtract(y, &share.1, &ctx.dt_training.big_int_prime));
-
-        let mut diff_received = Vec::new();
-        if ctx.raw_tcp_communication{
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write((serialize_biguint_vec(&diff_list)+ "\n").as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_received = deserialize_biguint_vec(&share_message.as_str());
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_received = deserialize_biguint_vec(&share_message.as_str());
-                o_stream.write((serialize_biguint_vec(&diff_list)+ "\n").as_bytes());
-            }
-        }else{
-            let mut diff_list_message = String::new();
-            let message_id = ctx.thread_hierarchy.join(":");
-            let message_content = serialize_biguint_vec(&diff_list);
-            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
-            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
-            diff_list_message = message_received[0].clone();
-            diff_received = deserialize_biguint_vec(&diff_list_message.as_str());
-        }
-
-
-        let mut d = BigUint::zero();
-        let mut e = BigUint::zero();
-        let prime = big_uint_clone(&ctx.dt_training.big_int_prime);
-        d = d.add(&diff_received[0]).mod_floor(&prime);
-        e = e.add(&diff_received[1]).mod_floor(&prime);
-        d = big_uint_subtract(x, &share.0, &prime).add(&d).mod_floor(&prime);
-        e = big_uint_subtract(y, &share.1, &prime).add(&e).mod_floor(&prime);
-
-        let u = &share.0;
-        let v = &share.1;
-        let w = &share.2;
-
-        let mut product = w.add((&d).mul(v).mod_floor(&prime)).mod_floor(&prime);
-        product = product.add((&e).mul(u).mod_floor(&prime)).mod_floor(&prime);
-        product = product.add((&d).mul(&e).mod_floor(&prime).mul(BigUint::from_u8(ctx.asymmetric_bit).unwrap()).mod_floor(&prime)).mod_floor(&prime);
-        ctx.thread_hierarchy.pop();
-        product
-    }
-
     pub fn parallel_multiplication_big_integer(row: &Vec<BigUint>, ctx: &mut ComputingParty) -> BigUint {
         ctx.thread_hierarchy.push("parallel_multiplication_bigint".to_string());
         let mut products = big_uint_vec_clone(row);
@@ -530,33 +532,48 @@ pub mod multiplication {
             }
             let mut i1 = 0;
             let mut i2 = to_index1;
-            let mut output_map = Arc::new(Mutex::new(HashMap::new()));
-            let mut batch_count = 0;
-            while i1 < to_index1 && i2 < to_index2 {
-                let temp_index1 = min(i1 + ctx.batch_size, to_index1);
-                let temp_index2 = min(i2 + ctx.batch_size, to_index2);
-                let mut output_map = Arc::clone(&output_map);
-                let mut ctx_copied = ctx.clone();
-                let mut products_slice = big_uint_vec_clone(&products[i1..temp_index1].to_vec());
-                let mut products_slice2 = big_uint_vec_clone(&products[i2..temp_index2].to_vec());
-                ctx_copied.thread_hierarchy.push(format!("{}", count));
-                thread_pool.execute(move || {
-                    let multi_result = batch_multiply_bigint(&products_slice, &products_slice2, &mut ctx_copied);
-                    let mut output_map = output_map.lock().unwrap();
-                    (*output_map).insert(batch_count, multi_result);
-                });
-                i1 = temp_index1;
-                i2 = temp_index2;
-                batch_count += 1;
-                count += 1;
-            }
-            thread_pool.join();
             let mut new_products = Vec::new();
-            let mut output_map = output_map.lock().unwrap();
-            for i in 0..batch_count {
-                let mut multi_result = (*output_map.get(&i).unwrap()).clone();
-                new_products.append(&mut multi_result);
+
+            if ctx.raw_tcp_communication{
+                while i1 < to_index1 && i2 < to_index2 {
+                    let temp_index1 = min(i1 + ctx.batch_size, to_index1);
+                    let temp_index2 = min(i2 + ctx.batch_size, to_index2);
+                    let mut batch_mul_result = batch_multiply_bigint(&products[i1..temp_index1].to_vec(), &products[i2..temp_index2].to_vec(), ctx);
+                    new_products.append(&mut batch_mul_result);
+                    i1 = temp_index1;
+                    i2 = temp_index2;
+                }
+            }else{
+                let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+                let mut batch_count = 0;
+                while i1 < to_index1 && i2 < to_index2 {
+                    let temp_index1 = min(i1 + ctx.batch_size, to_index1);
+                    let temp_index2 = min(i2 + ctx.batch_size, to_index2);
+                    let mut output_map = Arc::clone(&output_map);
+                    let mut ctx_copied = ctx.clone();
+                    let mut products_slice = big_uint_vec_clone(&products[i1..temp_index1].to_vec());
+                    let mut products_slice2 = big_uint_vec_clone(&products[i2..temp_index2].to_vec());
+                    ctx_copied.thread_hierarchy.push(format!("{}", count));
+                    thread_pool.execute(move || {
+                        let multi_result = batch_multiply_bigint(&products_slice, &products_slice2, &mut ctx_copied);
+                        let mut output_map = output_map.lock().unwrap();
+                        (*output_map).insert(batch_count, multi_result);
+                    });
+                    i1 = temp_index1;
+                    i2 = temp_index2;
+                    batch_count += 1;
+                    count += 1;
+                }
+                thread_pool.join();
+                let mut output_map = output_map.lock().unwrap();
+                for i in 0..batch_count {
+                    let mut multi_result = (*output_map.get(&i).unwrap()).clone();
+                    new_products.append(&mut multi_result);
+                }
             }
+
+
+
             products.clear();
             products = big_uint_vec_clone(&new_products);
             if !push.eq(&BigInt::from_i32(-1).unwrap()) {
