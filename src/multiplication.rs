@@ -430,32 +430,47 @@ pub mod multiplication {
             }
             let mut i1 = 0;
             let mut i2 = to_index1;
-            let mut batch_count = 0;
-            let mut output_map = Arc::new(Mutex::new(HashMap::new()));
-
-            while i1 < to_index1 && i2 < to_index2 {
-                let temp_index1 = min(i1 + ctx.batch_size, to_index1);
-                let temp_index2 = min(i2 + ctx.batch_size, to_index2);
-                let mut products_copied = products.clone();
-                let mut output_map = Arc::clone(&output_map);
-                let mut ctx_copied = ctx.clone();
-                ctx_copied.thread_hierarchy.push(format!("{}", batch_count));
-                thread_pool.execute(move || {
-                    let mut batch_mul_result = batch_multiplication_byte(&products_copied[i1..temp_index1].to_vec(), &products_copied[i2..temp_index2].to_vec(), &mut ctx_copied);
-                    let mut output_map = output_map.lock().unwrap();
-                    (*output_map).insert(batch_count, batch_mul_result);
-                });
-                batch_count += 1;
-                i1 = temp_index1;
-                i2 = temp_index2;
-            }
-            thread_pool.join();
             let mut new_products = Vec::new();
-            let mut output_map = &*(output_map.lock().unwrap());
-            for i in 0..batch_count {
-                let mut multi_result = (output_map.get(&i).unwrap()).clone();
-                new_products.append(&mut multi_result);
+
+            if ctx.raw_tcp_communication{
+                while i1 < to_index1 && i2 < to_index2 {
+                    let temp_index1 = min(i1 + ctx.batch_size, to_index1);
+                    let temp_index2 = min(i2 + ctx.batch_size, to_index2);
+                    let mut batch_mul_result = batch_multiplication_byte(&products[i1..temp_index1].to_vec(), &products[i2..temp_index2].to_vec(), ctx);
+                    new_products.append(&mut batch_mul_result);
+                    i1 = temp_index1;
+                    i2 = temp_index2;
+                }
+
+            }else{
+                let mut batch_count = 0;
+                let mut output_map = Arc::new(Mutex::new(HashMap::new()));
+                while i1 < to_index1 && i2 < to_index2 {
+                    let temp_index1 = min(i1 + ctx.batch_size, to_index1);
+                    let temp_index2 = min(i2 + ctx.batch_size, to_index2);
+                    let mut products_copied = products.clone();
+                    let mut output_map = Arc::clone(&output_map);
+                    let mut ctx_copied = ctx.clone();
+                    ctx_copied.thread_hierarchy.push(format!("{}", batch_count));
+                    thread_pool.execute(move || {
+                        let mut batch_mul_result = batch_multiplication_byte(&products_copied[i1..temp_index1].to_vec(), &products_copied[i2..temp_index2].to_vec(), &mut ctx_copied);
+                        let mut output_map = output_map.lock().unwrap();
+                        (*output_map).insert(batch_count, batch_mul_result);
+                    });
+                    batch_count += 1;
+                    i1 = temp_index1;
+                    i2 = temp_index2;
+                }
+                thread_pool.join();
+                let mut output_map = &*(output_map.lock().unwrap());
+                for i in 0..batch_count {
+                    let mut multi_result = (output_map.get(&i).unwrap()).clone();
+                    new_products.append(&mut multi_result);
+                }
             }
+
+
+
             products.clear();
             products = new_products.clone();
             if push != -1 {
