@@ -92,32 +92,45 @@ pub mod dot_product {
         let vector_length = x_list.len();
         let thread_pool = ThreadPool::new(ctx.thread_count);
         let mut i = 0;
-        let output_map = Arc::new(Mutex::new(HashMap::new()));
-        let mut batch_count = 0;
-        while i < vector_length {
-            let to_index = min(i + ctx.batch_size, vector_length);
-            let mut output_map = Arc::clone(&output_map);
-            let mut ctx_copied = ctx.clone();
-            ctx_copied.thread_hierarchy.push(format!("batch:{}",batch_count));
-            let mut x_list_copied = big_uint_vec_clone(&x_list[i..to_index].to_vec());
-            let mut y_list_copied = big_uint_vec_clone(&y_list[i..to_index].to_vec());
-            thread_pool.execute(move || {
-                let multi_result = batch_multiply_bigint(&x_list_copied, &y_list_copied, &mut ctx_copied);
-                let mut output_map = output_map.lock().unwrap();
-                (*output_map).insert(batch_count, multi_result);
-            });
-            batch_count += 1;
-            i = to_index;
-        }
-        thread_pool.join();
 
-        let output_map = &*(output_map.lock().unwrap());
-        for i in 0..batch_count {
-            let multi_result = output_map.get(&i).unwrap();
-            for item in multi_result {
-                dot_product = dot_product.add(item).mod_floor(&ctx.dt_training.big_int_prime);
+        if ctx.raw_tcp_communication{
+            while i < vector_length {
+                let to_index = min(i + ctx.batch_size, vector_length);
+                let multi_result = batch_multiply_bigint(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), ctx);
+                for item in multi_result {
+                    dot_product = dot_product.add(item).mod_floor(&ctx.dt_training.big_int_prime);
+                }
+                i = to_index;
+            }
+        }else {
+            let output_map = Arc::new(Mutex::new(HashMap::new()));
+            let mut batch_count = 0;
+            while i < vector_length {
+                let to_index = min(i + ctx.batch_size, vector_length);
+                let mut output_map = Arc::clone(&output_map);
+                let mut ctx_copied = ctx.clone();
+                ctx_copied.thread_hierarchy.push(format!("batch:{}",batch_count));
+                let mut x_list_copied = big_uint_vec_clone(&x_list[i..to_index].to_vec());
+                let mut y_list_copied = big_uint_vec_clone(&y_list[i..to_index].to_vec());
+                thread_pool.execute(move || {
+                    let multi_result = batch_multiply_bigint(&x_list_copied, &y_list_copied, &mut ctx_copied);
+                    let mut output_map = output_map.lock().unwrap();
+                    (*output_map).insert(batch_count, multi_result);
+                });
+                batch_count += 1;
+                i = to_index;
+            }
+            thread_pool.join();
+
+            let output_map = &*(output_map.lock().unwrap());
+            for i in 0..batch_count {
+                let multi_result = output_map.get(&i).unwrap();
+                for item in multi_result {
+                    dot_product = dot_product.add(item).mod_floor(&ctx.dt_training.big_int_prime);
+                }
             }
         }
+
         ctx.thread_hierarchy.pop();
         dot_product
     }

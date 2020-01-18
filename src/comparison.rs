@@ -222,35 +222,42 @@ pub mod comparison {
         let thread_pool = ThreadPool::new(2);
 
         let bit_length = ctx.dt_training.bit_length;
+        let mut x_shares = Vec::new();
+        let mut y_shares = Vec::new();
+        if ctx.raw_tcp_communication{
+            x_shares = bit_decomposition_bigint(x,ctx);
+            y_shares = bit_decomposition_bigint(y,ctx);
+        }else{
+            let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
+            let mut bd_result_map_cp = Arc::clone(&bd_result_map);
+            let mut ctx_cp = ctx.clone();
+            let x_cp = big_uint_clone(x);
+            ctx_cp.thread_hierarchy.push("decompose_x".to_string());
+            thread_pool.execute(move || {
+                let x_bits = bit_decomposition_bigint(&x_cp, &mut ctx_cp);
+                let mut bd_result_map_cp = bd_result_map_cp.lock().unwrap();
+                (*bd_result_map_cp).insert(0, x_bits);
+            });
 
-        let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
-        let mut bd_result_map_cp = Arc::clone(&bd_result_map);
-        let mut ctx_cp = ctx.clone();
-        let x_cp = big_uint_clone(x);
-        ctx_cp.thread_hierarchy.push("decompose_x".to_string());
-        thread_pool.execute(move || {
-            let x_bits = bit_decomposition_bigint(&x_cp, &mut ctx_cp);
-            let mut bd_result_map_cp = bd_result_map_cp.lock().unwrap();
-            (*bd_result_map_cp).insert(0, x_bits);
-        });
+            let mut ctx_cp = ctx.clone();
+            let mut bd_result_map_cp = Arc::clone(&bd_result_map);
+            let y_cp = big_uint_clone(y);
+            ctx_cp.thread_hierarchy.push("decompose_y".to_string());
+            thread_pool.execute(move || {
+                let y_bits = bit_decomposition_bigint(&y_cp, &mut ctx_cp);
+                let mut bd_result_map_cp = bd_result_map_cp.lock().unwrap();
+                (*bd_result_map_cp).insert(1, y_bits);
+            });
 
-        let mut ctx_cp = ctx.clone();
-        let mut bd_result_map_cp = Arc::clone(&bd_result_map);
-        let y_cp = big_uint_clone(y);
-        ctx_cp.thread_hierarchy.push("decompose_y".to_string());
-        thread_pool.execute(move || {
-            let y_bits = bit_decomposition_bigint(&y_cp, &mut ctx_cp);
-            let mut bd_result_map_cp = bd_result_map_cp.lock().unwrap();
-            (*bd_result_map_cp).insert(1, y_bits);
-        });
+            thread_pool.join();
 
-        thread_pool.join();
+            let bd_result_map = bd_result_map.lock().unwrap();
+            x_shares = (*bd_result_map).get(&0).unwrap().clone();
+            y_shares = (*bd_result_map).get(&1).unwrap().clone();
+        }
 
-        let bd_result_map = bd_result_map.lock().unwrap();
-        let x_shares = (*bd_result_map).get(&0).unwrap();
-        let y_shares = (*bd_result_map).get(&1).unwrap();
 
-        let result = comparison(x_shares, y_shares, ctx);
+        let result = comparison(&x_shares, &y_shares, ctx);
         ctx.thread_hierarchy.pop();
         BigUint::from(result)
     }
