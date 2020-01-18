@@ -146,12 +146,26 @@ pub mod utils {
         }
     }
 
-    pub fn get_current_binary_share(ctx: &ComputingParty) -> &(u8, u8, u8) {
+    pub fn get_current_binary_share(ctx: &mut ComputingParty) -> (u8, u8, u8) {
         let shares = &ctx.dt_shares.binary_triples;
-        let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
-        let result = &shares[current_index];
-        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
-        result
+        if ctx.raw_tcp_communication{
+            let current_index = ctx.dt_shares.sequential_binary_index;
+            ctx.dt_shares.sequential_binary_index+=1;
+            return shares[current_index];
+        }else{
+            let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
+            let result = shares[current_index];
+            increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
+            return result;
+        }
+    }
+
+    pub fn get_binary_shares(ctx: &mut ComputingParty,range:usize)->Vec<(u8, u8, u8)>{
+        let current_index = ctx.dt_shares.sequential_binary_index;
+        let shares = ctx.dt_shares.binary_triples[current_index..current_index+range].to_vec();
+
+        ctx.dt_shares.sequential_binary_index+=range;
+        return shares;
     }
 
     pub fn receive_message_from_queue(address: &String, routing_key: &String, message_count: usize) -> Vec<String> {

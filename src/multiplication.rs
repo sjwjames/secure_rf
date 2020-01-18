@@ -249,36 +249,34 @@ pub mod multiplication {
     pub fn multiplication_byte(x: u8, y: u8, ctx: &mut ComputingParty) -> u8 {
         ctx.thread_hierarchy.push("multiplication_byte".to_string());
         let mut diff_list = Vec::new();
-        let mut ctx_copied = ctx.clone();
-        let ti_share_triple = get_current_binary_share(&ctx_copied);
+        let ti_share_triple = get_current_binary_share(ctx).clone();
         diff_list.push(mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0)).0, BINARY_PRIME as u8));
         diff_list.push(mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1)).0, BINARY_PRIME as u8));
 
-//        let mut o_stream = ctx.o_stream.try_clone()
-//            .expect("failed cloning tcp o_stream");
-//        let mut message = RFMessage {
-//            message_id: ctx.thread_hierarchy.join(":"),
-//            message_content: serde_json::to_string(&diff_list).unwrap(),
-//        };
-//        if ctx.asymmetric_bit == 1 {
-//            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-//            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//            received_list = serde_json::from_str(&received_message.message_content).unwrap();
-//        } else {
-//            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//            received_list = serde_json::from_str(&received_message.message_content).unwrap();
-//            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-//        }
-//        o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-//        let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//        received_list = serde_json::from_str(&received_message.message_content).unwrap();
-
-        let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serde_json::to_string(&diff_list).unwrap();
-        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut received_list: Vec<u8> = Vec::new();
-        received_list = serde_json::from_str(&message_received[0]).unwrap();
+        if ctx.raw_tcp_communication {
+            let mut o_stream = ctx.o_stream.try_clone()
+                .expect("failed cloning tcp o_stream");
+            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+            let mut reader = BufReader::new(in_stream);
+            let mut share_message = String::new();
+            if ctx.asymmetric_bit == 1 {
+                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                received_list = serde_json::from_str(&share_message).unwrap();
+            } else {
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                received_list = serde_json::from_str(&share_message).unwrap();
+                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+            }
+        } else {
+//            let mut message_id = ctx.thread_hierarchy.join(":");
+//            let message_content = serde_json::to_string(&diff_list).unwrap();
+//            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+//            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+//            received_list = serde_json::from_str(&message_received[0]).unwrap();
+        }
+
 
         let mut d: u8 = 0;
         let mut e: u8 = 0;
@@ -300,12 +298,11 @@ pub mod multiplication {
         let mut diff_list = Vec::new();
         let mut output = Vec::new();
 
-        let mut ti_shares = Vec::new();
+        let mut ti_shares = get_binary_shares(ctx,batch_size);
         let mut ctx_copied = ctx.clone();
         for i in 0..batch_size {
             let mut new_row = Vec::new();
-            let ti_share_triple = get_current_binary_share(&ctx_copied);
-            ti_shares.push(ti_share_triple);
+            let ti_share_triple = ti_shares[i];
             new_row.push(mod_floor((Wrapping(x_list[i]) - Wrapping(ti_share_triple.0)).0, BINARY_PRIME as u8));
             new_row.push(mod_floor((Wrapping(y_list[i]) - Wrapping(ti_share_triple.1)).0, BINARY_PRIME as u8));
             diff_list.push(new_row);

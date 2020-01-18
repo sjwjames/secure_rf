@@ -120,13 +120,11 @@ fn test_protocols() {
                 let dt_shares = ti_receive(
                     party_context.ti_stream.try_clone().expect("failed to clone ti recvr"));
                 party_context.dt_shares = dt_shares;
-//                test_multi_byte(&mut party_context);
-//                test_batch_multiplication_byte(&mut party_context);
-//                party_context.raw_tcp_communication = true;
-//                test_batch_multiplication_integer(&mut party_context);
-                party_context.raw_tcp_communication = false;
-                test_batch_multiplication_integer(&mut party_context);
+                party_context.raw_tcp_communication = true;
 
+                test_multi_byte(&mut party_context);
+//                test_batch_multiplication_byte(&mut party_context);
+//                test_batch_multiplication_integer(&mut party_context);
 //                test_multiplication_bigint(&mut party_context);
 //                test_multi_thread_batch_mul_byte(&mut party_context);
 //                test_parallel_multiplication(&mut party_context);

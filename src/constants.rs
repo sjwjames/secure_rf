@@ -18,6 +18,10 @@ pub mod constants {
     pub const TI_BATCH_SIZE: usize = U64S_PER_TX / 3; // how many trplets in one tx
 
     pub const BINARY_PRIME: usize = 2;
+    pub const ADDITIVE_SHARERS:&str = "additive";
+    pub const BINARY_SHARERS:&str = "binary";
+    pub const ADDITIVE_BIGUINT_SHARERS:&str = "additive_biguint";
+    pub const EQUALITY_BIGUINT_SHARERS:&str = "equality_biguint";
 
     /* Simulated correlated randomness for debugging without the trusted initializer */
     pub const CR_0: (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) =
