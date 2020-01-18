@@ -324,11 +324,11 @@ pub mod multiplication {
                 o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
             }
         } else {
-//            let message_id = ctx.thread_hierarchy.join(":");
-//            let message_content = serde_json::to_string(&diff_list).unwrap();
-//            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
-//            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
-//            diff_list_received = serde_json::from_str(&message_received[0]).unwrap();
+            let message_id = ctx.thread_hierarchy.join(":");
+            let message_content = serde_json::to_string(&diff_list).unwrap();
+            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+            diff_list_received = serde_json::from_str(&message_received[0]).unwrap();
 
         }
         let mut d_list = vec![0u8; batch_size];
@@ -582,7 +582,7 @@ pub mod multiplication {
             while i < bit_length {
                 let to_index = min(i + ctx.batch_size, bit_length);
                 let mut batch_mul_result = batch_multiplication_byte(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), ctx);
-                result_map.insert(i as u32, batch_mul_result);
+                result_map.insert(batch_count, batch_mul_result);
                 i = to_index;
                 batch_count += 1;
             }

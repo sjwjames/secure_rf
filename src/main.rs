@@ -127,8 +127,8 @@ fn test_protocols() {
 //                test_multi_byte(&mut party_context);
 //                test_batch_multiplication_byte(&mut party_context);
 //                test_batch_multiplication_integer(&mut party_context);
-                test_multiplication_bigint(&mut party_context);
-//                test_multi_thread_batch_mul_byte(&mut party_context);
+//                test_multiplication_bigint(&mut party_context);
+                test_multi_thread_batch_mul_byte(&mut party_context);
 //                test_parallel_multiplication(&mut party_context);
 //                test_batch_multiply_bigint(&mut party_context);
 //                test_parallel_multiplication_big_integer(&mut party_context);

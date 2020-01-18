@@ -217,9 +217,9 @@ pub mod protocol_test {
         }
 
 
-        println!("x_pub_vec {:?}", x_pub_vec);
-        println!("y_pub_vec {:?}", y_pub_vec);
-        println!("result_vec {:?}", result_vec);
+//        println!("x_pub_vec {:?}", x_pub_vec);
+//        println!("y_pub_vec {:?}", y_pub_vec);
+//        println!("result_vec {:?}", result_vec);
         let (batch_count, result_map) = multi_thread_batch_mul_byte(&x_vec, &y_vec, ctx, 100);
 
         let mut revealed_all = Vec::new();
