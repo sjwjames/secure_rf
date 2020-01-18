@@ -63,7 +63,18 @@ pub mod utils {
         str_vec.join(";")
     }
 
-    pub fn serialize_biguint_triple_vec(biguint_triple_vec: Vec<(BigUint, BigUint, BigUint)>) -> String {
+    pub fn serialize_biguint_double_vec(biguint_tuple: &Vec<(BigUint, BigUint)>) -> String {
+        let mut str_vec: Vec<String> = Vec::new();
+        for item in biguint_tuple.iter() {
+            let mut tuple_vec = Vec::new();
+            tuple_vec.push(serialize_biguint(&item.0));
+            tuple_vec.push(serialize_biguint(&item.1));
+            str_vec.push(tuple_vec.join("&"));
+        }
+        str_vec.join(";")
+    }
+
+    pub fn serialize_biguint_triple_vec(biguint_triple_vec: &Vec<(BigUint, BigUint, BigUint)>) -> String {
         let mut str_vec: Vec<String> = Vec::new();
         for item in biguint_triple_vec.iter() {
             let mut tuple_vec = Vec::new();
@@ -90,6 +101,17 @@ pub mod utils {
         let str_vec: Vec<&str> = message.split(";").collect();
         for item in str_vec {
             result.push(deserialize_biguint(item));
+        }
+        result
+    }
+
+    pub fn deserialize_biguint_double_vec(message: &str) -> Vec<(BigUint,BigUint)> {
+        let message = message.trim_end();
+        let mut result = Vec::new();
+        let str_vec: Vec<&str> = message.split(";").collect();
+        for item in str_vec {
+            let tuple_items: Vec<&str> = item.split("&").collect();
+            result.push((deserialize_biguint(tuple_items[0]),deserialize_biguint(tuple_items[1])));
         }
         result
     }

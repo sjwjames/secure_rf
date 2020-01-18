@@ -32,60 +32,40 @@ pub mod multiplication {
                             big_uint_subtract(&y_list[i], &ctx.dt_shares.additive_bigint_triples[i].1, &prime)));
         }
 
-//        let mut o_stream = ctx.o_stream.try_clone()
-//            .expect("failed cloning tcp o_stream");
+        let mut diff_list_str = serialize_biguint_double_vec(&diff_list);
+        let mut diff_list_received = Vec::new();
 
-        let mut diff_list_str_vec = Vec::new();
-        for item in diff_list.iter() {
-            let mut tuple = Vec::new();
-            tuple.push(item.0.to_string());
-            tuple.push(item.1.to_string());
-            diff_list_str_vec.push(tuple.join("&"));
+        if ctx.raw_tcp_communication{
+            let mut o_stream = ctx.o_stream.try_clone()
+                .expect("failed cloning tcp o_stream");
+            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+            let mut reader = BufReader::new(in_stream);
+            let mut share_message = String::new();
+            if ctx.asymmetric_bit == 1 {
+                o_stream.write((diff_list_str + "\n").as_bytes());
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                diff_list_received = deserialize_biguint_double_vec(&share_message);
+            } else {
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                diff_list_received = deserialize_biguint_double_vec(&share_message);
+                o_stream.write((diff_list_str + "\n").as_bytes());
+            }
+        }else{
+            let message_id = ctx.thread_hierarchy.join(":");
+            push_message_to_queue(&ctx.remote_mq_address, &message_id, &diff_list_str);
+            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+            diff_list_received = deserialize_biguint_double_vec(&message_received[0]);
+
         }
-//        let message = RFMessage {
-//            message_id: ctx.thread_hierarchy.join(":"),
-//            message_content: diff_list_str_vec.join(";"),
-//        };
 
-//        let mut diff_list_message = String::new();
-//        if ctx.asymmetric_bit == 1 {
-//            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-//            let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//            diff_list_message = message_received.message_content;
-//        } else {
-//            let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//            diff_list_message = message_received.message_content;
-//            o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-//        }
-//        o_stream.write((serde_json::to_string(&message).unwrap() + "\n").as_bytes());
-//        let mut message_received = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//        diff_list_message = message_received.message_content;
 
-        let mut diff_list_message = String::new();
-        let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serde_json::to_string(&diff_list_str_vec.join(";")).unwrap();
-        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
-        diff_list_message = serde_json::from_str(&message_received[0]).unwrap();
-
-        let mut diff_list_str_vec: Vec<&str> = diff_list_message.split(";").collect();
-        let mut diff_list = Vec::new();
-        for item in diff_list_str_vec {
-            let str_vec: Vec<&str> = item.split("&").collect();
-            diff_list.push(
-                (
-                    BigUint::from_str(&str_vec[0]).unwrap(),
-                    BigUint::from_str(&str_vec[1]).unwrap()
-                )
-            );
-        }
         let batch_size = x_list.len();
         let mut d_list = Vec::new();
         let mut e_list = Vec::new();
 
         for i in 0..batch_size {
-            d_list.push(diff_list[i].0.mod_floor(&prime));
-            e_list.push(diff_list[i].1.mod_floor(&prime));
+            d_list.push(diff_list_received[i].0.mod_floor(&prime));
+            e_list.push(diff_list_received[i].1.mod_floor(&prime));
         }
 
         let big_int_shares = &ctx.dt_shares.additive_bigint_triples;
