@@ -25,8 +25,8 @@ pub mod utils {
         result
     }
 
-    pub fn big_uint_triple_clone(x:&(BigUint,BigUint,BigUint))->(BigUint,BigUint,BigUint){
-        let mut result = (big_uint_clone(&x.0),big_uint_clone(&x.1),big_uint_clone(&x.2));
+    pub fn big_uint_triple_clone(x: &(BigUint, BigUint, BigUint)) -> (BigUint, BigUint, BigUint) {
+        let mut result = (big_uint_clone(&x.0), big_uint_clone(&x.1), big_uint_clone(&x.2));
         result
     }
 
@@ -105,13 +105,13 @@ pub mod utils {
         result
     }
 
-    pub fn deserialize_biguint_double_vec(message: &str) -> Vec<(BigUint,BigUint)> {
+    pub fn deserialize_biguint_double_vec(message: &str) -> Vec<(BigUint, BigUint)> {
         let message = message.trim_end();
         let mut result = Vec::new();
         let str_vec: Vec<&str> = message.split(";").collect();
         for item in str_vec {
             let tuple_items: Vec<&str> = item.split("&").collect();
-            result.push((deserialize_biguint(tuple_items[0]),deserialize_biguint(tuple_items[1])));
+            result.push((deserialize_biguint(tuple_items[0]), deserialize_biguint(tuple_items[1])));
         }
         result
     }
@@ -146,12 +146,12 @@ pub mod utils {
 
     pub fn get_current_bigint_share(ctx: &mut ComputingParty) -> (BigUint, BigUint, BigUint) {
         let bigint_shares = &ctx.dt_shares.additive_bigint_triples;
-        if ctx.raw_tcp_communication{
+        if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_additive_bigint_index;
-            ctx.dt_shares.sequential_additive_bigint_index+=1;
+            ctx.dt_shares.sequential_additive_bigint_index += 1;
             let current_bigint_share = &bigint_shares[current_index];
             return big_uint_triple_clone(current_bigint_share);
-        }else{
+        } else {
             let current_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
             let result = big_uint_triple_clone(&bigint_shares[current_index]);
             increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_bigint_index));
@@ -161,19 +161,26 @@ pub mod utils {
 
     pub fn get_current_equality_share(ctx: &mut ComputingParty) -> BigUint {
         let shares = &ctx.dt_shares.equality_shares;
-        let current_index = *(ctx.dt_shares.current_equality_index.lock().unwrap());
-        let result = big_uint_clone(&shares[current_index]);
-        increment_current_share_index(Arc::clone(&ctx.dt_shares.current_equality_index));
-        result
+        if ctx.raw_tcp_communication {
+            let current_index = ctx.dt_shares.sequential_equality_index;
+            ctx.dt_shares.sequential_additive_bigint_index += 1;
+            let current_share = &shares[current_index];
+            return big_uint_clone(&current_share);
+        } else {
+            let current_index = *(ctx.dt_shares.current_equality_index.lock().unwrap());
+            let result = big_uint_clone(&shares[current_index]);
+            increment_current_share_index(Arc::clone(&ctx.dt_shares.current_equality_index));
+            return result;
+        }
     }
 
     pub fn get_current_additive_share(ctx: &mut ComputingParty) -> (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) {
         let shares = &ctx.dt_shares.additive_triples;
-        if ctx.raw_tcp_communication{
+        if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_additive_index;
-            ctx.dt_shares.sequential_additive_index+=1;
+            ctx.dt_shares.sequential_additive_index += 1;
             return shares[current_index];
-        }else{
+        } else {
             let current_index = *(ctx.dt_shares.current_additive_index.lock().unwrap());
             let result = shares[current_index];
             increment_current_share_index(Arc::clone(&ctx.dt_shares.current_additive_index));
@@ -183,11 +190,11 @@ pub mod utils {
 
     pub fn get_current_binary_share(ctx: &mut ComputingParty) -> (u8, u8, u8) {
         let shares = &ctx.dt_shares.binary_triples;
-        if ctx.raw_tcp_communication{
+        if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_binary_index;
-            ctx.dt_shares.sequential_binary_index+=1;
+            ctx.dt_shares.sequential_binary_index += 1;
             return shares[current_index];
-        }else{
+        } else {
             let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
             let result = shares[current_index];
             increment_current_share_index(Arc::clone(&ctx.dt_shares.current_binary_index));
@@ -195,18 +202,18 @@ pub mod utils {
         }
     }
 
-    pub fn get_binary_shares(ctx: &mut ComputingParty,range:usize)->Vec<(u8, u8, u8)>{
+    pub fn get_binary_shares(ctx: &mut ComputingParty, range: usize) -> Vec<(u8, u8, u8)> {
         let current_index = ctx.dt_shares.sequential_binary_index;
-        let shares = ctx.dt_shares.binary_triples[current_index..current_index+range].to_vec();
+        let shares = ctx.dt_shares.binary_triples[current_index..current_index + range].to_vec();
 
-        ctx.dt_shares.sequential_binary_index+=range;
+        ctx.dt_shares.sequential_binary_index += range;
         return shares;
     }
 
-    pub fn get_additive_shares(ctx: &mut ComputingParty,range:usize)->Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>{
+    pub fn get_additive_shares(ctx: &mut ComputingParty, range: usize) -> Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> {
         let current_index = ctx.dt_shares.sequential_additive_index;
-        let shares = ctx.dt_shares.additive_triples[current_index..current_index+range].to_vec();
-        ctx.dt_shares.sequential_binary_index+=range;
+        let shares = ctx.dt_shares.additive_triples[current_index..current_index + range].to_vec();
+        ctx.dt_shares.sequential_binary_index += range;
         return shares;
     }
 

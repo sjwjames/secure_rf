@@ -243,7 +243,6 @@ pub mod protocol_test {
             result = equality_big_integer(&x, &y, ctx);
         }
         let result_revealed = reveal_bigint_result(&result, ctx);
-        println!("{}", result_revealed.to_string());
         assert_eq!(result_revealed, BigUint::zero());
     }
 

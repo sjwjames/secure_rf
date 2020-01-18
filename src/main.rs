@@ -131,8 +131,8 @@ fn test_protocols() {
 //                test_multi_thread_batch_mul_byte(&mut party_context);
 //                test_parallel_multiplication(&mut party_context);
 //                test_batch_multiply_bigint(&mut party_context);
-                test_parallel_multiplication_big_integer(&mut party_context);
-////                test_equality_big_integer(&mut party_context);
+//                test_parallel_multiplication_big_integer(&mut party_context);
+                test_equality_big_integer(&mut party_context);
 //                test_comparison(&mut party_context);
 //                test_bit_decomposition(&mut party_context);
 //                test_bit_decomposition_bigint(&mut party_context);

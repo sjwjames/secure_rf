@@ -102,33 +102,38 @@ pub mod protocol {
     pub fn equality_big_integer(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
         ctx.thread_hierarchy.push("equality_big_integer".to_string());
         let equality_share = get_current_equality_share(ctx);
-        let mut bigint_share = get_current_bigint_share(ctx);
+        let bigint_share = get_current_bigint_share(ctx);
         let prime = &ctx.dt_training.big_int_prime;
         let diff = big_uint_subtract(x, y, prime);
         let mut diff_list = Vec::new();
         diff_list.push(big_uint_subtract(&diff, &bigint_share.0, prime));
         diff_list.push(big_uint_subtract(&equality_share, &bigint_share.1, prime));
-//        let mut in_stream = ctx.in_stream.try_clone()
-//            .expect("failed cloning tcp o_stream");
-//
-//        let mut o_stream = ctx.o_stream.try_clone()
-//            .expect("failed cloning tcp o_stream");
-//
-//        let mut message = serialize_biguint_vec(diff_list);
-//        o_stream.write((message + "\n").as_bytes());
-//
-//        let mut reader = BufReader::new(in_stream);
-//        let mut diff_list_message = String::new();
-//        reader.read_line(&mut diff_list_message).expect("fail to read diff list message");
 
-        let mut diff_list_message = String::new();
-        let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serialize_biguint_vec(&diff_list);
-        push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
-        diff_list_message = message_received[0].clone();
-
-        let mut diff_list_received = deserialize_biguint_vec(&diff_list_message.as_str());
+        let mut diff_list_received = Vec::new();
+        if ctx.raw_tcp_communication{
+            let mut o_stream = ctx.o_stream.try_clone()
+                .expect("failed cloning tcp o_stream");
+            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+            let mut reader = BufReader::new(in_stream);
+            let mut share_message = String::new();
+            if ctx.asymmetric_bit == 1 {
+                o_stream.write((serialize_biguint_vec(&diff_list)+ "\n").as_bytes());
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                diff_list_received = deserialize_biguint_vec(&share_message.as_str());
+            } else {
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                diff_list_received = deserialize_biguint_vec(&share_message.as_str());
+                o_stream.write((serialize_biguint_vec(&diff_list)+ "\n").as_bytes());
+            }
+        }else{
+            let mut diff_list_message = String::new();
+            let message_id = ctx.thread_hierarchy.join(":");
+            let message_content = serialize_biguint_vec(&diff_list);
+            push_message_to_queue(&ctx.remote_mq_address,&message_id,&message_content);
+            let message_received = receive_message_from_queue(&ctx.local_mq_address,&message_id,1);
+            diff_list_message = message_received[0].clone();
+            let mut diff_list_received = deserialize_biguint_vec(&diff_list_message.as_str());
+        }
 
         let d = big_uint_subtract(&diff, &bigint_share.0, prime).add(&diff_list_received[0]).mod_floor(prime);
         let e = big_uint_subtract(&equality_share, &bigint_share.1, prime).add(&diff_list_received[1]).mod_floor(prime);
