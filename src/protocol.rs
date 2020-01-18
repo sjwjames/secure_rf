@@ -102,12 +102,12 @@ pub mod protocol {
     pub fn equality_big_integer(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
         ctx.thread_hierarchy.push("equality_big_integer".to_string());
         let equality_share = get_current_equality_share(ctx);
-        let bigint_share = get_current_bigint_share(ctx);
+        let mut bigint_share = get_current_bigint_share(ctx);
         let prime = &ctx.dt_training.big_int_prime;
         let diff = big_uint_subtract(x, y, prime);
         let mut diff_list = Vec::new();
         diff_list.push(big_uint_subtract(&diff, &bigint_share.0, prime));
-        diff_list.push(big_uint_subtract(equality_share, &bigint_share.1, prime));
+        diff_list.push(big_uint_subtract(&equality_share, &bigint_share.1, prime));
 //        let mut in_stream = ctx.in_stream.try_clone()
 //            .expect("failed cloning tcp o_stream");
 //

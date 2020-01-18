@@ -60,14 +60,14 @@ pub mod protocol_test {
                 }
             }
         }
-        println!("x_pub_vec {:?}", x_pub_vec);
-        println!("y_pub_vec {:?}", y_pub_vec);
-        println!("result_vec {:?}", result_vec);
+//        println!("x_pub_vec {:?}", x_pub_vec);
+//        println!("y_pub_vec {:?}", y_pub_vec);
+//        println!("result_vec {:?}", result_vec);
         let result = batch_multiplication_byte(&x_vec, &y_vec, ctx);
-        println!("computed result {:?}", &result);
+//        println!("computed result {:?}", &result);
 
         let result_revealed = reveal_byte_vec_result(&result, ctx);
-        println!("result_revealed {:?}", result_revealed);
+//        println!("result_revealed {:?}", result_revealed);
 
         assert!(result_vec.iter().zip(result_revealed.iter()).all(|(a, b)| a == b), "Arrays are not equal");
     }
@@ -79,7 +79,7 @@ pub mod protocol_test {
         let mut y_vec_pub: Vec<Wrapping<u64>> = Vec::new();
         let mut result_pub: Vec<Wrapping<u64>> = Vec::new();
 
-        for i in 0..100000 {
+        for i in 0..1 {
             for j in 0..10 {
                 x_vec_pub.push(Wrapping(j));
                 y_vec_pub.push(Wrapping(j));
@@ -130,7 +130,6 @@ pub mod protocol_test {
         }
 
         for i in 0..5 {
-            println!("result_pub: {}", result_pub[i].to_usize().unwrap());
             let result = multiplication_bigint(&x_vec[i], &y_vec[i], ctx);
             let result_revealed = reveal_bigint_result(&result, ctx);
             println!("result_revealed: {}", result_revealed.to_usize().unwrap());

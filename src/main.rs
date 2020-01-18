@@ -122,10 +122,12 @@ fn test_protocols() {
                 party_context.dt_shares = dt_shares;
                 party_context.raw_tcp_communication = true;
 
-                test_multi_byte(&mut party_context);
+//                println!("current binary share index:{}",party_context.dt_shares.sequential_binary_index);
+//                println!("current additive share index:{}",party_context.dt_shares.sequential_additive_index);
+//                test_multi_byte(&mut party_context);
 //                test_batch_multiplication_byte(&mut party_context);
 //                test_batch_multiplication_integer(&mut party_context);
-//                test_multiplication_bigint(&mut party_context);
+                test_multiplication_bigint(&mut party_context);
 //                test_multi_thread_batch_mul_byte(&mut party_context);
 //                test_parallel_multiplication(&mut party_context);
 //                test_batch_multiply_bigint(&mut party_context);
