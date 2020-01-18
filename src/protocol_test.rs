@@ -12,8 +12,8 @@ pub mod protocol_test {
     use std::ops::BitAnd;
     use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint};
     use crate::dot_product::dot_product::dot_product_bigint;
-    use crate::or_xor::or_xor::or_xor;
-    use crate::field_change::field_change::change_binary_to_decimal_field;
+    use crate::or_xor::or_xor::{or_xor, or_xor_bigint};
+    use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
     use std::time::SystemTime;
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
@@ -370,6 +370,25 @@ pub mod protocol_test {
         }
     }
 
+    pub fn test_or_xor_bigint(ctx: &mut ComputingParty) {
+        if ctx.party_id == 0 {
+            let x = vec![BigUint::one(), BigUint::one(), BigUint::zero(), BigUint::one()];
+            let y = vec![BigUint::zero(), BigUint::zero(), BigUint::zero(), BigUint::one()];
+            let result = or_xor_bigint(&x, &y, ctx, &BigUint::from_u32(2).unwrap());
+//            println!("{:?}", result);
+            let result_revealed = reveal_bigint_vec_result(&result,ctx);
+            println!("{:?}",result_revealed);
+        } else {
+            let x = vec![BigUint::zero(), BigUint::one(), BigUint::zero(), BigUint::zero()];
+            let y = vec![BigUint::one(), BigUint::zero(), BigUint::zero(), BigUint::zero()];
+            let result = or_xor_bigint(&x, &y, ctx, &BigUint::from_u32(2).unwrap());
+//            println!("{:?}", result);
+            let result_revealed = reveal_bigint_vec_result(&result,ctx);
+            println!("{:?}",result_revealed);
+        }
+    }
+
+
     pub fn test_change_binary_to_decimal_field(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
             let input = vec![1, 0, 0, 1];
@@ -378,6 +397,18 @@ pub mod protocol_test {
         } else {
             let input = vec![0, 1, 1, 1];
             let result = change_binary_to_decimal_field(&input, ctx);
+            println!("{:?}", result);
+        }
+    }
+
+    pub fn test_change_binary_to_bigint_field(ctx: &mut ComputingParty) {
+        if ctx.party_id == 0 {
+            let input = vec![1, 0, 0, 1];
+            let result = change_binary_to_bigint_field(&input, ctx);
+            println!("{:?}", result);
+        } else {
+            let input = vec![0, 1, 1, 1];
+            let result = change_binary_to_bigint_field(&input, ctx);
             println!("{:?}", result);
         }
     }
