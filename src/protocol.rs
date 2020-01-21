@@ -41,56 +41,76 @@ pub mod protocol {
                 w_intermediate.insert(i, list);
             }
             //computeComparisons in JAVA Lynx
-            let thread_pool = ThreadPool::new(ctx.thread_count);
-            let mut output_map = Arc::new(Mutex::new((HashMap::new())));
-            let mut key = 0;
-            for i in 0..number_count {
-                for j in 0..number_count {
-                    if i != j {
-                        let mut output_map = Arc::clone(&output_map);
-                        let mut ctx_copied = ctx.clone();
-                        ctx_copied.thread_hierarchy.push(format!("{}",i * number_count + j));
-                        let mut bit_shares = bit_shares.clone();
-                        thread_pool.execute(move || {
-                            let comparison_result = comparison(&bit_shares[i], &bit_shares[j], &mut ctx_copied);
-                            let mut output_map = output_map.lock().unwrap();
-                            (*output_map).insert(key, comparison_result);
-                        });
-                        key += 1;
+            if ctx.raw_tcp_communication{
+                for i in 0..number_count {
+                    for j in 0..number_count {
+                        if i != j {
+                            let comparison_result = comparison(&bit_shares[i], &bit_shares[j], ctx);
+                            w_intermediate.get_mut(&i).unwrap().push(comparison_result);
+                        }
                     }
                 }
-            }
-            thread_pool.join();
-            let output_map = output_map.lock().unwrap();
-            for i in 0..number_count * (number_count - 1) {
-                let mut comparison = *output_map.get(&i).unwrap();
-                let key = i / (number_count - 1);
-                w_intermediate.get_mut(&key).unwrap().push(comparison);
-            }
 
-            let mut output_map = Arc::new(Mutex::new((HashMap::new())));
-            //multi-threaded parallel multiplication
-            ctx.thread_hierarchy.push("parallel_multiplication".to_string());
-            for i in 0..number_count {
-                let mut vec = Vec::new();
-                for item in w_intermediate.get(&i).unwrap().iter() {
-                    vec.push(*item);
+                for i in 0..number_count {
+                    let mut vec = Vec::new();
+                    for item in w_intermediate.get(&i).unwrap().iter() {
+                        vec.push(*item);
+                    }
+                    let multi_result = parallel_multiplication(&vec, ctx);
+                    result[i] = multi_result;
                 }
-                let mut output_map = Arc::clone(&output_map);
-                let mut ctx_copied = ctx.clone();
-                ctx_copied.thread_hierarchy.push(format!("{}", i));
-                thread_pool.execute(move || {
-                    let multi_result = parallel_multiplication(&vec, &mut ctx_copied);
-                    let mut output_map = output_map.lock().unwrap();
-                    (*output_map).insert(i, multi_result);
-                });
-            }
-            thread_pool.join();
-            ctx.thread_hierarchy.pop();
-            let output_map = &*(output_map.lock().unwrap());
-            for i in 0..number_count {
-                let multi_result = output_map.get(&i).unwrap();
-                result[i] = *multi_result;
+            }else{
+                let thread_pool = ThreadPool::new(ctx.thread_count);
+                let mut output_map = Arc::new(Mutex::new((HashMap::new())));
+                let mut key = 0;
+                for i in 0..number_count {
+                    for j in 0..number_count {
+                        if i != j {
+                            let mut output_map = Arc::clone(&output_map);
+                            let mut ctx_copied = ctx.clone();
+                            ctx_copied.thread_hierarchy.push(format!("{}",i * number_count + j));
+                            let mut bit_shares = bit_shares.clone();
+                            thread_pool.execute(move || {
+                                let comparison_result = comparison(&bit_shares[i], &bit_shares[j], &mut ctx_copied);
+                                let mut output_map = output_map.lock().unwrap();
+                                (*output_map).insert(key, comparison_result);
+                            });
+                            key += 1;
+                        }
+                    }
+                }
+                thread_pool.join();
+                let output_map = output_map.lock().unwrap();
+                for i in 0..number_count * (number_count - 1) {
+                    let mut comparison = *output_map.get(&i).unwrap();
+                    let key = i / (number_count - 1);
+                    w_intermediate.get_mut(&key).unwrap().push(comparison);
+                }
+
+                let mut output_map = Arc::new(Mutex::new((HashMap::new())));
+                //multi-threaded parallel multiplication
+                ctx.thread_hierarchy.push("parallel_multiplication".to_string());
+                for i in 0..number_count {
+                    let mut vec = Vec::new();
+                    for item in w_intermediate.get(&i).unwrap().iter() {
+                        vec.push(*item);
+                    }
+                    let mut output_map = Arc::clone(&output_map);
+                    let mut ctx_copied = ctx.clone();
+                    ctx_copied.thread_hierarchy.push(format!("{}", i));
+                    thread_pool.execute(move || {
+                        let multi_result = parallel_multiplication(&vec, &mut ctx_copied);
+                        let mut output_map = output_map.lock().unwrap();
+                        (*output_map).insert(i, multi_result);
+                    });
+                }
+                thread_pool.join();
+                ctx.thread_hierarchy.pop();
+                let output_map = &*(output_map.lock().unwrap());
+                for i in 0..number_count {
+                    let multi_result = output_map.get(&i).unwrap();
+                    result[i] = *multi_result;
+                }
             }
         }
 

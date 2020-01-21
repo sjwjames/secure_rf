@@ -243,8 +243,8 @@ pub mod utils {
             match message {
                 ConsumerMessage::Delivery(delivery) => {
                     let body = String::from_utf8_lossy(&delivery.body).to_string();
-//                    print!("queue:{} ", routing_key);
-//                    println!("({:>3}) Received [{}]", i, body);
+                    print!("queue:{} ", routing_key);
+                    println!("({:>3}) Received [{}]", i, body);
                     result.push(body.clone());
                     consumer.ack(delivery).unwrap();
                 }

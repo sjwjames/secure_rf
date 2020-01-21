@@ -28,7 +28,7 @@ pub mod comparison {
         ctx.thread_hierarchy.push("compute_D_shares".to_string());
         let (batch_count, output_map) = multi_thread_batch_mul_byte(&x_list, &y_list, ctx, bit_length);
         for i in 0..batch_count {
-            let mut product_result = Vec::new();
+            let mut product_result = output_map.get(&i).unwrap();
             for j in 0..product_result.len() {
                 let global_index = i as usize * ctx.batch_size + j;
                 let local_diff = Wrapping(y_list[global_index]) - Wrapping(product_result[j]);
@@ -57,11 +57,9 @@ pub mod comparison {
             if ctx.raw_tcp_communication{
                 while i < temp_mul_e.len() - 1 {
                     let to_index = min(i + ctx.batch_size, temp_mul_e.len());
-                    ctx.thread_hierarchy.push(format!("{}", computation_count));
                     let mut x_list_sliced = temp_mul_e[i..to_index - 1].to_vec();
                     let mut y_list_sliced = temp_mul_e[i + 1..to_index].to_vec();
                     let mut batch_mul_result = batch_multiplication_byte(&x_list_sliced, &y_list_sliced, ctx);
-                    ctx.thread_hierarchy.pop();
                     result_map.insert(i as u32,batch_mul_result);
                     i += to_index - 1;
                     batch_count += 1;
