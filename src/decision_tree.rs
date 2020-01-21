@@ -61,10 +61,10 @@ pub mod decision_tree {
         pub current_additive_bigint_index: Arc<Mutex<usize>>,
         pub current_equality_index: Arc<Mutex<usize>>,
         pub current_binary_index: Arc<Mutex<usize>>,
-        pub sequential_additive_index:usize,
-        pub sequential_additive_bigint_index:usize,
-        pub sequential_equality_index:usize,
-        pub sequential_binary_index:usize
+        pub sequential_additive_index: usize,
+        pub sequential_additive_bigint_index: usize,
+        pub sequential_equality_index: usize,
+        pub sequential_binary_index: usize,
     }
 
 
@@ -161,7 +161,7 @@ pub mod decision_tree {
                 sequential_additive_index: self.sequential_additive_index,
                 sequential_additive_bigint_index: self.sequential_additive_bigint_index,
                 sequential_equality_index: self.sequential_equality_index,
-                sequential_binary_index: self.sequential_binary_index
+                sequential_binary_index: self.sequential_binary_index,
             }
         }
     }
@@ -173,43 +173,43 @@ pub mod decision_tree {
         let major_class_index = find_common_class_index(ctx);
         // Make majority class index one-hot encoding public
         // Share major class index
-        ctx.thread_hierarchy.push("share_major_class_index".to_string());
 
-
-        let message_id = ctx.thread_hierarchy.join(":");
-        println!("current message_id:{}", message_id);
-        let message_content = serde_json::to_string(&major_class_index).unwrap();
-        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
         let mut major_class_index_receive: Vec<u8> = Vec::new();
-        major_class_index_receive = serde_json::from_str(&message_received[0]).unwrap();
 
-//        let mut o_stream = ctx.o_stream.try_clone()
-//            .expect("failed cloning tcp o_stream");
-//        let mut message = RFMessage {
-//            message_id: ctx.thread_hierarchy.join(":"),
-//            message_content: serde_json::to_string(&major_class_index).unwrap(),
-//        };
-//        let mut major_class_index_receive: Vec<u8> = Vec::new();
-//        if ctx.asymmetric_bit == 1 {
-//            o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
-//            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//            major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
-//        } else {
-//            let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//            major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
-//            o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
-//        }
-//        o_stream.write(format!("{}\n", serde_json::to_string(&message).unwrap()).as_bytes());
-//        let mut received_message = search_pop_message(ctx, message.message_id.clone()).unwrap();
-//        major_class_index_receive = serde_json::from_str(&received_message.message_content).unwrap();
+        if ctx.raw_tcp_communication {
+            let mut o_stream = ctx.o_stream.try_clone()
+                .expect("failed cloning tcp o_stream");
+            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+            let mut reader = BufReader::new(in_stream);
+            let mut share_message = String::new();
+
+            if ctx.asymmetric_bit == 1 {
+                o_stream.write(format!("{}\n", serde_json::to_string(&major_class_index).unwrap()).as_bytes());
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                major_class_index_receive = serde_json::from_str(&share_message).unwrap();
+            } else {
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                major_class_index_receive = serde_json::from_str(&share_message).unwrap();
+                o_stream.write(format!("{}\n", serde_json::to_string(&major_class_index).unwrap()).as_bytes());
+            }
+
+        } else {
+            ctx.thread_hierarchy.push("share_major_class_index".to_string());
+            let message_id = ctx.thread_hierarchy.join(":");
+            println!("current message_id:{}", message_id);
+            let message_content = serde_json::to_string(&major_class_index).unwrap();
+            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+            let mut major_class_index_receive: Vec<u8> = Vec::new();
+            major_class_index_receive = serde_json::from_str(&message_received[0]).unwrap();
+            ctx.thread_hierarchy.pop();
+        }
 
         let class_value_count = ctx.dt_data.class_value_count;
         let mut major_class_index_shared = vec![0u8; class_value_count];
         for i in 0..class_value_count {
             major_class_index_shared[i] = mod_floor((Wrapping((&major_class_index)[i]) + Wrapping((&major_class_index_receive)[i])).0, BINARY_PRIME as u8);
         }
-        ctx.thread_hierarchy.pop();
 
         let mut major_index = 0;
         for i in 0..class_value_count {
@@ -225,13 +225,13 @@ pub mod decision_tree {
 
         println!("Major class {}", major_index);
         println!("Major class OHE {:?}", major_class_index_shared);
-        ctx.thread_hierarchy.pop();
+//        ctx.thread_hierarchy.pop();
 
         // quit if reaching max depth
         if r == 0 {
             println!("Exited on base case: Recursion Level == 0");
             ctx.dt_results.result_list.push(format!("class={}", major_index));
-            ctx.thread_hierarchy.pop();
+//            ctx.thread_hierarchy.pop();
             return ctx.dt_results.clone();
         }
 
@@ -248,32 +248,44 @@ pub mod decision_tree {
         ctx.thread_hierarchy.pop();
 
         let class_value_count = ctx.dt_data.class_value_count;
-        let thread_pool = ThreadPool::new(ctx.thread_count);
-        let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
+
+        let mut major_class_trans_count = BigUint::zero();
+        let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
         let dataset_size = ctx.dt_data.instance_count;
-        ctx.thread_hierarchy.push("major_class_trans_count".to_string());
-        for i in 0..class_value_count {
-            let mut dp_result = Arc::clone(&dp_result_map);
-            let mut transactions_decimal_cp = transactions_decimal.clone();
-            let mut dt_ctx = ctx.clone();
-            let major_class_index_value = big_uint_clone(&major_class_index_decimal[i]);
-            dt_ctx.thread_hierarchy.push(format!("{}", i));
-            thread_pool.execute(move || {
-                let mut result = dot_product_bigint(&transactions_decimal_cp, &vec![major_class_index_value; dataset_size], &mut dt_ctx);
-                let mut dp_result = dp_result.lock().unwrap();
-                (*dp_result).insert(i, result);
-            });
+        let thread_pool = ThreadPool::new(ctx.thread_count);
+
+        if ctx.raw_tcp_communication{
+            for i in 0..class_value_count{
+                let major_class_index_value = big_uint_clone(&major_class_index_decimal[i]);
+                let mut dp_result = dot_product_bigint(&transactions_decimal, &vec![major_class_index_value; dataset_size], ctx);
+                major_class_trans_count = major_class_trans_count.add(&dp_result).mod_floor(&bigint_prime);
+            }
+        }else{
+            let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
+            ctx.thread_hierarchy.push("major_class_trans_count".to_string());
+            for i in 0..class_value_count {
+                let mut dp_result = Arc::clone(&dp_result_map);
+                let mut transactions_decimal_cp = transactions_decimal.clone();
+                let mut dt_ctx = ctx.clone();
+                let major_class_index_value = big_uint_clone(&major_class_index_decimal[i]);
+                dt_ctx.thread_hierarchy.push(format!("{}", i));
+                thread_pool.execute(move || {
+                    let mut result = dot_product_bigint(&transactions_decimal_cp, &vec![major_class_index_value; dataset_size], &mut dt_ctx);
+                    let mut dp_result = dp_result.lock().unwrap();
+                    (*dp_result).insert(i, result);
+                });
+            }
+
+            thread_pool.join();
+            ctx.thread_hierarchy.pop();
+
+            let mut dp_result_map = dp_result_map.lock().unwrap();
+            for i in 0..class_value_count {
+                let mut dp_result = (*dp_result_map).get(&i).unwrap();
+                major_class_trans_count = major_class_trans_count.add(dp_result).mod_floor(&bigint_prime);
+            }
         }
 
-        thread_pool.join();
-        ctx.thread_hierarchy.pop();
-        let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
-        let mut major_class_trans_count = BigUint::zero();
-        let mut dp_result_map = dp_result_map.lock().unwrap();
-        for i in 0..class_value_count {
-            let mut dp_result = (*dp_result_map).get(&i).unwrap();
-            major_class_trans_count = major_class_trans_count.add(dp_result).mod_floor(&bigint_prime);
-        }
 
         println!("Majority Class Transaction Count: {}", major_class_trans_count.to_string());
 
@@ -294,11 +306,32 @@ pub mod decision_tree {
         let mut compute_result = BigUint::one();
         let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
 
-        let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = stopping_bit.to_string();
-        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
-        let stopping_bit_received = BigUint::from_str(&message_received[0]).unwrap();
+        let mut stopping_bit_received = BigUint::zero();
+        if ctx.raw_tcp_communication{
+            let mut o_stream = ctx.o_stream.try_clone()
+                .expect("failed cloning tcp o_stream");
+            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+            let mut reader = BufReader::new(in_stream);
+            let mut share_message = String::new();
+
+            if ctx.asymmetric_bit == 1 {
+                o_stream.write((serialize_biguint(&stopping_bit)+"\n").as_bytes());
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                stopping_bit_received = deserialize_biguint(&share_message);
+            } else {
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                stopping_bit_received = deserialize_biguint(&share_message);
+                o_stream.write((serialize_biguint(&stopping_bit)+"\n").as_bytes());
+            }
+        }else{
+            let message_id = ctx.thread_hierarchy.join(":");
+            let message_content = stopping_bit.to_string();
+            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+            stopping_bit_received = BigUint::from_str(&message_received[0]).unwrap();
+        }
+
+
         println!("Stopping bit received:{}", stopping_bit_received.to_string());
         let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
         if stopping_check.eq(&BigUint::one()) {
@@ -347,27 +380,43 @@ pub mod decision_tree {
                     let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
 
                     for i in 0..class_value_count {
-                        let mut ctx_cp = ctx.clone();
-                        let mut dp_result_map_cp = Arc::clone(&dp_result_map);
-                        ctx_cp.thread_hierarchy.push(format!("{}", i));
-                        let u_decimal_cp = big_uint_vec_clone(&u_decimal[i]);
-                        let attr_value_trans_bigint = big_uint_vec_clone(&attr_value_trans_bigint_vec[k][j]);
+                        if ctx.raw_tcp_communication{
+                            let mut ctx_cp = ctx.clone();
+                            let u_decimal_cp = big_uint_vec_clone(&u_decimal[i]);
+                            let attr_value_trans_bigint = big_uint_vec_clone(&attr_value_trans_bigint_vec[k][j]);
 
-                        thread_pool.execute(move || {
                             let dp_result = dot_product_bigint(&u_decimal_cp, &attr_value_trans_bigint, &mut ctx_cp);
-                            let mut dp_result_map_cp = dp_result_map_cp.lock().unwrap();
-                            (*dp_result_map_cp).insert(i, dp_result);
-                        });
+                            x[k][i][j] = big_uint_clone(&dp_result);
+                            let y_temp = big_uint_clone(&y[k][j]);
+                            y[k][j] = y_temp.add(&dp_result).mod_floor(&bigint_prime);
+                        }else{
+                            let mut ctx_cp = ctx.clone();
+                            let mut dp_result_map_cp = Arc::clone(&dp_result_map);
+                            ctx_cp.thread_hierarchy.push(format!("{}", i));
+                            let u_decimal_cp = big_uint_vec_clone(&u_decimal[i]);
+                            let attr_value_trans_bigint = big_uint_vec_clone(&attr_value_trans_bigint_vec[k][j]);
+
+                            thread_pool.execute(move || {
+                                let dp_result = dot_product_bigint(&u_decimal_cp, &attr_value_trans_bigint, &mut ctx_cp);
+                                let mut dp_result_map_cp = dp_result_map_cp.lock().unwrap();
+                                (*dp_result_map_cp).insert(i, dp_result);
+                            });
+                        }
+
                     }
 
-                    thread_pool.join();
-                    let mut dp_result_map = dp_result_map.lock().unwrap();
-                    for i in 0..class_value_count {
-                        let dp_result = (*dp_result_map).get(&i).unwrap();
-                        x[k][i][j] = big_uint_clone(dp_result);
-                        let y_temp = big_uint_clone(&y[k][j]);
-                        y[k][j] = y_temp.add(dp_result).mod_floor(&bigint_prime);
+                    if !ctx.raw_tcp_communication{
+                        thread_pool.join();
+                        let mut dp_result_map = dp_result_map.lock().unwrap();
+                        for i in 0..class_value_count {
+                            let dp_result = (*dp_result_map).get(&i).unwrap();
+                            x[k][i][j] = big_uint_clone(dp_result);
+                            let y_temp = big_uint_clone(&y[k][j]);
+                            y[k][j] = y_temp.add(dp_result).mod_floor(&bigint_prime);
+                        }
                     }
+
+
                     y[k][j] = alpha.mul(&y[k][j]).add(if ctx.asymmetric_bit == 1 {
                         BigUint::one()
                     } else {
@@ -375,25 +424,36 @@ pub mod decision_tree {
                     }).mod_floor(&bigint_prime);
                 }
 
-                ctx.thread_hierarchy.push("compute_x_square".to_string());
-                let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
-                for i in 0..class_value_count {
-                    let mut batch_multi_result_map_cp = Arc::clone(&batch_multi_result_map);
+                if ctx.raw_tcp_communication{
                     let mut ctx_cp = ctx.clone();
-                    ctx_cp.thread_hierarchy.push(format!("{}", i));
-                    let x_list = big_uint_vec_clone(&x[k][i]);
-                    thread_pool.execute(move || {
-                        let batch_multi_result = batch_multiply_bigint(&x_list, &x_list, &mut ctx_cp);
-                        let mut batch_multi_result_map_cp = batch_multi_result_map_cp.lock().unwrap();
-                        (*batch_multi_result_map_cp).insert(i, batch_multi_result);
-                    });
+                    for i in 0..class_value_count{
+                        let batch_multi_result = batch_multiply_bigint(&x[k][i], &x[k][i], &mut ctx_cp);
+                        x2[k][i] = batch_multi_result;
+                    }
+
+                }else{
+                    ctx.thread_hierarchy.push("compute_x_square".to_string());
+                    let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
+                    for i in 0..class_value_count {
+                        let mut batch_multi_result_map_cp = Arc::clone(&batch_multi_result_map);
+                        let mut ctx_cp = ctx.clone();
+                        ctx_cp.thread_hierarchy.push(format!("{}", i));
+                        let x_list = big_uint_vec_clone(&x[k][i]);
+                        thread_pool.execute(move || {
+                            let batch_multi_result = batch_multiply_bigint(&x_list, &x_list, &mut ctx_cp);
+                            let mut batch_multi_result_map_cp = batch_multi_result_map_cp.lock().unwrap();
+                            (*batch_multi_result_map_cp).insert(i, batch_multi_result);
+                        });
+                    }
+                    thread_pool.join();
+                    let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
+                    for i in 0..class_value_count {
+                        x2[k][i] = big_uint_vec_clone((*batch_multi_result_map).get(&i).unwrap());
+                    }
+                    ctx.thread_hierarchy.pop();
                 }
-                thread_pool.join();
-                let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
-                for i in 0..class_value_count {
-                    x2[k][i] = big_uint_vec_clone((*batch_multi_result_map).get(&i).unwrap());
-                }
-                ctx.thread_hierarchy.pop();
+
+
 
                 let mut ctx_cloned = ctx.clone();
                 let p_multi = parallel_multiplication_big_integer(&y[k], &mut ctx_cloned);
@@ -458,42 +518,77 @@ pub mod decision_tree {
         }
         ctx.thread_hierarchy.pop();
 
-        ctx.thread_hierarchy.push("gini_argmax_public".to_string());
-        let message_id = ctx.thread_hierarchy.join(":");
-        let message_content = serialize_biguint(&gini_argmax);
-        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
-        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
-        let mut argmax_received = deserialize_biguint(&message_received[0]);
+        let mut argmax_received = BigUint::zero();
+        if ctx.raw_tcp_communication{
+            let mut o_stream = ctx.o_stream.try_clone()
+                .expect("failed cloning tcp o_stream");
+            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+            let mut reader = BufReader::new(in_stream);
+            let mut share_message = String::new();
+
+            if ctx.asymmetric_bit == 1 {
+                o_stream.write((serialize_biguint(&gini_argmax)+"\n").as_bytes());
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                argmax_received = deserialize_biguint(&share_message);
+            } else {
+                reader.read_line(&mut share_message).expect("fail to read share message str");
+                argmax_received = deserialize_biguint(&share_message);
+                o_stream.write((serialize_biguint(&gini_argmax)+"\n").as_bytes());
+            }
+        }else{
+            ctx.thread_hierarchy.push("gini_argmax_public".to_string());
+            let message_id = ctx.thread_hierarchy.join(":");
+            let message_content = serialize_biguint(&gini_argmax);
+            push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+            argmax_received = deserialize_biguint(&message_received[0]);
+            ctx.thread_hierarchy.pop();
+        }
+
         let mut shared_gini_argmax = gini_argmax.add(&argmax_received).mod_floor(&bigint_prime).to_usize().unwrap();
         attributes[shared_gini_argmax] = 0;
         ctx.dt_results.result_list.push(format!("attr={}", shared_gini_argmax));
-        ctx.thread_hierarchy.pop();
 
 
-        ctx.thread_hierarchy.push("update_transactions".to_string());
-        let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
-
-        for j in 0..attr_val_count {
+        if ctx.raw_tcp_communication{
             let mut dt_ctx = ctx.clone();
-            let mut batch_multi_result_cp = Arc::clone(&batch_multi_result_map);
-            let mut subset_transaction_cp = subset_transaction.clone();
-            thread_pool.execute(move || {
-                let attr_values_bytes = &dt_ctx.dt_data.attr_values_bytes;
-                let temp_value = attr_values_bytes[shared_gini_argmax][j].clone();
-                let batch_multi = batch_multiplication_byte(&subset_transaction_cp, &temp_value, &mut dt_ctx);
-                let mut batch_multi_result_cp = batch_multi_result_cp.lock().unwrap();
-                (*batch_multi_result_cp).insert(j, batch_multi);
-            });
-        }
-        thread_pool.join();
-        ctx.thread_hierarchy.pop();
-        let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
-        for j in 0..attr_val_count {
-            ctx.dt_training.subset_transaction_bit_vector = (*batch_multi_result_map).get(&j).unwrap().clone();
-            train(ctx, r - 1);
+            let mut result_map = HashMap::new();
+            for j in 0..attr_val_count {
+                let attr_values_bytes = &ctx.dt_data.attr_values_bytes;
+                let batch_multi = batch_multiplication_byte(&subset_transaction, &attr_values_bytes[shared_gini_argmax][j], &mut dt_ctx);
+                result_map.insert(j,batch_multi);
+            }
+
+            for j in 0..attr_val_count {
+                ctx.dt_training.subset_transaction_bit_vector = result_map.get(&j).unwrap().clone();
+                train(ctx, r - 1);
+            }
+        }else{
+            ctx.thread_hierarchy.push("update_transactions".to_string());
+            let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
+            for j in 0..attr_val_count {
+                let mut dt_ctx = ctx.clone();
+                let mut batch_multi_result_cp = Arc::clone(&batch_multi_result_map);
+                let mut subset_transaction_cp = subset_transaction.clone();
+                thread_pool.execute(move || {
+                    let attr_values_bytes = &dt_ctx.dt_data.attr_values_bytes;
+                    let temp_value = attr_values_bytes[shared_gini_argmax][j].clone();
+                    let batch_multi = batch_multiplication_byte(&subset_transaction_cp, &temp_value, &mut dt_ctx);
+                    let mut batch_multi_result_cp = batch_multi_result_cp.lock().unwrap();
+                    (*batch_multi_result_cp).insert(j, batch_multi);
+                });
+            }
+            thread_pool.join();
+            ctx.thread_hierarchy.pop();
+            let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
+            for j in 0..attr_val_count {
+                ctx.dt_training.subset_transaction_bit_vector = (*batch_multi_result_map).get(&j).unwrap().clone();
+                train(ctx, r - 1);
+            }
+
+            ctx.thread_hierarchy.pop();
         }
 
-        ctx.thread_hierarchy.pop();
         ctx.dt_results.clone()
     }
 
@@ -503,62 +598,77 @@ pub mod decision_tree {
         let mut subset_transaction_bit_vector = ctx.dt_training.subset_transaction_bit_vector.clone();
         let mut subset_decimal = change_binary_to_decimal_field(&subset_transaction_bit_vector, ctx);
         let mut s = Vec::new();
-        let thread_pool = ThreadPool::new(ctx.thread_count);
-        let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
-        let mut ctx_copied = ctx.clone();
-
-        ctx_copied.thread_hierarchy.push("compute_dp".to_string());
-        for i in 0..ctx.dt_data.class_value_count {
-            let mut dp_result_map = Arc::clone(&dp_result_map);
-            let mut subset_decimal_cloned = subset_decimal.clone();
-            let mut class_value_transaction = ctx.dt_data.class_values.clone();
-            let mut ctx = ctx_copied.clone();
-            ctx.thread_hierarchy.push(format!("{}", i));
-            thread_pool.execute(move || {
-                let precision = ctx.decimal_precision;
-                let dp_result = dot_product_integer(&subset_decimal_cloned, &class_value_transaction[i], &mut ctx);
-                let mut dp_result_map = dp_result_map.lock().unwrap();
-                (*dp_result_map).insert(i, (dp_result.0));
-            });
-        }
-        thread_pool.join();
-        println!("compute_dp completes in {}ms", now.elapsed().unwrap().as_millis());
-        ctx_copied.thread_hierarchy.pop();
-
-        let mut dp_result_map = &*(dp_result_map.lock().unwrap());
-        for i in 0..ctx.dt_data.class_value_count {
-            s.push((dp_result_map.get(&i).unwrap()).clone());
-        }
-
-        let mut ctx_copied = ctx.clone();
-        let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
-
-        ctx_copied.thread_hierarchy.push("compute_bd".to_string());
-        for i in 0..ctx.dt_data.class_value_count {
-            let mut bd_result_map = Arc::clone(&bd_result_map);
-            let mut ctx = ctx_copied.clone();
-            ctx.thread_hierarchy.push(format!("{}", i));
-            let s_copied = s[i];
-            thread_pool.execute(move || {
-                let bd_result = bit_decomposition(s_copied, &mut ctx);
-                let mut bd_result_map = bd_result_map.lock().unwrap();
-                (*bd_result_map).insert(i, bd_result);
-            });
-        }
-        thread_pool.join();
-        println!("compute_bd completes in {}ms", now.elapsed().unwrap().as_millis());
-        ctx_copied.thread_hierarchy.pop();
-
-        let mut bd_result_map = &*(bd_result_map.lock().unwrap());
         let mut bit_shares = Vec::new();
-        for i in 0..ctx.dt_data.class_value_count {
-            bit_shares.push((bd_result_map.get(&i).unwrap()).clone());
+        let mut argmax_result = Vec::new();
+        if ctx.raw_tcp_communication {
+            let mut class_value_transaction = ctx.dt_data.class_values.clone();
+            for i in 0..ctx.dt_data.class_value_count {
+                let dp_result = dot_product_integer(&subset_decimal, &class_value_transaction[i], ctx);
+                s.push(dp_result.0);
+            }
+            for i in 0..ctx.dt_data.class_value_count {
+                let s_copied = s[i];
+                let bd_result = bit_decomposition(s[i], ctx);
+                bit_shares.push(bd_result);
+                argmax_result = arg_max(&bit_shares, ctx);
+            }
+        } else {
+            let thread_pool = ThreadPool::new(ctx.thread_count);
+            let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
+            let mut ctx_copied = ctx.clone();
+
+            ctx_copied.thread_hierarchy.push("compute_dp".to_string());
+            for i in 0..ctx.dt_data.class_value_count {
+                let mut dp_result_map = Arc::clone(&dp_result_map);
+                let mut subset_decimal_cloned = subset_decimal.clone();
+                let mut class_value_transaction = ctx.dt_data.class_values.clone();
+                let mut ctx = ctx_copied.clone();
+                ctx.thread_hierarchy.push(format!("{}", i));
+                thread_pool.execute(move || {
+//                    let precision = ctx.decimal_precision;
+                    let dp_result = dot_product_integer(&subset_decimal_cloned, &class_value_transaction[i], &mut ctx);
+                    let mut dp_result_map = dp_result_map.lock().unwrap();
+                    (*dp_result_map).insert(i, (dp_result.0));
+                });
+            }
+            thread_pool.join();
+            println!("compute_dp completes in {}ms", now.elapsed().unwrap().as_millis());
+            ctx_copied.thread_hierarchy.pop();
+
+            let mut dp_result_map = &*(dp_result_map.lock().unwrap());
+            for i in 0..ctx.dt_data.class_value_count {
+                s.push((dp_result_map.get(&i).unwrap()).clone());
+            }
+
+            let mut ctx_copied = ctx.clone();
+            let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
+
+            ctx_copied.thread_hierarchy.push("compute_bd".to_string());
+            for i in 0..ctx.dt_data.class_value_count {
+                let mut bd_result_map = Arc::clone(&bd_result_map);
+                let mut ctx = ctx_copied.clone();
+                ctx.thread_hierarchy.push(format!("{}", i));
+                let s_copied = s[i];
+                thread_pool.execute(move || {
+                    let bd_result = bit_decomposition(s_copied, &mut ctx);
+                    let mut bd_result_map = bd_result_map.lock().unwrap();
+                    (*bd_result_map).insert(i, bd_result);
+                });
+            }
+            thread_pool.join();
+            println!("compute_bd completes in {}ms", now.elapsed().unwrap().as_millis());
+            ctx_copied.thread_hierarchy.pop();
+
+            let mut bd_result_map = &*(bd_result_map.lock().unwrap());
+            for i in 0..ctx.dt_data.class_value_count {
+                bit_shares.push((bd_result_map.get(&i).unwrap()).clone());
+            }
+
+            argmax_result = arg_max(&bit_shares, ctx);
+            ctx.thread_hierarchy.pop();
         }
 
-        let mut arg_max = arg_max(&bit_shares, ctx);
-
-        ctx.thread_hierarchy.pop();
         println!("find common class index completes in {}ms", now.elapsed().unwrap().as_millis());
-        arg_max
+        argmax_result
     }
 }
