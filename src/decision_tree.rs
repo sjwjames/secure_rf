@@ -5,7 +5,7 @@ pub mod decision_tree {
     use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint, reveal_bigint_result};
+    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint, reveal_bigint_result, reveal_byte_vec_result};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
@@ -170,19 +170,23 @@ pub mod decision_tree {
     pub fn train(ctx: &mut ComputingParty, r: usize) -> DecisionTreeResult {
         println!("start building model");
         ctx.thread_hierarchy.push(format!("DT_level_{}", r));
+        if ctx.debug_output{
+            let current_transactions = ctx.dt_training.subset_transaction_bit_vector.clone();
+            let revealed = reveal_byte_vec_result(&current_transactions,ctx);
+            println!("current transactions{:?}",revealed);
+        }
         let major_class_index = find_common_class_index(ctx);
         // Make majority class index one-hot encoding public
         // Share major class index
 
         let mut major_class_index_receive: Vec<u8> = Vec::new();
-
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+        let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+        let mut reader = BufReader::new(in_stream);
+        let mut share_message = String::new();
         if ctx.raw_tcp_communication {
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-
+            share_message = String::new();
             if ctx.asymmetric_bit == 1 {
                 o_stream.write(format!("{}\n", serde_json::to_string(&major_class_index).unwrap()).as_bytes());
                 reader.read_line(&mut share_message).expect("fail to read share message str");
@@ -192,7 +196,6 @@ pub mod decision_tree {
                 major_class_index_receive = serde_json::from_str(&share_message).unwrap();
                 o_stream.write(format!("{}\n", serde_json::to_string(&major_class_index).unwrap()).as_bytes());
             }
-
         } else {
             ctx.thread_hierarchy.push("share_major_class_index".to_string());
             let message_id = ctx.thread_hierarchy.join(":");
@@ -230,7 +233,8 @@ pub mod decision_tree {
         // quit if reaching max depth
         if r == 0 {
             println!("Exited on base case: Recursion Level == 0");
-            ctx.dt_results.result_list.push(format!("class={}", major_index));
+//            ctx.dt_results.result_list.push(format!("class={}", major_index));
+            ctx.result_file.write_all(format!("class={}", major_index).as_bytes());
 //            ctx.thread_hierarchy.pop();
             return ctx.dt_results.clone();
         }
@@ -254,13 +258,13 @@ pub mod decision_tree {
         let dataset_size = ctx.dt_data.instance_count;
         let thread_pool = ThreadPool::new(ctx.thread_count);
 
-        if ctx.raw_tcp_communication{
-            for i in 0..class_value_count{
+        if ctx.raw_tcp_communication {
+            for i in 0..class_value_count {
                 let major_class_index_value = big_uint_clone(&major_class_index_decimal[i]);
                 let mut dp_result = dot_product_bigint(&transactions_decimal, &vec![major_class_index_value; dataset_size], ctx);
                 major_class_trans_count = major_class_trans_count.add(&dp_result).mod_floor(&bigint_prime);
             }
-        }else{
+        } else {
             let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
             ctx.thread_hierarchy.push("major_class_trans_count".to_string());
             for i in 0..class_value_count {
@@ -299,31 +303,26 @@ pub mod decision_tree {
         println!("Transactions in current subset: {}", transaction_count.to_string());
 
         let eq_test_result = equality_big_integer(&transaction_count, &major_class_trans_count, ctx);
-        let eq_test_revealed = reveal_bigint_result(&eq_test_result, ctx);
-        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_result.to_string());
+//        let eq_test_revealed = reveal_bigint_result(&eq_test_result, ctx);
+//        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_revealed.to_string());
 
         ctx.thread_hierarchy.push("early_stop_criteria".to_string());
         let mut compute_result = BigUint::one();
         let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
 
         let mut stopping_bit_received = BigUint::zero();
-        if ctx.raw_tcp_communication{
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-
+        if ctx.raw_tcp_communication {
+            share_message = String::new();
             if ctx.asymmetric_bit == 1 {
-                o_stream.write((serialize_biguint(&stopping_bit)+"\n").as_bytes());
+                o_stream.write((serialize_biguint(&stopping_bit) + "\n").as_bytes());
                 reader.read_line(&mut share_message).expect("fail to read share message str");
                 stopping_bit_received = deserialize_biguint(&share_message);
             } else {
                 reader.read_line(&mut share_message).expect("fail to read share message str");
                 stopping_bit_received = deserialize_biguint(&share_message);
-                o_stream.write((serialize_biguint(&stopping_bit)+"\n").as_bytes());
+                o_stream.write((serialize_biguint(&stopping_bit) + "\n").as_bytes());
             }
-        }else{
+        } else {
             let message_id = ctx.thread_hierarchy.join(":");
             let message_content = stopping_bit.to_string();
             push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
@@ -336,7 +335,9 @@ pub mod decision_tree {
         let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
         if stopping_check.eq(&BigUint::one()) {
             println!("Exited on base case: All transactions predict same outcome");
-            ctx.dt_results.result_list.push(format!("class={}", major_index));
+//            ctx.dt_results.result_list.push(format!("class={}", major_index));
+            ctx.result_file.write_all(format!("class={}", major_index).as_bytes());
+
             ctx.thread_hierarchy.pop();
             return ctx.dt_results.clone();
         }
@@ -380,7 +381,7 @@ pub mod decision_tree {
                     let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
 
                     for i in 0..class_value_count {
-                        if ctx.raw_tcp_communication{
+                        if ctx.raw_tcp_communication {
                             let mut ctx_cp = ctx.clone();
                             let u_decimal_cp = big_uint_vec_clone(&u_decimal[i]);
                             let attr_value_trans_bigint = big_uint_vec_clone(&attr_value_trans_bigint_vec[k][j]);
@@ -389,7 +390,7 @@ pub mod decision_tree {
                             x[k][i][j] = big_uint_clone(&dp_result);
                             let y_temp = big_uint_clone(&y[k][j]);
                             y[k][j] = y_temp.add(&dp_result).mod_floor(&bigint_prime);
-                        }else{
+                        } else {
                             let mut ctx_cp = ctx.clone();
                             let mut dp_result_map_cp = Arc::clone(&dp_result_map);
                             ctx_cp.thread_hierarchy.push(format!("{}", i));
@@ -402,10 +403,9 @@ pub mod decision_tree {
                                 (*dp_result_map_cp).insert(i, dp_result);
                             });
                         }
-
                     }
 
-                    if !ctx.raw_tcp_communication{
+                    if !ctx.raw_tcp_communication {
                         thread_pool.join();
                         let mut dp_result_map = dp_result_map.lock().unwrap();
                         for i in 0..class_value_count {
@@ -424,14 +424,13 @@ pub mod decision_tree {
                     }).mod_floor(&bigint_prime);
                 }
 
-                if ctx.raw_tcp_communication{
+                if ctx.raw_tcp_communication {
                     let mut ctx_cp = ctx.clone();
-                    for i in 0..class_value_count{
+                    for i in 0..class_value_count {
                         let batch_multi_result = batch_multiply_bigint(&x[k][i], &x[k][i], &mut ctx_cp);
                         x2[k][i] = batch_multi_result;
                     }
-
-                }else{
+                } else {
                     ctx.thread_hierarchy.push("compute_x_square".to_string());
                     let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
                     for i in 0..class_value_count {
@@ -452,7 +451,6 @@ pub mod decision_tree {
                     }
                     ctx.thread_hierarchy.pop();
                 }
-
 
 
                 let mut ctx_cloned = ctx.clone();
@@ -519,23 +517,18 @@ pub mod decision_tree {
         ctx.thread_hierarchy.pop();
 
         let mut argmax_received = BigUint::zero();
-        if ctx.raw_tcp_communication{
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-
+        if ctx.raw_tcp_communication {
+            share_message = String::new();
             if ctx.asymmetric_bit == 1 {
-                o_stream.write((serialize_biguint(&gini_argmax)+"\n").as_bytes());
+                o_stream.write((serialize_biguint(&gini_argmax) + "\n").as_bytes());
                 reader.read_line(&mut share_message).expect("fail to read share message str");
                 argmax_received = deserialize_biguint(&share_message);
             } else {
                 reader.read_line(&mut share_message).expect("fail to read share message str");
                 argmax_received = deserialize_biguint(&share_message);
-                o_stream.write((serialize_biguint(&gini_argmax)+"\n").as_bytes());
+                o_stream.write((serialize_biguint(&gini_argmax) + "\n").as_bytes());
             }
-        }else{
+        } else {
             ctx.thread_hierarchy.push("gini_argmax_public".to_string());
             let message_id = ctx.thread_hierarchy.join(":");
             let message_content = serialize_biguint(&gini_argmax);
@@ -547,23 +540,24 @@ pub mod decision_tree {
 
         let mut shared_gini_argmax = gini_argmax.add(&argmax_received).mod_floor(&bigint_prime).to_usize().unwrap();
         attributes[shared_gini_argmax] = 0;
-        ctx.dt_results.result_list.push(format!("attr={}", shared_gini_argmax));
+        ctx.result_file.write_all(format!("attr={}", shared_gini_argmax).as_bytes());
+//        ctx.dt_results.result_list.push(format!("attr={}", shared_gini_argmax));
+        ctx.dt_training.attribute_bit_vector = attributes;
 
-
-        if ctx.raw_tcp_communication{
+        if ctx.raw_tcp_communication {
             let mut dt_ctx = ctx.clone();
             let mut result_map = HashMap::new();
             for j in 0..attr_val_count {
                 let attr_values_bytes = &ctx.dt_data.attr_values_bytes;
                 let batch_multi = batch_multiplication_byte(&subset_transaction, &attr_values_bytes[shared_gini_argmax][j], &mut dt_ctx);
-                result_map.insert(j,batch_multi);
+                result_map.insert(j, batch_multi);
             }
-
             for j in 0..attr_val_count {
-                ctx.dt_training.subset_transaction_bit_vector = result_map.get(&j).unwrap().clone();
-                train(ctx, r - 1);
+                let mut dt_ctx = ctx.clone();
+                dt_ctx.dt_training.subset_transaction_bit_vector = result_map.get(&j).unwrap().clone();
+                train(&mut dt_ctx, r - 1);
             }
-        }else{
+        } else {
             ctx.thread_hierarchy.push("update_transactions".to_string());
             let mut batch_multi_result_map = Arc::new(Mutex::new(HashMap::new()));
             for j in 0..attr_val_count {
@@ -610,8 +604,9 @@ pub mod decision_tree {
                 let s_copied = s[i];
                 let bd_result = bit_decomposition(s[i], ctx);
                 bit_shares.push(bd_result);
-                argmax_result = arg_max(&bit_shares, ctx);
             }
+            argmax_result = arg_max(&bit_shares, ctx);
+
         } else {
             let thread_pool = ThreadPool::new(ctx.thread_count);
             let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));

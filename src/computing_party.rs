@@ -65,6 +65,7 @@ pub mod computing_party {
         pub dt_training: DecisionTreeTraining,
         pub dt_shares: DecisionTreeShares,
         pub dt_results: DecisionTreeResult,
+        pub result_file:File,
 
         /* random forest */
         pub thread_count: usize,
@@ -108,6 +109,7 @@ pub mod computing_party {
                 dt_shares: self.dt_shares.clone(),
                 dt_results: self.dt_results.clone(),
 
+                result_file: self.result_file.try_clone().unwrap(),
                 thread_count: self.thread_count,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
@@ -540,7 +542,7 @@ pub mod computing_party {
         };
         let local_mq_address = format!("amqp://guest:guest@{}:{}", local_mq_ip.clone(), local_mq_port);
         let remote_mq_address = format!("amqp://guest:guest@{}:{}", remote_mq_ip.clone(), remote_mq_port);
-
+        let mut result_file = File::create(output_path.clone()).unwrap();
         ComputingParty {
             debug_output,
             raw_tcp_communication,
@@ -570,6 +572,7 @@ pub mod computing_party {
             tree_training_batch_size,
             dt_data,
             dt_training,
+            result_file,
             dt_shares: DecisionTreeShares {
                 additive_triples: vec![],
                 additive_bigint_triples: vec![],

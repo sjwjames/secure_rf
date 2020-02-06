@@ -54,34 +54,50 @@ pub mod dot_product {
         ctx.thread_hierarchy.push("dot_product".to_string());
         let mut dot_product: Wrapping<u64> = Wrapping(0 as u64);
         let vector_length = x_list.len();
-        let thread_pool = ThreadPool::new(ctx.thread_count);
-        let mut batch_count = 0;
-        let mut i = 0;
-        let output_map = Arc::new(Mutex::new(HashMap::new()));
-        while i < vector_length {
-            let to_index = min(i + ctx.batch_size, vector_length);
-            let mut ctx_copied = ctx.clone();
-            let x_list_copied = x_list[i..to_index].to_vec().clone();
-            let y_list_copied = y_list[i..to_index].to_vec().clone();
-            let mut output_map = Arc::clone(&output_map);
-            ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
-            thread_pool.execute(move || {
-                let multi_result = batch_multiplication_integer(&x_list_copied, &y_list_copied, &mut ctx_copied);
-                let mut output_map = output_map.lock().unwrap();
-                (*output_map).insert(batch_count, multi_result);
-            });
-            batch_count += 1;
-            i = to_index;
-        }
-        thread_pool.join();
-        let output_map = &*(output_map.lock().unwrap());
-        for i in 0..batch_count {
-            let multi_result = output_map.get(&i).unwrap();
-            for item in multi_result {
-                dot_product = dot_product + item;
+        if ctx.raw_tcp_communication{
+            let mut i = 0;
+            while i < vector_length {
+                let to_index = min(i + ctx.batch_size, vector_length);
+                let x_list_copied = x_list[i..to_index].to_vec().clone();
+                let y_list_copied = y_list[i..to_index].to_vec().clone();
+                let multi_result = batch_multiplication_integer(&x_list_copied, &y_list_copied, ctx);
+                for item in multi_result {
+                    dot_product = dot_product + item;
+                }
+                i = to_index;
+            }
+
+        }else{
+            let thread_pool = ThreadPool::new(ctx.thread_count);
+            let mut batch_count = 0;
+            let mut i = 0;
+            let output_map = Arc::new(Mutex::new(HashMap::new()));
+            while i < vector_length {
+                let to_index = min(i + ctx.batch_size, vector_length);
+                let mut ctx_copied = ctx.clone();
+                let x_list_copied = x_list[i..to_index].to_vec().clone();
+                let y_list_copied = y_list[i..to_index].to_vec().clone();
+                let mut output_map = Arc::clone(&output_map);
+                ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
+                thread_pool.execute(move || {
+                    let multi_result = batch_multiplication_integer(&x_list_copied, &y_list_copied, &mut ctx_copied);
+                    let mut output_map = output_map.lock().unwrap();
+                    (*output_map).insert(batch_count, multi_result);
+                });
+                batch_count += 1;
+                i = to_index;
+            }
+            thread_pool.join();
+            let output_map = &*(output_map.lock().unwrap());
+            for i in 0..batch_count {
+                let multi_result = output_map.get(&i).unwrap();
+                for item in multi_result {
+                    dot_product = dot_product + item;
+                }
             }
         }
-        dot_product = Wrapping(mod_floor(dot_product.0,ctx.dt_training.prime));
+
+        dot_product = Wrapping(mod_floor(dot_product.0,ctx.dt_training.dataset_size_prime));
         ctx.thread_hierarchy.pop();
         dot_product
     }

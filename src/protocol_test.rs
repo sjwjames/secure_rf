@@ -2,7 +2,7 @@ pub mod protocol_test {
     use crate::computing_party::computing_party::ComputingParty;
     use std::num::Wrapping;
     use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte, batch_multiplication_integer, multiplication_bigint, multi_thread_batch_mul_byte, parallel_multiplication, batch_multiply_bigint, parallel_multiplication_big_integer};
-    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result};
+    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result, reveal_int_result};
     use rand::{random, Rng};
     use num::integer::*;
     use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
@@ -11,7 +11,7 @@ pub mod protocol_test {
     use crate::comparison::comparison::{compare_bigint, comparison, compute_e_shares, compute_d_shares, compute_multi_e_parallel, compute_c_shares};
     use std::ops::BitAnd;
     use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint};
-    use crate::dot_product::dot_product::dot_product_bigint;
+    use crate::dot_product::dot_product::{dot_product_bigint, dot_product_integer};
     use crate::or_xor::or_xor::{or_xor, or_xor_bigint};
     use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
     use std::time::SystemTime;
@@ -422,6 +422,24 @@ pub mod protocol_test {
             println!("{:?}", result);
             let result_revealed = reveal_byte_vec_result(&result, ctx);
             println!("{:?}", result_revealed);
+        }
+    }
+
+    pub fn test_dot_product_integer(ctx: &mut ComputingParty){
+        if ctx.party_id == 0 {
+            let x = vec![Wrapping(1 as u64),Wrapping(2 as u64),Wrapping(3 as u64),Wrapping(1 as u64)];
+            let y = vec![Wrapping(1 as u64),Wrapping(0 as u64),Wrapping(2 as u64),Wrapping(1 as u64)];
+            let result = dot_product_integer(&x,&y,ctx);
+            println!("{:?}", result);
+//            let result_revealed = reveal_int_result(&result, ctx);
+//            println!("{:?}", result_revealed);
+        } else {
+            let x = vec![Wrapping(1 as u64),Wrapping(1 as u64),Wrapping(2 as u64),Wrapping(0 as u64)];
+            let y =  vec![Wrapping(3 as u64),Wrapping(0 as u64),Wrapping(3 as u64),Wrapping(3 as u64)];
+            let result = dot_product_integer(&x,&y,ctx);
+            println!("{:?}", result);
+//            let result_revealed = reveal_int_result(&result, ctx);
+//            println!("{:?}", result_revealed);
         }
     }
 }

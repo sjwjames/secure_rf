@@ -92,6 +92,7 @@ pub mod utils {
     }
 
     pub fn deserialize_biguint(message: &str) -> BigUint {
+        let message = message.trim_end();
         BigUint::from_str(&message).unwrap()
     }
 
@@ -315,6 +316,15 @@ pub mod utils {
         result
     }
 
+    pub fn reveal_int_result(x: &Wrapping<u64>, ctx: &mut ComputingParty) -> u64 {
+        let message_id = "reveal".to_string();
+        let message_content = serde_json::to_string(x).unwrap();
+        push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
+        let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+        let mut message_rec: Wrapping<u64> = serde_json::from_str(&message_received[0]).unwrap();
+        let mut result = (x.0 + message_rec.0).mod_floor(&ctx.dt_training.dataset_size_prime);
+        result
+    }
     pub fn reveal_bigint_result(x: &BigUint, ctx: &mut ComputingParty) -> BigUint {
         let message_id = "reveal".to_string();
         let message_content = serialize_biguint(x);

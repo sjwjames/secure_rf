@@ -28,10 +28,10 @@ thread_count = 40
 
 #[random data]
 batch_size = 34
-add_shares_per_tree = 1000
-add_shares_bigint_per_tree = 1000
-equality_shares_per_tree = 1000
-binary_shares_per_tree = 1000
+add_shares_per_tree = 100000
+add_shares_bigint_per_tree = 100000
+equality_shares_per_tree = 100000
+binary_shares_per_tree = 100000
 big_int_prime = "8589934592"
 prime = 8
 bigint_bit_size = 33

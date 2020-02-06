@@ -106,7 +106,7 @@ pub mod random_forest {
 
             current_p0_port += 1;
             current_p1_port += 1;
-            println!("tree {} result {:?}",current_tree_index,dt_training.result_list);
+//            println!("tree {} result {:?}",current_tree_index,dt_training.result_list);
         }
 
         thread_pool.join();
