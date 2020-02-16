@@ -73,7 +73,6 @@ bit_length = 33
 x_input_path = "/Users/sjw/Desktop/PPML/preprocess/james/shared_fold_2_train-1.csv"
 output_path = "fold_1_trees_1.txt"
 
-
 #[GSE2034]
 
 #x_input_path = "inputs/GSE2034_5_folds/5X_train_share1.csv"

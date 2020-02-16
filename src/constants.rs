@@ -22,6 +22,8 @@ pub mod constants {
     pub const BINARY_SHARERS:&str = "binary";
     pub const ADDITIVE_BIGUINT_SHARERS:&str = "additive_biguint";
     pub const EQUALITY_BIGUINT_SHARERS:&str = "equality_biguint";
+    pub const LOCAL_ADDITION:u8 = 0;
+    pub const LOCAL_SUBTRACTION:u8 = 1;
 
     /* Simulated correlated randomness for debugging without the trusted initializer */
     pub const CR_0: (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) =

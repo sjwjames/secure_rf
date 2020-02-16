@@ -18,7 +18,7 @@ pub mod or_xor{
 
     pub fn or_xor(x_list: &Vec<Wrapping<u64>>,
                   y_list: &Vec<Wrapping<u64>>,
-                  ctx: &mut ComputingParty, constant_multiplier: u64) -> Vec<Wrapping<u64>> {
+                  ctx: &mut ComputingParty, constant_multiplier: u64,prime:u64) -> Vec<Wrapping<u64>> {
         ctx.thread_hierarchy.push("or_xor".to_string());
         let bit_length = x_list.len();
         let mut i = 0;
@@ -31,7 +31,7 @@ pub mod or_xor{
                 let mut batch_mul_result = batch_multiplication_integer(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), ctx);
                 for item in batch_mul_result.iter() {
                     let result = Wrapping(x_list[global_index].0) + Wrapping(y_list[global_index].0) - (Wrapping(constant_multiplier) * Wrapping(item.0));
-                    output.push(Wrapping(mod_floor(result.0, ctx.dt_training.dataset_size_prime)));
+                    output.push(Wrapping(mod_floor(result.0, prime)));
                     global_index += 1;
                 }
                 i = to_index;
@@ -64,7 +64,7 @@ pub mod or_xor{
                 let batch_result = output_map.get(&i).unwrap();
                 for item in batch_result.iter() {
                     let result = Wrapping(x_list[global_index].0) + Wrapping(y_list[global_index].0) - (Wrapping(constant_multiplier) * Wrapping(item.0));
-                    output.push(Wrapping(mod_floor(result.0, ctx.dt_training.dataset_size_prime)));
+                    output.push(Wrapping(mod_floor(result.0, prime)));
                     global_index += 1;
                 }
             }

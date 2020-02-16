@@ -6,7 +6,7 @@ pub mod field_change{
     use num::{Zero, One, FromPrimitive, abs, BigInt};
     use crate::or_xor::or_xor::{or_xor, or_xor_bigint};
 
-    pub fn change_binary_to_decimal_field(binary_numbers: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+    pub fn change_binary_to_decimal_field(binary_numbers: &Vec<u8>, ctx: &mut ComputingParty,prime:u64) -> Vec<Wrapping<u64>> {
         println!("change_binary_to_decimal_field starts");
         ctx.thread_hierarchy.push("change_binary_to_decimal_field".to_string());
         let mut dummy_list = vec![Wrapping(0u64); binary_numbers.len()];
@@ -16,9 +16,9 @@ pub mod field_change{
             binary_int_list.push(Wrapping(*item as u64));
         }
         if ctx.asymmetric_bit == 1 {
-            output = or_xor(&binary_int_list, &dummy_list, ctx, 2);
+            output = or_xor(&binary_int_list, &dummy_list, ctx, 2,prime);
         } else {
-            output = or_xor(&dummy_list, &binary_int_list, ctx, 2);
+            output = or_xor(&dummy_list, &binary_int_list, ctx, 2,prime);
         }
         ctx.thread_hierarchy.pop();
         println!("change_binary_to_decimal_field ends");

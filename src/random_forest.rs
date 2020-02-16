@@ -7,6 +7,18 @@ pub mod random_forest {
     use std::thread::current;
     use crate::message::message::MessageManager;
     use std::collections::HashMap;
+    use std::num::Wrapping;
+    use crate::protocol::protocol::{matrix_multiplication_integer, batch_equality_integer};
+    use crate::utils::utils::get_additive_shares;
+    use crate::bit_decomposition::bit_decomposition::bit_decomposition;
+    use crate::comparison::comparison::comparison;
+
+    pub fn random_feature_selection(ctx: &mut ComputingParty) -> Vec<Vec<Wrapping<u64>>> {
+        let x = &ctx.dt_data.discretized_x.clone();
+        let rfs_shares = &ctx.dt_shares.rfs_shares.clone();
+        let mut result = matrix_multiplication_integer(&x, &rfs_shares, ctx,ctx.dt_training.rfs_field);
+        result
+    }
 
 
     pub fn train(ctx: &mut ComputingParty) {
@@ -15,12 +27,81 @@ pub mod random_forest {
         let mut remainder = ctx.tree_count;
         let mut current_p0_port = ctx.party0_port + 1;
         let mut current_p1_port = ctx.party1_port + 1;
-
+        let rfs_field = ctx.dt_training.rfs_field;
         for current_tree_index in 0..remainder {
             let dt_shares = ti_receive(
                 ctx.ti_stream.try_clone().expect("failed to clone ti recvr"));
             let mut dt_ctx = ctx.clone();
             dt_ctx.dt_shares = dt_shares;
+            if dt_ctx.asymmetric_bit == 1 {
+                dt_ctx.dt_data.discretized_x = {
+                    [
+                        [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
+                        [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+                        [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
+                        [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec()
+                    ].to_vec()
+                };
+            } else {
+                dt_ctx.dt_data.discretized_x = {
+                    [
+                        [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+                        [Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)].to_vec(),
+                        [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+                        [Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(0 as u64)].to_vec()
+                    ].to_vec()
+                };
+            }
+            dt_ctx.dt_data.rfs_x = random_feature_selection(&mut dt_ctx);
+
+            let cols = dt_ctx.dt_data.rfs_x[0].len();
+            let rows = dt_ctx.dt_data.rfs_x.len();
+            let attr_value_cnt = dt_ctx.dt_data.attr_value_count;
+            let mut equality_x = Vec::new();
+            let mut equality_y = Vec::new();
+            for j in 0..cols {
+                for k in 0..attr_value_cnt {
+                    let mut x_row = Vec::new();
+                    let mut y_row = Vec::new();
+
+                    for i in 0..rows {
+                        x_row.push(dt_ctx.dt_data.rfs_x[i][j]);
+                        if dt_ctx.asymmetric_bit==1{
+                            y_row.push(Wrapping(k as u64));
+                        }else{
+                            y_row.push(Wrapping(0));
+                        }
+                    }
+                    equality_x.append(&mut x_row);
+                    equality_y.append(&mut y_row);
+                }
+            }
+            let result = batch_equality_integer(&equality_x, &equality_y, &mut dt_ctx,rfs_field);
+            println!("result:{:?}",result);
+            let mut comparison_results = Vec::new();
+            for item in result{
+                let bits = bit_decomposition(item,&mut dt_ctx);
+                let mut compared = vec![0;bits.len()];
+                let comparison_result=comparison(&compared,&bits,&mut dt_ctx);
+                comparison_results.push(comparison_result);
+            }
+
+            let mut count = 0;
+            let mut attr_values_bytes = Vec::new();
+            for j in 0..cols{
+                let mut attr_row = Vec::new();
+                for k in 0..attr_value_cnt{
+                    let mut row = Vec::new();
+                    for i in 0..rows{
+                        row.push(comparison_results[count]);
+                        count+=1;
+                    }
+                    attr_row.push(row);
+                }
+                attr_values_bytes.push(attr_row);
+            }
+            println!("attr_values_bytes:{:?}",attr_values_bytes);
+
 //
 //            thread_pool.execute(move || {
 //                dt_ctx.party0_port = current_p0_port;
@@ -64,7 +145,7 @@ pub mod random_forest {
 //                println!("{:?}",dt_training.result_list);
 //            });
 
-            dt_ctx.party0_port = current_p0_port;
+                dt_ctx.party0_port = current_p0_port;
             dt_ctx.party1_port = current_p1_port;
             reset_share_indices(&mut dt_ctx);
             let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);
@@ -79,12 +160,13 @@ pub mod random_forest {
             let mut attr_values_bigint = Vec::new();
             let mut class_values_bigint = Vec::new();
             let mut attr_values_bytes = dt_ctx.dt_data.attr_values_bytes.clone();
+            let dataset_size_prime = dt_ctx.dt_training.dataset_size_prime;
             // multi-thread could help
             for item in attr_values_bytes.iter() {
                 let mut attr_data_item = Vec::new();
                 let mut attr_data_bigint_item = Vec::new();
                 for data_item in item.iter() {
-                    attr_data_item.push(change_binary_to_decimal_field(data_item, &mut dt_ctx));
+                    attr_data_item.push(change_binary_to_decimal_field(data_item, &mut dt_ctx, dataset_size_prime));
                     attr_data_bigint_item.push(change_binary_to_bigint_field(data_item, &mut dt_ctx));
                 }
                 attr_values.push(attr_data_item);
@@ -95,14 +177,14 @@ pub mod random_forest {
 
             let mut class_value_bytes = dt_ctx.dt_data.class_values_bytes.clone();
             for item in class_value_bytes.iter() {
-                class_values.push(change_binary_to_decimal_field(item, &mut dt_ctx));
+                class_values.push(change_binary_to_decimal_field(item, &mut dt_ctx, dataset_size_prime));
                 class_values_bigint.push(change_binary_to_bigint_field(item, &mut dt_ctx));
             }
 
             dt_ctx.dt_data.class_values = class_values;
             dt_ctx.dt_data.class_values_big_integer = class_values_bigint;
             let max_depth = (&dt_ctx.dt_training).max_depth;
-            let dt_training = decision_tree::train(&mut dt_ctx,max_depth);
+            let dt_training = decision_tree::train(&mut dt_ctx, max_depth);
 
             current_p0_port += 1;
             current_p1_port += 1;

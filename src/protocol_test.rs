@@ -7,7 +7,7 @@ pub mod protocol_test {
     use num::integer::*;
     use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
     use std::cmp::max;
-    use crate::protocol::protocol::{equality_big_integer, arg_max};
+    use crate::protocol::protocol::{equality_big_integer, arg_max, batch_equality_integer};
     use crate::comparison::comparison::{compare_bigint, comparison, compute_e_shares, compute_d_shares, compute_multi_e_parallel, compute_c_shares};
     use std::ops::BitAnd;
     use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint};
@@ -352,14 +352,14 @@ pub mod protocol_test {
         if ctx.party_id == 0 {
             let x = vec![Wrapping(1), Wrapping(1), Wrapping(0), Wrapping(1)];
             let y = vec![Wrapping(0), Wrapping(0), Wrapping(0), Wrapping(1)];
-            let result = or_xor(&x, &y, ctx, 2);
+            let result = or_xor(&x, &y, ctx, 2,ctx.dt_training.dataset_size_prime);
             println!("{:?}", result);
 //            let result_revealed = reveal_byte_vec_result(&result,ctx);
 //            println!("{}",result_revealed.to_string());
         } else {
             let x = vec![Wrapping(0), Wrapping(1), Wrapping(0), Wrapping(0)];
             let y = vec![Wrapping(1), Wrapping(0), Wrapping(0), Wrapping(0)];
-            let result = or_xor(&x, &y, ctx, 2);
+            let result = or_xor(&x, &y, ctx, 2,ctx.dt_training.dataset_size_prime);
             println!("{:?}", result);
 //            let result_revealed = reveal_bigint_result(&result,ctx);
 //            println!("{}",result_revealed.to_string());
@@ -388,11 +388,11 @@ pub mod protocol_test {
     pub fn test_change_binary_to_decimal_field(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
             let input = vec![1, 0, 0, 1];
-            let result = change_binary_to_decimal_field(&input, ctx);
+            let result = change_binary_to_decimal_field(&input, ctx,ctx.dt_training.dataset_size_prime);
             println!("{:?}", result);
         } else {
             let input = vec![0, 1, 1, 1];
-            let result = change_binary_to_decimal_field(&input, ctx);
+            let result = change_binary_to_decimal_field(&input, ctx,ctx.dt_training.dataset_size_prime);
             println!("{:?}", result);
         }
     }
@@ -437,6 +437,24 @@ pub mod protocol_test {
             let x = vec![Wrapping(1 as u64),Wrapping(1 as u64),Wrapping(2 as u64),Wrapping(0 as u64)];
             let y =  vec![Wrapping(3 as u64),Wrapping(0 as u64),Wrapping(3 as u64),Wrapping(3 as u64)];
             let result = dot_product_integer(&x,&y,ctx);
+            println!("{:?}", result);
+//            let result_revealed = reveal_int_result(&result, ctx);
+//            println!("{:?}", result_revealed);
+        }
+    }
+
+    pub fn test_batch_integer_equality(ctx: &mut ComputingParty){
+        if ctx.party_id == 0 {
+            let x = vec![Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64)];
+            let y = vec![Wrapping(1 as u64),Wrapping(1 as u64),Wrapping(1 as u64),Wrapping(1 as u64)];
+            let result = batch_equality_integer(&x,&y,ctx,2);
+            println!("{:?}", result);
+//            let result_revealed = reveal_int_result(&result, ctx);
+//            println!("{:?}", result_revealed);
+        } else {
+            let x = vec![Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64)];
+            let y =  vec![Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64)];
+            let result = batch_equality_integer(&x,&y,ctx,2);
             println!("{:?}", result);
 //            let result_revealed = reveal_int_result(&result, ctx);
 //            println!("{:?}", result_revealed);

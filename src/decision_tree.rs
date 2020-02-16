@@ -35,6 +35,9 @@ pub mod decision_tree {
         pub class_values_bytes: Vec<Vec<u8>>,
         pub attr_values_big_integer: Vec<Vec<Vec<BigUint>>>,
         pub class_values_big_integer: Vec<Vec<BigUint>>,
+        pub discretized_x: Vec<Vec<Wrapping<u64>>>,
+        pub discretized_y: Vec<u64>,
+        pub rfs_x: Vec<Vec<Wrapping<u64>>>,
     }
 
     pub struct DecisionTreeTraining {
@@ -50,13 +53,18 @@ pub mod decision_tree {
         pub dataset_size_bit_length: u64,
         pub bit_length: u64,
         pub big_int_ti_index: u64,
+        pub rfs_field:u64,
+        pub bagging_field:u64
     }
 
     pub struct DecisionTreeShares {
         pub additive_triples: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
         pub additive_bigint_triples: Vec<(BigUint, BigUint, BigUint)>,
+        pub rfs_shares: Vec<Vec<Wrapping<u64>>>,
+        pub bagging_shares: Vec<Wrapping<u64>>,
         pub binary_triples: Vec<(u8, u8, u8)>,
         pub equality_shares: Vec<(BigUint)>,
+        pub equality_integer_shares:Vec<Wrapping<u64>>,
         pub current_additive_index: Arc<Mutex<usize>>,
         pub current_additive_bigint_index: Arc<Mutex<usize>>,
         pub current_equality_index: Arc<Mutex<usize>>,
@@ -65,6 +73,10 @@ pub mod decision_tree {
         pub sequential_additive_bigint_index: usize,
         pub sequential_equality_index: usize,
         pub sequential_binary_index: usize,
+        pub sequential_equality_integer_index:usize,
+        pub sequential_ohe_additive_index:usize,
+        pub matrix_mul_shares:(Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>),
+        pub ohe_additive_triples: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
     }
 
 
@@ -74,6 +86,11 @@ pub mod decision_tree {
         pub additive_bigint_triples: String,
         pub binary_triples: String,
         pub equality_shares: String,
+        pub rfs_shares: String,
+        pub bagging_shares: String,
+        pub matrix_mul_shares:String,
+        pub equality_integer_shares:String,
+        pub ohe_additive_shares:String
     }
 
     pub struct DecisionTreeResult {
@@ -101,6 +118,9 @@ pub mod decision_tree {
                 class_values_bytes: self.class_values_bytes.clone(),
                 attr_values_big_integer: self.attr_values_big_integer.clone(),
                 class_values_big_integer: self.class_values_big_integer.clone(),
+                discretized_x: self.discretized_x.clone(),
+                discretized_y: self.discretized_y.clone(),
+                rfs_x: self.rfs_x.clone(),
             }
         }
     }
@@ -120,6 +140,8 @@ pub mod decision_tree {
                 dataset_size_bit_length: self.dataset_size_bit_length,
                 bit_length: self.bit_length,
                 big_int_ti_index: self.big_int_ti_index,
+                rfs_field: self.rfs_field,
+                bagging_field: self.bagging_field
             }
         }
     }
@@ -131,6 +153,21 @@ pub mod decision_tree {
             let mut additive_bigint_triples = Vec::new();
             let mut binary_triples = Vec::new();
             let mut equality_shares = Vec::new();
+            let mut rfs_shares = Vec::new();
+            let mut bagging_shares = Vec::new();
+            let mut ohe_additive_triples = Vec::new();
+
+            for item in self.ohe_additive_triples.iter(){
+                ohe_additive_triples.push(item.clone());
+            }
+
+            for item in self.rfs_shares.iter() {
+                rfs_shares.push(item.clone());
+            }
+
+            for item in self.bagging_shares.iter() {
+                bagging_shares.push(item.clone());
+            }
 
             for item in self.additive_triples.iter() {
                 additive_triples.push((item.0.clone(), item.1.clone(), item.2.clone()));
@@ -152,8 +189,11 @@ pub mod decision_tree {
             DecisionTreeShares {
                 additive_triples,
                 additive_bigint_triples,
+                rfs_shares,
+                bagging_shares,
                 binary_triples,
                 equality_shares,
+                equality_integer_shares: self.equality_integer_shares.clone(),
                 current_additive_index: Arc::clone(&self.current_additive_index),
                 current_additive_bigint_index: Arc::clone(&self.current_additive_bigint_index),
                 current_equality_index: Arc::clone(&self.current_equality_index),
@@ -162,6 +202,10 @@ pub mod decision_tree {
                 sequential_additive_bigint_index: self.sequential_additive_bigint_index,
                 sequential_equality_index: self.sequential_equality_index,
                 sequential_binary_index: self.sequential_binary_index,
+                sequential_equality_integer_index: self.sequential_equality_integer_index,
+                sequential_ohe_additive_index: self.sequential_ohe_additive_index,
+                matrix_mul_shares: (self.matrix_mul_shares.0.clone(), self.matrix_mul_shares.1.clone(), self.matrix_mul_shares.2.clone()),
+                ohe_additive_triples
             }
         }
     }
@@ -170,10 +214,10 @@ pub mod decision_tree {
     pub fn train(ctx: &mut ComputingParty, r: usize) -> DecisionTreeResult {
         println!("start building model");
         ctx.thread_hierarchy.push(format!("DT_level_{}", r));
-        if ctx.debug_output{
+        if ctx.debug_output {
             let current_transactions = ctx.dt_training.subset_transaction_bit_vector.clone();
-            let revealed = reveal_byte_vec_result(&current_transactions,ctx);
-            println!("current transactions{:?}",revealed);
+            let revealed = reveal_byte_vec_result(&current_transactions, ctx);
+            println!("current transactions{:?}", revealed);
         }
         let major_class_index = find_common_class_index(ctx);
         // Make majority class index one-hot encoding public
@@ -590,7 +634,7 @@ pub mod decision_tree {
         let mut now = SystemTime::now();
         ctx.thread_hierarchy.push("find_common_class_index".to_string());
         let mut subset_transaction_bit_vector = ctx.dt_training.subset_transaction_bit_vector.clone();
-        let mut subset_decimal = change_binary_to_decimal_field(&subset_transaction_bit_vector, ctx);
+        let mut subset_decimal = change_binary_to_decimal_field(&subset_transaction_bit_vector, ctx, ctx.dt_training.dataset_size_prime);
         let mut s = Vec::new();
         let mut bit_shares = Vec::new();
         let mut argmax_result = Vec::new();
@@ -606,7 +650,6 @@ pub mod decision_tree {
                 bit_shares.push(bd_result);
             }
             argmax_result = arg_max(&bit_shares, ctx);
-
         } else {
             let thread_pool = ThreadPool::new(ctx.thread_count);
             let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));

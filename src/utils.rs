@@ -149,7 +149,7 @@ pub mod utils {
         let bigint_shares = &ctx.dt_shares.additive_bigint_triples;
         if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_additive_bigint_index;
-            ctx.dt_shares.sequential_additive_bigint_index += 1;
+//            ctx.dt_shares.sequential_additive_bigint_index += 1;
             let current_bigint_share = &bigint_shares[current_index];
             return big_uint_triple_clone(current_bigint_share);
         } else {
@@ -164,7 +164,7 @@ pub mod utils {
         let shares = &ctx.dt_shares.equality_shares;
         if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_equality_index;
-            ctx.dt_shares.sequential_additive_bigint_index += 1;
+//            ctx.dt_shares.sequential_additive_bigint_index += 1;
             let current_share = &shares[current_index];
             return big_uint_clone(&current_share);
         } else {
@@ -175,11 +175,18 @@ pub mod utils {
         }
     }
 
+    pub fn get_current_equality_integer_shares(ctx: &mut ComputingParty,range:usize) -> Vec<Wrapping<u64>> {
+        let current_index = ctx.dt_shares.sequential_equality_integer_index;
+        let shares = ctx.dt_shares.equality_integer_shares[current_index..current_index + range].to_vec();
+        ctx.dt_shares.sequential_equality_integer_index += range;
+        return shares;
+    }
+
     pub fn get_current_additive_share(ctx: &mut ComputingParty) -> (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) {
         let shares = &ctx.dt_shares.additive_triples;
         if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_additive_index;
-            ctx.dt_shares.sequential_additive_index += 1;
+//            ctx.dt_shares.sequential_additive_index += 1;
             return shares[current_index];
         } else {
             let current_index = *(ctx.dt_shares.current_additive_index.lock().unwrap());
@@ -193,7 +200,7 @@ pub mod utils {
         let shares = &ctx.dt_shares.binary_triples;
         if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_binary_index;
-            ctx.dt_shares.sequential_binary_index += 1;
+//            ctx.dt_shares.sequential_binary_index += 1;
             return shares[current_index];
         } else {
             let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
@@ -215,6 +222,14 @@ pub mod utils {
         let current_index = ctx.dt_shares.sequential_additive_index;
         let shares = ctx.dt_shares.additive_triples[current_index..current_index + range].to_vec();
         ctx.dt_shares.sequential_binary_index += range;
+        return shares;
+    }
+
+
+    pub fn get_ohe_additive_shares(ctx: &mut ComputingParty, range: usize) -> Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> {
+        let current_index = ctx.dt_shares.sequential_ohe_additive_index;
+        let shares = ctx.dt_shares.ohe_additive_triples[current_index..current_index + range].to_vec();
+        ctx.dt_shares.sequential_ohe_additive_index += range;
         return shares;
     }
 
@@ -345,5 +360,9 @@ pub mod utils {
             result.push((&x[i]).add(&message_rec[i]).mod_floor(&ctx.dt_training.big_int_prime));
         }
         result
+    }
+
+    pub fn change_to_ohe(x:&Vec<Vec<u64>>,y:&Vec<u64>){
+
     }
 }

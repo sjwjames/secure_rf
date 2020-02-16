@@ -65,7 +65,7 @@ pub mod computing_party {
         pub dt_training: DecisionTreeTraining,
         pub dt_shares: DecisionTreeShares,
         pub dt_results: DecisionTreeResult,
-        pub result_file:File,
+        pub result_file: File,
 
         /* random forest */
         pub thread_count: usize,
@@ -222,6 +222,9 @@ pub mod computing_party {
             class_values_bytes,
             attr_values_big_integer: vec![],
             class_values_big_integer: vec![],
+            discretized_x: vec![],
+            discretized_y: vec![],
+            rfs_x: vec![]
         }
     }
 
@@ -451,9 +454,9 @@ pub mod computing_party {
 
         let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
 
-        let dataset_size_bit_length = ((instance_count as f64).log(E) / (2 as f64).log(E)).ceil() as u64;
+        let dataset_size_bit_length = (attr_value_count as f64).log2().ceil() as u64;
 
-        let dataset_size_prime = dataset_size_bit_length * dataset_size_bit_length as u64;
+        let dataset_size_prime = 2.0_f64.powf(dataset_size_bit_length as f64) as u64;
 
         let mut internal_addr; //= String::new();
         let mut external_addr; //= String::new();
@@ -522,6 +525,9 @@ pub mod computing_party {
 
         let dt_data = produce_dt_data(one_hot_encoding_matrix, class_value_count, attr_value_count, attribute_count, instance_count, party_id);
 
+        let rfs_field = 2.0_f64.powf((attr_value_count as f64).log2().ceil()) as u64;
+
+        let bagging_field = 2.0_f64.powf((instance_count as f64).log2().ceil()) as u64;
 
         let subset_transaction_bit_vector = vec![party_id as u8; instance_count];
         let cutoff_transaction_set_size = (epsilon * instance_count as f64) as usize;
@@ -539,6 +545,8 @@ pub mod computing_party {
             dataset_size_bit_length,
             bit_length,
             big_int_ti_index: 0,
+            rfs_field,
+            bagging_field
         };
         let local_mq_address = format!("amqp://guest:guest@{}:{}", local_mq_ip.clone(), local_mq_port);
         let remote_mq_address = format!("amqp://guest:guest@{}:{}", remote_mq_ip.clone(), remote_mq_port);
@@ -576,8 +584,11 @@ pub mod computing_party {
             dt_shares: DecisionTreeShares {
                 additive_triples: vec![],
                 additive_bigint_triples: vec![],
+                rfs_shares: vec![],
+                bagging_shares: vec![],
                 binary_triples: vec![],
                 equality_shares: vec![],
+                equality_integer_shares: vec![],
                 current_additive_index: Arc::new(Mutex::new(0 as usize)),
                 current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
                 current_equality_index: Arc::new(Mutex::new(0 as usize)),
@@ -585,7 +596,11 @@ pub mod computing_party {
                 sequential_additive_index: 0,
                 sequential_additive_bigint_index: 0,
                 sequential_equality_index: 0,
-                sequential_binary_index: 0
+                sequential_binary_index: 0,
+                sequential_equality_integer_index: 0,
+                sequential_ohe_additive_index: 0,
+                matrix_mul_shares: (vec![], vec![], vec![]),
+                ohe_additive_triples: vec![]
             },
             dt_results: DecisionTreeResult {
                 result_list: vec![]
@@ -719,11 +734,40 @@ pub mod computing_party {
             );
         }
 
+        let mut rfs_shares = Vec::new();
+        let rfs_share_vec: Vec<&str> = ti_shares_message.rfs_shares.split(";").collect();
+        for item in rfs_share_vec {
+            rfs_shares.push(serde_json::from_str(item).unwrap());
+        }
+
+        let mut bagging_shares = Vec::new();
+        let bagging_vec: Vec<&str> = ti_shares_message.bagging_shares.split(";").collect();
+        for item in bagging_vec {
+            bagging_shares.push(serde_json::from_str(item).unwrap());
+        }
+
+        let mut matrix_mul_shares = (Vec::new(),Vec::new(),Vec::new());
+        let matrix_mul_shares_str_vec:Vec<&str> = ti_shares_message.matrix_mul_shares.split("&").collect();
+        matrix_mul_shares.0 = serde_json::from_str(&matrix_mul_shares_str_vec[0]).unwrap();
+        matrix_mul_shares.1 = serde_json::from_str(&matrix_mul_shares_str_vec[1]).unwrap();
+        matrix_mul_shares.2 = serde_json::from_str(&matrix_mul_shares_str_vec[2]).unwrap();
+
+        let mut equality_integer_shares = serde_json::from_str(&ti_shares_message.equality_integer_shares).unwrap();
+
+        let ohe_additive_shares_str: Vec<&str> = ti_shares_message.ohe_additive_shares.split(";").collect();
+        let mut ohe_additive_triples = Vec::new();
+        for item in ohe_additive_shares_str {
+            ohe_additive_triples.push(serde_json::from_str(item).unwrap());
+        }
+
         DecisionTreeShares {
             additive_triples,
             additive_bigint_triples,
+            rfs_shares,
+            bagging_shares,
             binary_triples,
             equality_shares,
+            equality_integer_shares,
             current_additive_index: Arc::new(Mutex::new(0 as usize)),
             current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
             current_equality_index: Arc::new(Mutex::new(0 as usize)),
@@ -731,7 +775,11 @@ pub mod computing_party {
             sequential_additive_index: 0,
             sequential_additive_bigint_index: 0,
             sequential_equality_index: 0,
-            sequential_binary_index: 0
+            sequential_binary_index: 0,
+            sequential_equality_integer_index:0,
+            sequential_ohe_additive_index:0,
+            matrix_mul_shares,
+            ohe_additive_triples
         }
 //
 //
