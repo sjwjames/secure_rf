@@ -1,5 +1,5 @@
 pub mod random_forest {
-    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, reset_share_indices};
+    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, reset_share_indices, produce_dt_data};
     use crate::decision_tree::decision_tree;
     use std::sync::{Arc, Mutex};
     use threadpool::ThreadPool;
@@ -12,12 +12,47 @@ pub mod random_forest {
     use crate::utils::utils::get_additive_shares;
     use crate::bit_decomposition::bit_decomposition::bit_decomposition;
     use crate::comparison::comparison::comparison;
+    use crate::constants::constants::BINARY_PRIME;
 
     pub fn random_feature_selection(ctx: &mut ComputingParty) -> Vec<Vec<Wrapping<u64>>> {
         let x = &ctx.dt_data.discretized_x.clone();
         let rfs_shares = &ctx.dt_shares.rfs_shares.clone();
-        let mut result = matrix_multiplication_integer(&x, &rfs_shares, ctx,ctx.dt_training.rfs_field);
+        let mut result = matrix_multiplication_integer(&x, &rfs_shares, ctx, ctx.dt_training.rfs_field, &ctx.dt_shares.matrix_mul_shares);
+        let attribute_cnt = ctx.dt_shares.rfs_shares[0].len();
+        ctx.dt_training.attribute_bit_vector = vec![1u8; attribute_cnt];
         result
+    }
+
+    pub fn sample_with_replacement(ctx: &mut ComputingParty, attr_value_vec: &Vec<Vec<u8>>) {
+        println!("{:?}", ctx.dt_shares.bagging_shares);
+        let bagging_shares = ctx.dt_shares.bagging_shares.clone();
+        let mut temp = attr_value_vec.clone();
+        let mut class_values = ctx.dt_data.class_values_bytes.clone();
+        temp.append(&mut class_values);
+        let mut x_list = Vec::new();
+        for row in temp {
+            let mut temp_row = Vec::new();
+            for item in row {
+                temp_row.push(Wrapping(item as u64));
+            }
+            x_list.push(temp_row);
+        }
+        let mut result = matrix_multiplication_integer(&x_list, &bagging_shares, ctx, BINARY_PRIME as u64, &ctx.dt_shares.bagging_matrix_mul_shares);
+        let mut result_u8 = Vec::new();
+        for row in result {
+            let mut temp_row = Vec::new();
+            for item in row {
+                temp_row.push(item.0 as u8);
+            }
+            result_u8.push(temp_row);
+        }
+        let class_value_count = ctx.dt_data.class_value_count;
+        let instance_cnt = ctx.dt_shares.bagging_shares[0].len();
+        let attribute_cnt = ctx.dt_shares.rfs_shares[0].len();
+        ctx.dt_data = produce_dt_data(result_u8, ctx.dt_data.class_value_count, ctx.dt_data.attr_value_count, attribute_cnt, instance_cnt, ctx.asymmetric_bit);
+
+        ctx.dt_training.subset_transaction_bit_vector = vec![ctx.asymmetric_bit as u8; instance_cnt];
+        ctx.dt_training.cutoff_transaction_set_size = (ctx.dt_training.epsilon * instance_cnt as f64) as usize;
     }
 
 
@@ -66,9 +101,9 @@ pub mod random_forest {
 
                     for i in 0..rows {
                         x_row.push(dt_ctx.dt_data.rfs_x[i][j]);
-                        if dt_ctx.asymmetric_bit==1{
+                        if dt_ctx.asymmetric_bit == 1 {
                             y_row.push(Wrapping(k as u64));
-                        }else{
+                        } else {
                             y_row.push(Wrapping(0));
                         }
                     }
@@ -76,32 +111,31 @@ pub mod random_forest {
                     equality_y.append(&mut y_row);
                 }
             }
-            let result = batch_equality_integer(&equality_x, &equality_y, &mut dt_ctx,rfs_field);
-            println!("result:{:?}",result);
+            let result = batch_equality_integer(&equality_x, &equality_y, &mut dt_ctx, rfs_field);
+            println!("result:{:?}", result);
             let mut comparison_results = Vec::new();
-            for item in result{
-                let bits = bit_decomposition(item,&mut dt_ctx);
-                let mut compared = vec![0;bits.len()];
-                let comparison_result=comparison(&compared,&bits,&mut dt_ctx);
+            let rfs_field = (dt_ctx.dt_training.rfs_field as f64).log2().ceil() as usize;
+            for item in result {
+                let bits = bit_decomposition(item, &mut dt_ctx, rfs_field);
+                let mut compared = vec![0; bits.len()];
+                let comparison_result = comparison(&compared, &bits, &mut dt_ctx);
                 comparison_results.push(comparison_result);
             }
 
             let mut count = 0;
             let mut attr_values_bytes = Vec::new();
-            for j in 0..cols{
-                let mut attr_row = Vec::new();
-                for k in 0..attr_value_cnt{
+            for j in 0..cols {
+                for k in 0..attr_value_cnt {
                     let mut row = Vec::new();
-                    for i in 0..rows{
+                    for i in 0..rows {
                         row.push(comparison_results[count]);
-                        count+=1;
+                        count += 1;
                     }
-                    attr_row.push(row);
+                    attr_values_bytes.push(row);
                 }
-                attr_values_bytes.push(attr_row);
             }
-            println!("attr_values_bytes:{:?}",attr_values_bytes);
-
+            println!("attr_values_bytes:{:?}", attr_values_bytes);
+            sample_with_replacement(&mut dt_ctx, &attr_values_bytes);
 //
 //            thread_pool.execute(move || {
 //                dt_ctx.party0_port = current_p0_port;
@@ -145,7 +179,7 @@ pub mod random_forest {
 //                println!("{:?}",dt_training.result_list);
 //            });
 
-                dt_ctx.party0_port = current_p0_port;
+            dt_ctx.party0_port = current_p0_port;
             dt_ctx.party1_port = current_p1_port;
             reset_share_indices(&mut dt_ctx);
             let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);

@@ -61,7 +61,7 @@ pub mod decision_tree {
         pub additive_triples: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
         pub additive_bigint_triples: Vec<(BigUint, BigUint, BigUint)>,
         pub rfs_shares: Vec<Vec<Wrapping<u64>>>,
-        pub bagging_shares: Vec<Wrapping<u64>>,
+        pub bagging_shares: Vec<Vec<Wrapping<u64>>>,
         pub binary_triples: Vec<(u8, u8, u8)>,
         pub equality_shares: Vec<(BigUint)>,
         pub equality_integer_shares:Vec<Wrapping<u64>>,
@@ -76,6 +76,7 @@ pub mod decision_tree {
         pub sequential_equality_integer_index:usize,
         pub sequential_ohe_additive_index:usize,
         pub matrix_mul_shares:(Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>),
+        pub bagging_matrix_mul_shares:(Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>),
         pub ohe_additive_triples: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
     }
 
@@ -89,6 +90,7 @@ pub mod decision_tree {
         pub rfs_shares: String,
         pub bagging_shares: String,
         pub matrix_mul_shares:String,
+        pub bagging_matrix_mul_shares:String,
         pub equality_integer_shares:String,
         pub ohe_additive_shares:String
     }
@@ -205,6 +207,7 @@ pub mod decision_tree {
                 sequential_equality_integer_index: self.sequential_equality_integer_index,
                 sequential_ohe_additive_index: self.sequential_ohe_additive_index,
                 matrix_mul_shares: (self.matrix_mul_shares.0.clone(), self.matrix_mul_shares.1.clone(), self.matrix_mul_shares.2.clone()),
+                bagging_matrix_mul_shares: (self.bagging_matrix_mul_shares.0.clone(), self.bagging_matrix_mul_shares.1.clone(), self.bagging_matrix_mul_shares.2.clone()),
                 ohe_additive_triples
             }
         }
@@ -215,9 +218,9 @@ pub mod decision_tree {
         println!("start building model");
         ctx.thread_hierarchy.push(format!("DT_level_{}", r));
         if ctx.debug_output {
-            let current_transactions = ctx.dt_training.subset_transaction_bit_vector.clone();
-            let revealed = reveal_byte_vec_result(&current_transactions, ctx);
-            println!("current transactions{:?}", revealed);
+//            let current_transactions = ctx.dt_training.subset_transaction_bit_vector.clone();
+//            let revealed = reveal_byte_vec_result(&current_transactions, ctx);
+//            println!("current transactions{:?}", revealed);
         }
         let major_class_index = find_common_class_index(ctx);
         // Make majority class index one-hot encoding public
@@ -400,8 +403,11 @@ pub mod decision_tree {
         //todo multi-thread
         let mut u_decimal = Vec::new();
         for i in 0..class_value_count {
-            u_decimal.push(change_binary_to_bigint_field(&u_list[i], ctx));
+            let bigint_u = change_binary_to_bigint_field(&u_list[i], ctx);
+            u_decimal.push(bigint_u);
         }
+
+
 
         let attr_count = ctx.dt_data.attribute_count;
         let attr_val_count = ctx.dt_data.attr_value_count;
@@ -646,7 +652,7 @@ pub mod decision_tree {
             }
             for i in 0..ctx.dt_data.class_value_count {
                 let s_copied = s[i];
-                let bd_result = bit_decomposition(s[i], ctx);
+                let bd_result = bit_decomposition(s[i], ctx,ctx.dt_training.bit_length as usize);
                 bit_shares.push(bd_result);
             }
             argmax_result = arg_max(&bit_shares, ctx);
@@ -682,13 +688,14 @@ pub mod decision_tree {
             let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
 
             ctx_copied.thread_hierarchy.push("compute_bd".to_string());
+            let bit_length = ctx.dt_training.bit_length as usize;
             for i in 0..ctx.dt_data.class_value_count {
                 let mut bd_result_map = Arc::clone(&bd_result_map);
                 let mut ctx = ctx_copied.clone();
                 ctx.thread_hierarchy.push(format!("{}", i));
                 let s_copied = s[i];
                 thread_pool.execute(move || {
-                    let bd_result = bit_decomposition(s_copied, &mut ctx);
+                    let bd_result = bit_decomposition(s_copied, &mut ctx,bit_length);
                     let mut bd_result_map = bd_result_map.lock().unwrap();
                     (*bd_result_map).insert(i, bd_result);
                 });

@@ -194,7 +194,7 @@ pub mod computing_party {
         }
     }
 
-    fn produce_dt_data(one_hot_encoding_data: Vec<Vec<u8>>, class_value_count: usize, attr_value_count: usize, attribute_count: usize, instance_count: usize, asymmetric_bit: u8) -> DecisionTreeData {
+    pub fn produce_dt_data(one_hot_encoding_data: Vec<Vec<u8>>, class_value_count: usize, attr_value_count: usize, attribute_count: usize, instance_count: usize, asymmetric_bit: u8) -> DecisionTreeData {
         let mut attr_values_bytes = Vec::new();
         let mut class_values_bytes = Vec::new();
         for i in 0..attribute_count {
@@ -529,7 +529,7 @@ pub mod computing_party {
 
         let bagging_field = 2.0_f64.powf((instance_count as f64).log2().ceil()) as u64;
 
-        let subset_transaction_bit_vector = vec![party_id as u8; instance_count];
+        let subset_transaction_bit_vector = vec![asymmetric_bit as u8; instance_count];
         let cutoff_transaction_set_size = (epsilon * instance_count as f64) as usize;
         let attribute_bit_vector = vec![1u8; attribute_count];
         let dt_training = DecisionTreeTraining {
@@ -600,6 +600,7 @@ pub mod computing_party {
                 sequential_equality_integer_index: 0,
                 sequential_ohe_additive_index: 0,
                 matrix_mul_shares: (vec![], vec![], vec![]),
+                bagging_matrix_mul_shares: (vec![], vec![], vec![]),
                 ohe_additive_triples: vec![]
             },
             dt_results: DecisionTreeResult {
@@ -760,6 +761,12 @@ pub mod computing_party {
             ohe_additive_triples.push(serde_json::from_str(item).unwrap());
         }
 
+        let mut bagging_matrix_mul_shares = (Vec::new(),Vec::new(),Vec::new());
+        let bagging_matrix_mul_shares_str_vec:Vec<&str> = ti_shares_message.bagging_matrix_mul_shares.split("&").collect();
+        bagging_matrix_mul_shares.0 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[0]).unwrap();
+        bagging_matrix_mul_shares.1 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[1]).unwrap();
+        bagging_matrix_mul_shares.2 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[2]).unwrap();
+
         DecisionTreeShares {
             additive_triples,
             additive_bigint_triples,
@@ -779,6 +786,7 @@ pub mod computing_party {
             sequential_equality_integer_index:0,
             sequential_ohe_additive_index:0,
             matrix_mul_shares,
+            bagging_matrix_mul_shares,
             ohe_additive_triples
         }
 //

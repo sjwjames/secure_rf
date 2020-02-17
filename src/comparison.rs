@@ -45,6 +45,9 @@ pub mod comparison {
         ctx.thread_hierarchy.push("compute_E_parallel".to_string());
         let mut main_index = bit_length - 1;
         multiplication_e[main_index] = e_shares[bit_length - 1];
+        if main_index<1{
+            return multiplication_e;
+        }
         main_index -= 1;
         let mut temp_mul_e = e_shares.clone();
 

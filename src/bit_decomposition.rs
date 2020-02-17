@@ -12,10 +12,9 @@ pub mod bit_decomposition {
     use std::num::Wrapping;
     use std::ops::Div;
 
-    pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty) -> Vec<u8> {
+    pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty,bit_length:usize) -> Vec<u8> {
         ctx.thread_hierarchy.push("bit_decomposition".to_string());
         let mut input_shares = Vec::new();
-        let bit_length = ctx.dt_training.bit_length as usize;
 
         let binary_str = format!("{:b}", input);
         let reversed_binary_vec:Vec<char> = binary_str.chars().rev().collect();

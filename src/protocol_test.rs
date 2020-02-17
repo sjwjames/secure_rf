@@ -248,8 +248,8 @@ pub mod protocol_test {
     pub fn test_comparison(ctx: &mut ComputingParty) {
         let mut result = 0;
         if ctx.party_id == 0 {
-            let x: Vec<u8> = vec![1, 0, 0, 0];
-            let y: Vec<u8> = vec![0, 1, 0, 0];
+            let x: Vec<u8> = vec![0, 0, 0, 0];
+            let y: Vec<u8> = vec![0, 0, 0, 0];
 //            let e_shares = compute_e_shares(&x, &y, ctx);
 //            assert_eq!(e_shares, [1, 1, 0, 0]);
 //            let d_shares = compute_d_shares(&x, &y, ctx);
@@ -282,9 +282,9 @@ pub mod protocol_test {
 //            assert_eq!(c_share_revealed, [0, 0, 0, 0]);
             result = comparison(&x, &y, ctx);
         }
-
-        let result_revealed = reveal_byte_result(result, ctx);
-        assert_eq!(result_revealed, 0);
+         println!("{:?}",result);
+//        let result_revealed = reveal_byte_result(result, ctx);
+//        assert_eq!(result_revealed, 0);
     }
 
 
@@ -305,16 +305,19 @@ pub mod protocol_test {
     }
 
     pub fn test_bit_decomposition(ctx: &mut ComputingParty) {
+        let bit_length = (ctx.dt_training.rfs_field as f64).log2().ceil() as usize;
         if ctx.party_id == 0 {
-            let input = 4;
-            let bit_decomposed = bit_decomposition(input, ctx);
-            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
-            println!("{:?}", bit_decomposed_revealed);
+            let input = 1;
+            let bit_decomposed = bit_decomposition(input, ctx,bit_length);
+//            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
+//            println!("{:?}", bit_decomposed_revealed);
+            println!("{:?}",bit_decomposed);
         } else {
-            let input = 4;
-            let bit_decomposed = bit_decomposition(input, ctx);
-            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
-            println!("{:?}", bit_decomposed_revealed);
+            let input = 1;
+            let bit_decomposed = bit_decomposition(input, ctx,bit_length);
+//            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
+//            println!("{:?}", bit_decomposed_revealed);
+            println!("{:?}",bit_decomposed);
         }
     }
 

@@ -201,8 +201,7 @@ pub mod protocol {
     }
 
 
-    pub fn matrix_multiplication_integer(x: &Vec<Vec<Wrapping<u64>>>, y: &Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty,prime:u64) -> Vec<Vec<Wrapping<u64>>> {
-        let matrix_mul_shares = &ctx.dt_shares.matrix_mul_shares;
+    pub fn matrix_multiplication_integer(x: &Vec<Vec<Wrapping<u64>>>, y: &Vec<Vec<Wrapping<u64>>>, ctx: &ComputingParty,prime:u64,matrix_mul_shares:&(Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>)) -> Vec<Vec<Wrapping<u64>>> {
         let mut d_matrix = Vec::new();
         let mut e_matrix = Vec::new();
         let u_shares = matrix_mul_shares.0.clone();

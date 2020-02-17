@@ -38,6 +38,7 @@ big_int_prime = "8589934592"
 prime = 8
 bigint_bit_size = 33
 attr_value_cnt = 2
+class_value_cnt = 2
 feature_selected = 2
 instance_selected = 3
 instance_cnt = 4
