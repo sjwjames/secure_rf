@@ -146,7 +146,7 @@ pub mod multiplication {
         {
             let corr_rand = &mut ctx.dt_shares.additive_triples;
             for i in 0..tx_len {
-                let (u, v, w) = get_current_additive_share(ctx);
+                let (u, v, w) = get_current_additive_share(ctx,ctx.dt_training.prime);
                 //let (u, v, w) = if ctx.asymmetric_bit == 1 {CR_1} else {CR_0};
 
                 u_list[i] = Wrapping(u.0);
@@ -338,7 +338,7 @@ pub mod multiplication {
         let mut diff_list = Vec::new();
         let mut output = Vec::new();
 
-        let mut ti_shares = get_additive_shares(ctx,batch_size);
+        let mut ti_shares = get_additive_shares(ctx,batch_size,ctx.dt_training.prime);
         for i in 0..batch_size {
             let mut new_row = Vec::new();
             let ti_share_triple = ti_shares[i];

@@ -60,6 +60,7 @@ pub mod computing_party {
 
         /* DT training Data*/
         pub dt_data: DecisionTreeData,
+        pub raw_data_path: String,
 
         /* DT training*/
         pub dt_training: DecisionTreeTraining,
@@ -72,6 +73,8 @@ pub mod computing_party {
         pub tree_count: usize,
         pub batch_size: usize,
         pub tree_training_batch_size: usize,
+        pub instance_selected:u64,
+        pub feature_selected:u64,
 
         //multi_thread
         pub thread_hierarchy: Vec<String>,
@@ -105,6 +108,7 @@ pub mod computing_party {
                 output_path: self.output_path.clone(),
 
                 dt_data: self.dt_data.clone(),
+                raw_data_path: self.raw_data_path.clone(),
                 dt_training: self.dt_training.clone(),
                 dt_shares: self.dt_shares.clone(),
                 dt_results: self.dt_results.clone(),
@@ -115,6 +119,8 @@ pub mod computing_party {
                 batch_size: self.batch_size,
 
                 tree_training_batch_size: self.tree_training_batch_size,
+                instance_selected: self.instance_selected,
+                feature_selected: self.feature_selected,
                 thread_hierarchy: self.thread_hierarchy.clone(),
                 message_manager: Arc::new(Mutex::new(MessageManager {
                     map: HashMap::new()
@@ -122,6 +128,33 @@ pub mod computing_party {
 
             }
         }
+    }
+
+    pub fn load_dt_raw_data(file_path: &String) -> (Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>) {
+        let file = File::open(file_path).expect("input file not found");
+        let reader = BufReader::new(file);
+        let mut x = Vec::new();
+        let mut y = Vec::new();
+        for line in reader.lines() {
+            let line = line.unwrap();
+            let item: Vec<&str> = line.split(",").collect();
+            let length = item.len();
+            let mut x_row = Vec::new();
+            let mut y_row = Vec::new();
+            for i in 0..length{
+                if i != length{
+                    let x_item:u64 = item[i].parse().unwrap();
+                    x_row.push(Wrapping(x_item));
+                }else{
+                    let y_item:u64 = item[i].parse().unwrap();
+                    y_row.push(Wrapping(y_item));
+                }
+            }
+            x.push(x_row);
+            y.push(y_row);
+        }
+
+        (x,y)
     }
 
     fn load_dt_training_file(file_path: &String) -> (usize, usize, usize, usize, Vec<Vec<u8>>) {
@@ -224,7 +257,6 @@ pub mod computing_party {
             class_values_big_integer: vec![],
             discretized_x: vec![],
             discretized_y: vec![],
-            rfs_x: vec![]
         }
     }
 
@@ -451,8 +483,49 @@ pub mod computing_party {
             }
         };
 
+        let class_value_count = match settings.get_int("class_value_count") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing class_value_count: {:?}", error)
+            }
+        };
 
-        let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
+        let attr_value_count = match settings.get_int("attr_value_count") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing attr_value_count: {:?}", error)
+            }
+        };
+
+        let attribute_count = match settings.get_int("attribute_count") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing attribute_count: {:?}", error)
+            }
+        };
+
+        let instance_count = match settings.get_int("instance_count") {
+            Ok(num) => num as usize,
+            Err(error) => {
+                panic!("Encountered a problem while parsing instance_count: {:?}", error)
+            }
+        };
+
+        let instance_selected = match settings.get_int("instance_selected") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing instance_selected: {:?}", error)
+            }
+        };
+
+        let feature_selected = match settings.get_int("feature_selected") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing feature_selected: {:?}", error)
+            }
+        };
+
+//        let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
 
         let dataset_size_bit_length = (attr_value_count as f64).log2().ceil() as u64;
 
@@ -523,11 +596,11 @@ pub mod computing_party {
         ti_stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
 
-        let dt_data = produce_dt_data(one_hot_encoding_matrix, class_value_count, attr_value_count, attribute_count, instance_count, party_id);
+//        let dt_data = produce_dt_data(one_hot_encoding_matrix, class_value_count, attr_value_count, attribute_count, instance_count, party_id);
 
         let rfs_field = 2.0_f64.powf((attr_value_count as f64).log2().ceil()) as u64;
 
-        let bagging_field = 2.0_f64.powf((instance_count as f64).log2().ceil()) as u64;
+        let bagging_field = 2.0_f64.powf((instance_selected as f64).log2().ceil()) as u64;
 
         let subset_transaction_bit_vector = vec![asymmetric_bit as u8; instance_count];
         let cutoff_transaction_set_size = (epsilon * instance_count as f64) as usize;
@@ -546,7 +619,7 @@ pub mod computing_party {
             bit_length,
             big_int_ti_index: 0,
             rfs_field,
-            bagging_field
+            bagging_field,
         };
         let local_mq_address = format!("amqp://guest:guest@{}:{}", local_mq_ip.clone(), local_mq_port);
         let remote_mq_address = format!("amqp://guest:guest@{}:{}", remote_mq_ip.clone(), remote_mq_port);
@@ -578,30 +651,30 @@ pub mod computing_party {
             tree_count,
             batch_size,
             tree_training_batch_size,
-            dt_data,
+            instance_selected,
             dt_training,
             result_file,
+            raw_data_path:x_input_path,
             dt_shares: DecisionTreeShares {
-                additive_triples: vec![],
+                additive_triples: Default::default(),
                 additive_bigint_triples: vec![],
                 rfs_shares: vec![],
                 bagging_shares: vec![],
                 binary_triples: vec![],
                 equality_shares: vec![],
-                equality_integer_shares: vec![],
+                equality_integer_shares: Default::default(),
                 current_additive_index: Arc::new(Mutex::new(0 as usize)),
                 current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
                 current_equality_index: Arc::new(Mutex::new(0 as usize)),
                 current_binary_index: Arc::new(Mutex::new(0 as usize)),
-                sequential_additive_index: 0,
+                sequential_additive_index: Default::default(),
                 sequential_additive_bigint_index: 0,
                 sequential_equality_index: 0,
                 sequential_binary_index: 0,
-                sequential_equality_integer_index: 0,
+                sequential_equality_integer_index: Default::default(),
                 sequential_ohe_additive_index: 0,
                 matrix_mul_shares: (vec![], vec![], vec![]),
                 bagging_matrix_mul_shares: (vec![], vec![], vec![]),
-                ohe_additive_triples: vec![]
             },
             dt_results: DecisionTreeResult {
                 result_list: vec![]
@@ -610,6 +683,21 @@ pub mod computing_party {
             message_manager: Arc::new(Mutex::new(MessageManager {
                 map: HashMap::new()
             })),
+            dt_data: DecisionTreeData {
+                attr_value_count,
+                class_value_count,
+                attribute_count,
+                instance_count,
+                attr_values: vec![],
+                class_values: vec![],
+                attr_values_bytes: vec![],
+                class_values_bytes: vec![],
+                attr_values_big_integer: vec![],
+                class_values_big_integer: vec![],
+                discretized_x: vec![],
+                discretized_y: vec![],
+            },
+            feature_selected
         }
     }
 
@@ -668,7 +756,7 @@ pub mod computing_party {
         (in_stream, o_stream)
     }
 
-    pub fn ti_receive(mut stream: TcpStream) -> DecisionTreeShares {
+    pub fn ti_receive(mut stream: TcpStream,ctx:&mut ComputingParty) -> DecisionTreeShares {
         stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
         stream.set_write_timeout(None).expect("set_write_timeout call failed");
         stream.set_read_timeout(None).expect("set_read_timeout call failed");
@@ -701,11 +789,7 @@ pub mod computing_party {
         let mut share_message = String::new();
         reader.read_line(&mut share_message).expect("fail to read share message str");
         let ti_shares_message: DecisionTreeTIShareMessage = serde_json::from_str(&share_message).unwrap();
-        let additive_triple_str_vec: Vec<&str> = ti_shares_message.additive_triples.split(";").collect();
-        let mut additive_triples = Vec::new();
-        for item in additive_triple_str_vec {
-            additive_triples.push(serde_json::from_str(item).unwrap());
-        }
+        let additive_triples: HashMap<u64,Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>= serde_json::from_str(&ti_shares_message.additive_triples).unwrap();
 
         let mut additive_bigint_triples = Vec::new();
         let additive_bigint_triple_str_vec: Vec<&str> = ti_shares_message.additive_bigint_triples.split(";").collect();
@@ -747,25 +831,28 @@ pub mod computing_party {
             bagging_shares.push(serde_json::from_str(item).unwrap());
         }
 
-        let mut matrix_mul_shares = (Vec::new(),Vec::new(),Vec::new());
-        let matrix_mul_shares_str_vec:Vec<&str> = ti_shares_message.matrix_mul_shares.split("&").collect();
+        let mut matrix_mul_shares = (Vec::new(), Vec::new(), Vec::new());
+        let matrix_mul_shares_str_vec: Vec<&str> = ti_shares_message.matrix_mul_shares.split("&").collect();
         matrix_mul_shares.0 = serde_json::from_str(&matrix_mul_shares_str_vec[0]).unwrap();
         matrix_mul_shares.1 = serde_json::from_str(&matrix_mul_shares_str_vec[1]).unwrap();
         matrix_mul_shares.2 = serde_json::from_str(&matrix_mul_shares_str_vec[2]).unwrap();
 
         let mut equality_integer_shares = serde_json::from_str(&ti_shares_message.equality_integer_shares).unwrap();
 
-        let ohe_additive_shares_str: Vec<&str> = ti_shares_message.ohe_additive_shares.split(";").collect();
-        let mut ohe_additive_triples = Vec::new();
-        for item in ohe_additive_shares_str {
-            ohe_additive_triples.push(serde_json::from_str(item).unwrap());
-        }
-
-        let mut bagging_matrix_mul_shares = (Vec::new(),Vec::new(),Vec::new());
-        let bagging_matrix_mul_shares_str_vec:Vec<&str> = ti_shares_message.bagging_matrix_mul_shares.split("&").collect();
+        let mut bagging_matrix_mul_shares = (Vec::new(), Vec::new(), Vec::new());
+        let bagging_matrix_mul_shares_str_vec: Vec<&str> = ti_shares_message.bagging_matrix_mul_shares.split("&").collect();
         bagging_matrix_mul_shares.0 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[0]).unwrap();
         bagging_matrix_mul_shares.1 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[1]).unwrap();
         bagging_matrix_mul_shares.2 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[2]).unwrap();
+
+        let mut sequential_equality_integer_index = HashMap::new();
+        sequential_equality_integer_index.insert(ctx.dt_training.rfs_field,0);
+        sequential_equality_integer_index.insert(ctx.dt_training.bagging_field,0);
+
+        let mut sequential_additive_index  = HashMap::new();
+        sequential_additive_index.insert(ctx.dt_training.prime,0);
+        sequential_additive_index.insert(ctx.dt_training.rfs_field,0);
+        sequential_additive_index.insert(ctx.dt_training.bagging_field,0);
 
         DecisionTreeShares {
             additive_triples,
@@ -779,15 +866,14 @@ pub mod computing_party {
             current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
             current_equality_index: Arc::new(Mutex::new(0 as usize)),
             current_binary_index: Arc::new(Mutex::new(0 as usize)),
-            sequential_additive_index: 0,
+            sequential_additive_index,
             sequential_additive_bigint_index: 0,
             sequential_equality_index: 0,
             sequential_binary_index: 0,
-            sequential_equality_integer_index:0,
-            sequential_ohe_additive_index:0,
+            sequential_equality_integer_index,
+            sequential_ohe_additive_index: 0,
             matrix_mul_shares,
             bagging_matrix_mul_shares,
-            ohe_additive_triples
         }
 //
 //

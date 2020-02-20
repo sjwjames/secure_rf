@@ -201,15 +201,15 @@ pub mod protocol {
     }
 
 
-    pub fn matrix_multiplication_integer(x: &Vec<Vec<Wrapping<u64>>>, y: &Vec<Vec<Wrapping<u64>>>, ctx: &ComputingParty,prime:u64,matrix_mul_shares:&(Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>)) -> Vec<Vec<Wrapping<u64>>> {
+    pub fn matrix_multiplication_integer(x: &Vec<Vec<Wrapping<u64>>>, y: &Vec<Vec<Wrapping<u64>>>, ctx: &ComputingParty, prime: u64, matrix_mul_shares: &(Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>)) -> Vec<Vec<Wrapping<u64>>> {
         let mut d_matrix = Vec::new();
         let mut e_matrix = Vec::new();
         let u_shares = matrix_mul_shares.0.clone();
         let v_shares = matrix_mul_shares.1.clone();
         let w_shares = matrix_mul_shares.2.clone();
-        println!("{:?}",u_shares);
-        println!("{:?}",v_shares);
-        println!("{:?}",w_shares);
+        println!("{:?}", u_shares);
+        println!("{:?}", v_shares);
+        println!("{:?}", w_shares);
 
         let mut o_stream = ctx.o_stream.try_clone()
             .expect("failed cloning tcp o_stream");
@@ -250,25 +250,25 @@ pub mod protocol {
         let dv = local_matrix_multiplication(&d, &v_shares, prime);
         let w_eu = local_matrix_computation(&w_shares, &eu, prime, LOCAL_ADDITION);
         let w_eu_dv = local_matrix_computation(&w_eu, &dv, prime, LOCAL_ADDITION);
-        let result = if ctx.asymmetric_bit==1 { local_matrix_computation(&w_eu_dv, &de, prime, LOCAL_ADDITION)} else { w_eu_dv.clone() } ;
-        println!("d:{:?}",d);
-        println!("e:{:?}",e);
-        println!("de:{:?}",de);
-        println!("eu:{:?}",eu);
-        println!("dv:{:?}",dv);
-        println!("w_eu:{:?}",w_eu);
-        println!("w_eu_dv:{:?}",w_eu_dv);
+        let result = if ctx.asymmetric_bit == 1 { local_matrix_computation(&w_eu_dv, &de, prime, LOCAL_ADDITION) } else { w_eu_dv.clone() };
+        println!("d:{:?}", d);
+        println!("e:{:?}", e);
+        println!("de:{:?}", de);
+        println!("eu:{:?}", eu);
+        println!("dv:{:?}", dv);
+        println!("w_eu:{:?}", w_eu);
+        println!("w_eu_dv:{:?}", w_eu_dv);
         println!("rfs result{:?}", result);
         result
     }
 
-    pub fn batch_equality_integer(x: &Vec<Wrapping<u64>>, y: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty,prime:u64) -> Vec<u64> {
+    pub fn batch_equality_integer(x: &Vec<Wrapping<u64>>, y: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty, prime: u64) -> Vec<u64> {
         let range = x.len();
         let mut xy_diff = Vec::new();
         let mut diff_list = vec![vec![Wrapping(0 as u64); 2]; range];
         let mut result = Vec::new();
-        let additive_shares = get_ohe_additive_shares(ctx, range);
-        let equality_shares = get_current_equality_integer_shares(ctx, range);
+        let additive_shares = get_additive_shares(ctx, range, prime);
+        let equality_shares = get_current_equality_integer_shares(ctx, range, prime);
         for i in 0..range {
             let diff = Wrapping((x[i] - y[i]).0.mod_floor(&prime));
             xy_diff.push(diff);

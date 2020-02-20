@@ -350,7 +350,7 @@ pub mod ti {
             for i in 0..current_batch_size {
                 print!("{} [{}] generating additive shares...      ", &prefix, i);
                 let now = SystemTime::now();
-                let (add_triples0, add_triples1) = generate_additive_shares(&ctx, &thread_pool, ctx.prime);
+                let (add_triples0, add_triples1) = generate_additive_shares(&ctx, &thread_pool);
                 println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
 
 
@@ -389,14 +389,9 @@ pub mod ti {
 
                 print!("{} [{}] generating equality integer shares...           ", &prefix, i);
                 let now = SystemTime::now();
-                let (equality_share0, equality_share1) = generate_equality_integer_shares(&ctx, &thread_pool, ctx.rfs_field);
+                let (equality_share0, equality_share1) = generate_equality_integer_shares(&ctx, &thread_pool);
                 println!("complete -- work time = {:5} (ms)",
                          now.elapsed().unwrap().as_millis());
-
-                print!("{} [{}] generating additive shares...      ", &prefix, i);
-                let now = SystemTime::now();
-                let (ohe_add_triples0, ohe_add_triples1) = generate_additive_shares(&ctx, &thread_pool, ctx.rfs_field);
-                println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
 
                 let now = SystemTime::now();
                 let (bagging_matrix_mul_share0, bagging_matrix_mul_share1) = generate_rfs_matrix_shares(&ctx, (ctx.feature_selected * ctx.attr_value_cnt + ctx.class_value_cnt) as usize, ctx.instance_cnt as usize, ctx.instance_selected as usize, BINARY_PRIME as u64);
@@ -415,15 +410,14 @@ pub mod ti {
                     current_additive_bigint_index: Arc::new(Mutex::new(0)),
                     current_equality_index: Arc::new(Mutex::new(0)),
                     current_binary_index: Arc::new(Mutex::new(0)),
-                    sequential_additive_index: 0,
+                    sequential_additive_index: Default::default(),
                     sequential_additive_bigint_index: 0,
                     sequential_equality_index: 0,
                     sequential_binary_index: 0,
-                    sequential_equality_integer_index: 0,
+                    sequential_equality_integer_index: Default::default(),
                     sequential_ohe_additive_index: 0,
                     matrix_mul_shares: matrix_mul_share0,
                     bagging_matrix_mul_shares: bagging_matrix_mul_share0,
-                    ohe_additive_triples: ohe_add_triples0,
                 };
 
                 let mut share1 = DecisionTreeShares {
@@ -438,15 +432,14 @@ pub mod ti {
                     current_additive_bigint_index: Arc::new(Mutex::new(0)),
                     current_equality_index: Arc::new(Mutex::new(0)),
                     current_binary_index: Arc::new(Mutex::new(0)),
-                    sequential_additive_index: 0,
+                    sequential_additive_index: Default::default(),
                     sequential_additive_bigint_index: 0,
                     sequential_equality_index: 0,
                     sequential_binary_index: 0,
-                    sequential_equality_integer_index: 0,
+                    sequential_equality_integer_index: Default::default(),
                     sequential_ohe_additive_index: 0,
                     matrix_mul_shares: matrix_mul_share1,
                     bagging_matrix_mul_shares: bagging_matrix_mul_share1,
-                    ohe_additive_triples: ohe_add_triples1,
                 };
                 let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
                 let sender_thread0 = thread::spawn(move || {
@@ -496,10 +489,6 @@ pub mod ti {
         //////////////////////// SEND ADDITIVES ////////////////////////
 
         let mut additive_shares = shares.additive_triples;
-        let mut additive_share_str_vec = Vec::new();
-        for item in additive_shares.iter() {
-            additive_share_str_vec.push(serde_json::to_string(&item).unwrap());
-        }
 
         //////////////////////// SEND ADDITIVES ////////////////////////
 
@@ -558,13 +547,6 @@ pub mod ti {
         let mut equality_integer_shares = shares.equality_integer_shares;
 
 
-        let mut ohe_additive_triples = shares.ohe_additive_triples;
-
-        let mut ohe_additive_triples_str_vec = Vec::new();
-        for item in ohe_additive_triples.iter() {
-            ohe_additive_triples_str_vec.push(serde_json::to_string(&item).unwrap());
-        }
-
         let mut bagging_matrix_mul_share = shares.bagging_matrix_mul_shares;
         let mut bagging_matrix_mul_share_str_vec = Vec::new();
         bagging_matrix_mul_share_str_vec.push(serde_json::to_string(&bagging_matrix_mul_share.0).unwrap());
@@ -572,7 +554,7 @@ pub mod ti {
         bagging_matrix_mul_share_str_vec.push(serde_json::to_string(&bagging_matrix_mul_share.2).unwrap());
 
         let dt_share_message = DecisionTreeTIShareMessage {
-            additive_triples: additive_share_str_vec.join(";"),
+            additive_triples: serde_json::to_string(&additive_shares).unwrap(),
             additive_bigint_triples: additive_bigint_str_vec.join(";"),
             binary_triples: binary_share_str_vec.join(";"),
             equality_shares: equality_bigint_str_vec.join(";"),
@@ -581,7 +563,6 @@ pub mod ti {
             matrix_mul_shares: matrix_mul_share_str_vec.join("&"),
             bagging_matrix_mul_shares: bagging_matrix_mul_share_str_vec.join("&"),
             equality_integer_shares: serde_json::to_string(&equality_integer_shares).unwrap(),
-            ohe_additive_shares: ohe_additive_triples_str_vec.join(";"),
         };
 
         let mut message_str = serde_json::to_string(&dt_share_message).unwrap() + "\n";
@@ -623,7 +604,7 @@ pub mod ti {
         (share0, share1)
     }
 
-    fn generate_additive_shares(ctx: &TI, thread_pool: &ThreadPool, prime: u64) -> (Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>) {
+    fn additive_share_helper(ctx: &TI, thread_pool: &ThreadPool, prime: u64) -> (Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share0 = Vec::new();
@@ -657,7 +638,38 @@ pub mod ti {
         (share0, share1)
     }
 
-    fn generate_equality_integer_shares(ctx: &TI, thread_pool: &ThreadPool, prime: u64) -> (Vec<Wrapping<u64>>, Vec<Wrapping<u64>>) {
+    fn generate_additive_shares(ctx: &TI, thread_pool: &ThreadPool) -> (HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>, HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>) {
+        let mut result0 = HashMap::new();
+        let mut result1 = HashMap::new();
+        let (mut general0, mut general1) = additive_share_helper(ctx, thread_pool, ctx.prime);
+        let (mut feature0, mut feature1) = additive_share_helper(ctx, thread_pool, ctx.rfs_field);
+        let (mut class0, mut class1) = additive_share_helper(ctx, thread_pool, ctx.bagging_field);
+        result0.insert(ctx.prime, general0);
+        result1.insert(ctx.prime, general1);
+        if ctx.prime == ctx.rfs_field {
+            result0.get_mut(&ctx.prime).unwrap().append(&mut feature0);
+            result1.get_mut(&ctx.prime).unwrap().append(&mut feature1);
+        } else {
+            result0.insert(ctx.rfs_field, feature0);
+            result1.insert(ctx.rfs_field, feature1);
+        }
+        if ctx.prime == ctx.bagging_field {
+            result0.get_mut(&ctx.prime).unwrap().append(&mut class0);
+            result1.get_mut(&ctx.prime).unwrap().append(&mut class1);
+        } else {
+            if ctx.rfs_field == ctx.bagging_field {
+                result0.get_mut(&ctx.rfs_field).unwrap().append(&mut class0);
+                result1.get_mut(&ctx.rfs_field).unwrap().append(&mut class1);
+            } else {
+                result0.insert(ctx.bagging_field, class0);
+                result1.insert(ctx.bagging_field, class1);
+            }
+        }
+
+        (result0, result1)
+    }
+
+    fn equality_integer_shares_helper(ctx: &TI, thread_pool: &ThreadPool, prime: u64) -> (Vec<Wrapping<u64>>, Vec<Wrapping<u64>>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
@@ -687,8 +699,25 @@ pub mod ti {
             let mut share1_item = share1_map.get(&i).unwrap().clone();
             share1.push(share1_item);
         }
-
         (share0, share1)
+    }
+
+    fn generate_equality_integer_shares(ctx: &TI, thread_pool: &ThreadPool) -> (HashMap<u64, Vec<Wrapping<u64>>>, HashMap<u64, Vec<Wrapping<u64>>>) {
+        let mut result0 = HashMap::new();
+        let mut result1 = HashMap::new();
+        let (mut feature_eq0, mut feature_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.rfs_field);
+        let (mut class_eq0, mut class_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.bagging_field);
+        result0.insert(ctx.rfs_field, feature_eq0);
+        result1.insert(ctx.rfs_field, feature_eq1);
+
+        if ctx.rfs_field == ctx.bagging_field {
+            result0.get_mut(&ctx.rfs_field).unwrap().append(&mut class_eq0);
+            result1.get_mut(&ctx.rfs_field).unwrap().append(&mut class_eq1);
+        } else {
+            result0.insert(ctx.bagging_field, class_eq0);
+            result1.insert(ctx.bagging_field, class_eq1);
+        }
+        (result0, result1)
     }
 
     fn generate_rfs_share(ctx: &TI) -> (Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>) {

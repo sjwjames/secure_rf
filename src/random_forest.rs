@@ -1,5 +1,5 @@
 pub mod random_forest {
-    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, reset_share_indices, produce_dt_data};
+    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, reset_share_indices, produce_dt_data, load_dt_raw_data};
     use crate::decision_tree::decision_tree;
     use std::sync::{Arc, Mutex};
     use threadpool::ThreadPool;
@@ -55,6 +55,77 @@ pub mod random_forest {
         ctx.dt_training.cutoff_transaction_set_size = (ctx.dt_training.epsilon * instance_cnt as f64) as usize;
     }
 
+    pub fn discretize_data(x:Vec<Vec<Wrapping<u64>>>,ctx:&mut ComputingParty){
+        if ctx.asymmetric_bit == 1 {
+            ctx.dt_data.discretized_x = {
+                [
+                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
+                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
+                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec()
+                ].to_vec()
+            };
+        } else {
+            ctx.dt_data.discretized_x = {
+                [
+                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+                    [Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)].to_vec(),
+                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+                    [Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(0 as u64)].to_vec()
+                ].to_vec()
+            };
+        }
+    }
+
+    pub fn ohe_conversion(x:&Vec<Vec<Wrapping<u64>>>,ctx: &mut ComputingParty,category:usize,prime:u64)->Vec<Vec<u8>>{
+        let rows = x.len();
+        let cols = x[0].len();
+        let mut equality_x = Vec::new();
+        let mut equality_y = Vec::new();
+        for j in 0..cols {
+            for k in 0..category {
+                let mut x_row = Vec::new();
+                let mut y_row = Vec::new();
+
+                for i in 0..rows {
+                    x_row.push(x[i][j]);
+                    if ctx.asymmetric_bit == 1 {
+                        y_row.push(Wrapping(k as u64));
+                    } else {
+                        y_row.push(Wrapping(0));
+                    }
+                }
+                equality_x.append(&mut x_row);
+                equality_y.append(&mut y_row);
+            }
+        }
+        let result = batch_equality_integer(&equality_x, &equality_y, ctx, prime);
+        println!("result:{:?}", result);
+        let mut comparison_results = Vec::new();
+        let bit_length = (prime as f64).log2().ceil() as usize;
+        for item in result {
+            let bits = bit_decomposition(item, ctx, bit_length);
+            let mut compared = vec![0; bits.len()];
+            let comparison_result = comparison(&compared, &bits, ctx);
+            comparison_results.push(comparison_result);
+        }
+
+        let mut count = 0;
+        let mut result = Vec::new();
+        for j in 0..cols {
+            for k in 0..category {
+                let mut row = Vec::new();
+                for i in 0..rows {
+                    row.push(comparison_results[count]);
+                    count += 1;
+                }
+                result.push(row);
+            }
+        }
+        println!("attr_values_bytes:{:?}", result);
+        result
+    }
+
 
     pub fn train(ctx: &mut ComputingParty) {
         ctx.thread_hierarchy.push("RF".to_string());
@@ -62,79 +133,30 @@ pub mod random_forest {
         let mut remainder = ctx.tree_count;
         let mut current_p0_port = ctx.party0_port + 1;
         let mut current_p1_port = ctx.party1_port + 1;
+        let (x,mut y) = load_dt_raw_data(&ctx.raw_data_path);
+
+        y= [
+            [Wrapping(1)].to_vec(),
+            [Wrapping(0)].to_vec(),
+            [Wrapping(0)].to_vec(),
+            [Wrapping(1)].to_vec()
+        ].to_vec();
+        discretize_data(x,ctx);
+        let attr_value_count = ctx.dt_data.attr_value_count;
         let rfs_field = ctx.dt_training.rfs_field;
+        let class_value_count = ctx.dt_data.class_value_count;
+        let bagging_field = ctx.dt_training.bagging_field;
         for current_tree_index in 0..remainder {
             let dt_shares = ti_receive(
-                ctx.ti_stream.try_clone().expect("failed to clone ti recvr"));
+                ctx.ti_stream.try_clone().expect("failed to clone ti recvr"),ctx);
             let mut dt_ctx = ctx.clone();
             dt_ctx.dt_shares = dt_shares;
-            if dt_ctx.asymmetric_bit == 1 {
-                dt_ctx.dt_data.discretized_x = {
-                    [
-                        [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
-                        [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-                        [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
-                        [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec()
-                    ].to_vec()
-                };
-            } else {
-                dt_ctx.dt_data.discretized_x = {
-                    [
-                        [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-                        [Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)].to_vec(),
-                        [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-                        [Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(0 as u64)].to_vec()
-                    ].to_vec()
-                };
-            }
-            dt_ctx.dt_data.rfs_x = random_feature_selection(&mut dt_ctx);
+            dt_ctx.dt_data.class_values_bytes = ohe_conversion(&y,&mut dt_ctx,class_value_count,bagging_field);
 
-            let cols = dt_ctx.dt_data.rfs_x[0].len();
-            let rows = dt_ctx.dt_data.rfs_x.len();
-            let attr_value_cnt = dt_ctx.dt_data.attr_value_count;
-            let mut equality_x = Vec::new();
-            let mut equality_y = Vec::new();
-            for j in 0..cols {
-                for k in 0..attr_value_cnt {
-                    let mut x_row = Vec::new();
-                    let mut y_row = Vec::new();
 
-                    for i in 0..rows {
-                        x_row.push(dt_ctx.dt_data.rfs_x[i][j]);
-                        if dt_ctx.asymmetric_bit == 1 {
-                            y_row.push(Wrapping(k as u64));
-                        } else {
-                            y_row.push(Wrapping(0));
-                        }
-                    }
-                    equality_x.append(&mut x_row);
-                    equality_y.append(&mut y_row);
-                }
-            }
-            let result = batch_equality_integer(&equality_x, &equality_y, &mut dt_ctx, rfs_field);
-            println!("result:{:?}", result);
-            let mut comparison_results = Vec::new();
-            let rfs_field = (dt_ctx.dt_training.rfs_field as f64).log2().ceil() as usize;
-            for item in result {
-                let bits = bit_decomposition(item, &mut dt_ctx, rfs_field);
-                let mut compared = vec![0; bits.len()];
-                let comparison_result = comparison(&compared, &bits, &mut dt_ctx);
-                comparison_results.push(comparison_result);
-            }
+            let rfs_x = random_feature_selection(&mut dt_ctx);
+            let mut attr_values_bytes = ohe_conversion(&rfs_x,&mut dt_ctx,attr_value_count,rfs_field);
 
-            let mut count = 0;
-            let mut attr_values_bytes = Vec::new();
-            for j in 0..cols {
-                for k in 0..attr_value_cnt {
-                    let mut row = Vec::new();
-                    for i in 0..rows {
-                        row.push(comparison_results[count]);
-                        count += 1;
-                    }
-                    attr_values_bytes.push(row);
-                }
-            }
-            println!("attr_values_bytes:{:?}", attr_values_bytes);
             sample_with_replacement(&mut dt_ctx, &attr_values_bytes);
 //
 //            thread_pool.execute(move || {

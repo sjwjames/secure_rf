@@ -37,7 +37,6 @@ pub mod decision_tree {
         pub class_values_big_integer: Vec<Vec<BigUint>>,
         pub discretized_x: Vec<Vec<Wrapping<u64>>>,
         pub discretized_y: Vec<u64>,
-        pub rfs_x: Vec<Vec<Wrapping<u64>>>,
     }
 
     pub struct DecisionTreeTraining {
@@ -58,26 +57,25 @@ pub mod decision_tree {
     }
 
     pub struct DecisionTreeShares {
-        pub additive_triples: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
+        pub additive_triples: HashMap<u64,Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>,
         pub additive_bigint_triples: Vec<(BigUint, BigUint, BigUint)>,
         pub rfs_shares: Vec<Vec<Wrapping<u64>>>,
         pub bagging_shares: Vec<Vec<Wrapping<u64>>>,
         pub binary_triples: Vec<(u8, u8, u8)>,
         pub equality_shares: Vec<(BigUint)>,
-        pub equality_integer_shares:Vec<Wrapping<u64>>,
+        pub equality_integer_shares:HashMap<u64,Vec<Wrapping<u64>>>,
         pub current_additive_index: Arc<Mutex<usize>>,
         pub current_additive_bigint_index: Arc<Mutex<usize>>,
         pub current_equality_index: Arc<Mutex<usize>>,
         pub current_binary_index: Arc<Mutex<usize>>,
-        pub sequential_additive_index: usize,
+        pub sequential_additive_index: HashMap<u64,usize>,
         pub sequential_additive_bigint_index: usize,
         pub sequential_equality_index: usize,
         pub sequential_binary_index: usize,
-        pub sequential_equality_integer_index:usize,
+        pub sequential_equality_integer_index:HashMap<u64,usize>,
         pub sequential_ohe_additive_index:usize,
         pub matrix_mul_shares:(Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>),
         pub bagging_matrix_mul_shares:(Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>),
-        pub ohe_additive_triples: Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>,
     }
 
 
@@ -92,7 +90,6 @@ pub mod decision_tree {
         pub matrix_mul_shares:String,
         pub bagging_matrix_mul_shares:String,
         pub equality_integer_shares:String,
-        pub ohe_additive_shares:String
     }
 
     pub struct DecisionTreeResult {
@@ -122,7 +119,6 @@ pub mod decision_tree {
                 class_values_big_integer: self.class_values_big_integer.clone(),
                 discretized_x: self.discretized_x.clone(),
                 discretized_y: self.discretized_y.clone(),
-                rfs_x: self.rfs_x.clone(),
             }
         }
     }
@@ -151,17 +147,11 @@ pub mod decision_tree {
 
     impl Clone for DecisionTreeShares {
         fn clone(&self) -> Self {
-            let mut additive_triples = Vec::new();
             let mut additive_bigint_triples = Vec::new();
             let mut binary_triples = Vec::new();
             let mut equality_shares = Vec::new();
             let mut rfs_shares = Vec::new();
             let mut bagging_shares = Vec::new();
-            let mut ohe_additive_triples = Vec::new();
-
-            for item in self.ohe_additive_triples.iter(){
-                ohe_additive_triples.push(item.clone());
-            }
 
             for item in self.rfs_shares.iter() {
                 rfs_shares.push(item.clone());
@@ -171,9 +161,7 @@ pub mod decision_tree {
                 bagging_shares.push(item.clone());
             }
 
-            for item in self.additive_triples.iter() {
-                additive_triples.push((item.0.clone(), item.1.clone(), item.2.clone()));
-            }
+
 
             for item in self.binary_triples.iter() {
                 binary_triples.push((item.0.clone(), item.1.clone(), item.2.clone()));
@@ -189,7 +177,7 @@ pub mod decision_tree {
             }
 
             DecisionTreeShares {
-                additive_triples,
+                additive_triples:self.additive_triples.clone(),
                 additive_bigint_triples,
                 rfs_shares,
                 bagging_shares,
@@ -200,15 +188,14 @@ pub mod decision_tree {
                 current_additive_bigint_index: Arc::clone(&self.current_additive_bigint_index),
                 current_equality_index: Arc::clone(&self.current_equality_index),
                 current_binary_index: Arc::clone(&self.current_binary_index),
-                sequential_additive_index: self.sequential_additive_index,
+                sequential_additive_index: self.sequential_additive_index.clone(),
                 sequential_additive_bigint_index: self.sequential_additive_bigint_index,
                 sequential_equality_index: self.sequential_equality_index,
                 sequential_binary_index: self.sequential_binary_index,
-                sequential_equality_integer_index: self.sequential_equality_integer_index,
+                sequential_equality_integer_index: self.sequential_equality_integer_index.clone(),
                 sequential_ohe_additive_index: self.sequential_ohe_additive_index,
                 matrix_mul_shares: (self.matrix_mul_shares.0.clone(), self.matrix_mul_shares.1.clone(), self.matrix_mul_shares.2.clone()),
                 bagging_matrix_mul_shares: (self.bagging_matrix_mul_shares.0.clone(), self.bagging_matrix_mul_shares.1.clone(), self.bagging_matrix_mul_shares.2.clone()),
-                ohe_additive_triples
             }
         }
     }

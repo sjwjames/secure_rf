@@ -118,7 +118,7 @@ fn test_protocols() {
             } else {
                 let mut party_context = initialize_party_context(settings_file.clone());
                 let dt_shares = ti_receive(
-                    party_context.ti_stream.try_clone().expect("failed to clone ti recvr"));
+                    party_context.ti_stream.try_clone().expect("failed to clone ti recvr"),&mut party_context);
                 party_context.dt_shares = dt_shares;
                 party_context.raw_tcp_communication = true;
 

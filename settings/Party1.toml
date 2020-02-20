@@ -39,6 +39,8 @@ thread_count = 40
 max_depth = 1
 alpha = 8
 epsilon = 0.1
+instance_selected = 3
+feature_selected = 2
 
 #[BREAST CANCER]
 #batch_size = 176
@@ -63,7 +65,7 @@ tree_training_batch_size = 20
 attr_value_count = 2
 class_value_count = 2
 attribute_count = 3
-instance_count = 5
+instance_count = 4
 asymmetric_bit = 1
 prime = 8
 big_int_prime = "8589934592"

@@ -175,19 +175,19 @@ pub mod utils {
         }
     }
 
-    pub fn get_current_equality_integer_shares(ctx: &mut ComputingParty,range:usize) -> Vec<Wrapping<u64>> {
-        let current_index = ctx.dt_shares.sequential_equality_integer_index;
-        let shares = ctx.dt_shares.equality_integer_shares[current_index..current_index + range].to_vec();
-        ctx.dt_shares.sequential_equality_integer_index += range;
+    pub fn get_current_equality_integer_shares(ctx: &mut ComputingParty,range:usize,prime:u64) -> Vec<Wrapping<u64>> {
+        let current_index = ctx.dt_shares.sequential_equality_integer_index.get(&prime).unwrap();
+        let shares = ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[*current_index..(current_index + range)].to_vec();
+        ctx.dt_shares.sequential_equality_integer_index.insert(prime,current_index+range);
         return shares;
     }
 
-    pub fn get_current_additive_share(ctx: &mut ComputingParty) -> (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) {
-        let shares = &ctx.dt_shares.additive_triples;
+    pub fn get_current_additive_share(ctx: &mut ComputingParty,prime:u64) -> (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) {
+        let shares = ctx.dt_shares.additive_triples.get(&prime).unwrap();
         if ctx.raw_tcp_communication {
-            let current_index = ctx.dt_shares.sequential_additive_index;
-//            ctx.dt_shares.sequential_additive_index += 1;
-            return shares[current_index];
+            let current_index = ctx.dt_shares.sequential_additive_index.get(&prime).unwrap();
+//            ctx.dt_shares.sequential_additive_index.insert(prime,current_index+1);
+            return shares[*current_index];
         } else {
             let current_index = *(ctx.dt_shares.current_additive_index.lock().unwrap());
             let result = shares[current_index];
@@ -218,18 +218,10 @@ pub mod utils {
         return shares;
     }
 
-    pub fn get_additive_shares(ctx: &mut ComputingParty, range: usize) -> Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> {
-        let current_index = ctx.dt_shares.sequential_additive_index;
-        let shares = ctx.dt_shares.additive_triples[current_index..current_index + range].to_vec();
-        ctx.dt_shares.sequential_binary_index += range;
-        return shares;
-    }
-
-
-    pub fn get_ohe_additive_shares(ctx: &mut ComputingParty, range: usize) -> Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> {
-        let current_index = ctx.dt_shares.sequential_ohe_additive_index;
-        let shares = ctx.dt_shares.ohe_additive_triples[current_index..current_index + range].to_vec();
-        ctx.dt_shares.sequential_ohe_additive_index += range;
+    pub fn get_additive_shares(ctx: &mut ComputingParty, range: usize,prime:u64) -> Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> {
+        let current_index = ctx.dt_shares.sequential_additive_index.get(&prime).unwrap();
+        let shares = ctx.dt_shares.additive_triples.get(&prime).unwrap()[*current_index..current_index + range].to_vec();
+        ctx.dt_shares.sequential_additive_index.insert(prime,current_index + range);
         return shares;
     }
 
