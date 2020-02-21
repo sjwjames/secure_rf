@@ -12,8 +12,15 @@ pub mod utils {
     use std::time::Duration;
     use std::str::FromStr;
     use std::net::TcpStream;
-    use std::io::Write;
+    use std::io::{Write, Read};
+    use std::convert::TryFrom;
+    use crate::constants::constants::{U64S_PER_TX, U8S_PER_TX, TYPE_U8, TYPE_U64, TYPE_BIGINT};
+    use num::ToPrimitive;
 
+    pub union Xbuffer {
+        pub u64_buf: [u64; U64S_PER_TX],
+        pub u8_buf: [u8; U8S_PER_TX],
+    }
 
     pub fn big_uint_subtract(x: &BigUint, y: &BigUint, big_int_prime: &BigUint) -> BigUint {
         let result = x.to_bigint().unwrap().sub(y.to_bigint().unwrap()).mod_floor(&(big_int_prime.to_bigint().unwrap())).to_biguint().unwrap();
@@ -175,14 +182,14 @@ pub mod utils {
         }
     }
 
-    pub fn get_current_equality_integer_shares(ctx: &mut ComputingParty,range:usize,prime:u64) -> Vec<Wrapping<u64>> {
+    pub fn get_current_equality_integer_shares(ctx: &mut ComputingParty, range: usize, prime: u64) -> Vec<Wrapping<u64>> {
         let current_index = ctx.dt_shares.sequential_equality_integer_index.get(&prime).unwrap();
         let shares = ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[*current_index..(current_index + range)].to_vec();
-        ctx.dt_shares.sequential_equality_integer_index.insert(prime,current_index+range);
+        ctx.dt_shares.sequential_equality_integer_index.insert(prime, current_index + range);
         return shares;
     }
 
-    pub fn get_current_additive_share(ctx: &mut ComputingParty,prime:u64) -> (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) {
+    pub fn get_current_additive_share(ctx: &mut ComputingParty, prime: u64) -> (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) {
         let shares = ctx.dt_shares.additive_triples.get(&prime).unwrap();
         if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_additive_index.get(&prime).unwrap();
@@ -218,10 +225,10 @@ pub mod utils {
         return shares;
     }
 
-    pub fn get_additive_shares(ctx: &mut ComputingParty, range: usize,prime:u64) -> Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> {
+    pub fn get_additive_shares(ctx: &mut ComputingParty, range: usize, prime: u64) -> Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> {
         let current_index = ctx.dt_shares.sequential_additive_index.get(&prime).unwrap();
         let shares = ctx.dt_shares.additive_triples.get(&prime).unwrap()[*current_index..current_index + range].to_vec();
-        ctx.dt_shares.sequential_additive_index.insert(prime,current_index + range);
+        ctx.dt_shares.sequential_additive_index.insert(prime, current_index + range);
         return shares;
     }
 
@@ -332,6 +339,7 @@ pub mod utils {
         let mut result = (x.0 + message_rec.0).mod_floor(&ctx.dt_training.dataset_size_prime);
         result
     }
+
     pub fn reveal_bigint_result(x: &BigUint, ctx: &mut ComputingParty) -> BigUint {
         let message_id = "reveal".to_string();
         let message_content = serialize_biguint(x);
@@ -354,7 +362,129 @@ pub mod utils {
         result
     }
 
-    pub fn change_to_ohe(x:&Vec<Vec<u64>>,y:&Vec<u64>){
+    fn send_batch_message(ctx: &mut ComputingParty, data: &Vec<u8>) -> Xbuffer {
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+        let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+        let mut recv_buf = Xbuffer { u8_buf: [0u8; U8S_PER_TX] };
+        if ctx.asymmetric_bit == 1 {
+            let mut bytes_written = 0;
+            while bytes_written < U8S_PER_TX {
+                let current_bytes = unsafe {
+                    o_stream.write(&data[bytes_written..])
+                };
+                bytes_written += current_bytes.unwrap();
+            }
 
+            unsafe {
+                let mut bytes_read = 0;
+                while bytes_read < recv_buf.u8_buf.len() {
+                    let current_bytes = in_stream.read(&mut recv_buf.u8_buf[bytes_read..]).unwrap();
+                    bytes_read += current_bytes;
+                }
+            }
+        } else {
+            unsafe {
+                let mut bytes_read = 0;
+                while bytes_read < recv_buf.u8_buf.len() {
+                    let current_bytes = in_stream.read(&mut recv_buf.u8_buf[bytes_read..]).unwrap();
+                    bytes_read += current_bytes;
+                }
+            }
+
+            let mut bytes_written = 0;
+            while bytes_written < U8S_PER_TX {
+                let current_bytes = unsafe {
+                    o_stream.write(&data[bytes_written..])
+                };
+                bytes_written += current_bytes.unwrap();
+            }
+        }
+        recv_buf
     }
+
+    pub fn send_u8_messages(ctx: &mut ComputingParty, data: &Vec<u8>) -> Vec<u8> {
+        let mut batches: usize = 0;
+        let mut data_len = data.len();
+        let mut result: Vec<u8> = Vec::new();
+        let mut current_batch = 0;
+        let mut push_buf = Xbuffer { u8_buf: [0u8; U8S_PER_TX] };
+        batches = (data_len as f64 / U8S_PER_TX as f64).ceil() as usize;
+        while current_batch < batches {
+            for i in 0..U8S_PER_TX {
+                unsafe {
+                    if current_batch * U8S_PER_TX + i < data_len {
+                        push_buf.u8_buf[i] = data[current_batch * U8S_PER_TX + i];
+                    } else {
+                        break;
+                    }
+                }
+            }
+            unsafe {
+                let buf_vec = push_buf.u8_buf.to_vec();
+                let mut part_result =send_batch_message(ctx,&buf_vec);
+                result.append(&mut (part_result.u8_buf.to_vec()));
+            }
+
+            current_batch+=1;
+        }
+        result
+    }
+
+    pub fn send_u64_messages(ctx: &mut ComputingParty, data: &Vec<Wrapping<u64>>)->Vec<Wrapping<u64>>{
+        let mut batches: usize = 0;
+        let mut data_len = data.len();
+        let mut result: Vec<Wrapping<u64>> = Vec::new();
+        let mut current_batch = 0;
+        let mut push_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+        batches = (data_len as f64 / U64S_PER_TX as f64).ceil() as usize;
+        while current_batch<batches{
+            for i in 0..U64S_PER_TX {
+                unsafe {
+                    if current_batch * U64S_PER_TX + i < data_len {
+                        push_buf.u64_buf[i] = data[current_batch * U64S_PER_TX + i].0;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            unsafe {
+                let buf_vec = push_buf.u8_buf.to_vec();
+                let mut part_result = send_batch_message(ctx,&buf_vec);
+                for item in part_result.u64_buf.to_vec(){
+                    result.push(Wrapping(item));
+                }
+            }
+
+            current_batch+=1;
+        }
+        result
+    }
+
+
+    pub fn send_biguint_messages(ctx: &mut ComputingParty, data: &Vec<BigUint>)->Vec<BigUint>{
+        let mut batches: usize = 0;
+        let mut data_len = data.len();
+        let mut result: Vec<BigUint> = Vec::new();
+        let mut current_batch = 0;
+        let mut push_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+        batches = data_len;
+        while current_batch<batches{
+            let bytes = data[current_batch].to_bytes_le();
+            for i in 0..bytes.len() {
+                unsafe {
+                    push_buf.u8_buf[i] = bytes[i];
+                }
+            }
+            unsafe {
+                let buf_vec = push_buf.u8_buf.to_vec();
+                let mut part_result = send_batch_message(ctx,&buf_vec);
+                result.push(BigUint::from_bytes_le(&part_result.u8_buf));
+            }
+
+            current_batch+=1;
+        }
+        result
+    }
+
 }

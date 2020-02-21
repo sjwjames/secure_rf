@@ -13,17 +13,20 @@ pub mod constants {
     // how many reveals in one TX
 
     pub const BUF_SIZE: usize = BATCH_SIZE * MULT_ELEMS * SIZEOF_U64;
-    pub const U64S_PER_TX: usize = 2 * BATCH_SIZE;
+    pub const U64S_PER_TX: usize = MULT_ELEMS * BATCH_SIZE;
     pub const U8S_PER_TX: usize = 8 * U64S_PER_TX;
     pub const TI_BATCH_SIZE: usize = U64S_PER_TX / 3; // how many trplets in one tx
 
     pub const BINARY_PRIME: usize = 2;
-    pub const ADDITIVE_SHARERS:&str = "additive";
-    pub const BINARY_SHARERS:&str = "binary";
-    pub const ADDITIVE_BIGUINT_SHARERS:&str = "additive_biguint";
-    pub const EQUALITY_BIGUINT_SHARERS:&str = "equality_biguint";
-    pub const LOCAL_ADDITION:u8 = 0;
-    pub const LOCAL_SUBTRACTION:u8 = 1;
+    pub const ADDITIVE_SHARERS: &str = "additive";
+    pub const BINARY_SHARERS: &str = "binary";
+    pub const ADDITIVE_BIGUINT_SHARERS: &str = "additive_biguint";
+    pub const EQUALITY_BIGUINT_SHARERS: &str = "equality_biguint";
+    pub const LOCAL_ADDITION: u8 = 0;
+    pub const LOCAL_SUBTRACTION: u8 = 1;
+    pub const TYPE_U8: u8 = 0;
+    pub const TYPE_U64: u8 = 1;
+    pub const TYPE_BIGINT: u8 = 2;
 
     /* Simulated correlated randomness for debugging without the trusted initializer */
     pub const CR_0: (Wrapping<u64>, Wrapping<u64>, Wrapping<u64>) =
