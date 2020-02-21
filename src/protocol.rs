@@ -269,32 +269,39 @@ pub mod protocol {
         let mut result = Vec::new();
         let additive_shares = get_additive_shares(ctx, range, prime);
         let equality_shares = get_current_equality_integer_shares(ctx, range, prime);
+        let mut list_sent = Vec::new();
         for i in 0..range {
             let diff = Wrapping((x[i] - y[i]).0.mod_floor(&prime));
             xy_diff.push(diff);
-            diff_list[i][0] = Wrapping((diff - additive_shares[i].0).0.mod_floor(&prime));
-            diff_list[i][1] = Wrapping((equality_shares[i] - additive_shares[i].1).0.mod_floor(&prime));
+            let item0 = Wrapping((diff - additive_shares[i].0).0.mod_floor(&prime));
+            let item1 = Wrapping((equality_shares[i] - additive_shares[i].1).0.mod_floor(&prime));
+            diff_list[i][0] = item0;
+            diff_list[i][1] = item1;
+            list_sent.push(item0);
+            list_sent.push(item1);
         }
 
-        let mut o_stream = ctx.o_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
-        let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-        let mut reader = BufReader::new(in_stream);
-        let mut share_message = String::new();
-        let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
-        if ctx.asymmetric_bit == 1 {
-            o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
-            reader.read_line(&mut share_message).expect("fail to read share message str");
-            received_list = serde_json::from_str(&share_message).unwrap();
-        } else {
-            reader.read_line(&mut share_message).expect("fail to read share message str");
-            received_list = serde_json::from_str(&share_message).unwrap();
-            o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
-        }
+        let received_list= send_u64_messages(ctx,&list_sent);
+//
+//        let mut o_stream = ctx.o_stream.try_clone()
+//            .expect("failed cloning tcp o_stream");
+//        let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+//        let mut reader = BufReader::new(in_stream);
+//        let mut share_message = String::new();
+//        let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
+//        if ctx.asymmetric_bit == 1 {
+//            o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+//            reader.read_line(&mut share_message).expect("fail to read share message str");
+//            received_list = serde_json::from_str(&share_message).unwrap();
+//        } else {
+//            reader.read_line(&mut share_message).expect("fail to read share message str");
+//            received_list = serde_json::from_str(&share_message).unwrap();
+//            o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
+//        }
 
         for i in 0..range {
-            let d = Wrapping((diff_list[i][0] + received_list[i][0]).0.mod_floor(&prime));
-            let e = Wrapping((diff_list[i][1] + received_list[i][1]).0.mod_floor(&prime));
+            let d = Wrapping((diff_list[i][0] + received_list[i*2]).0.mod_floor(&prime));
+            let e = Wrapping((diff_list[i][1] + received_list[i*2+1]).0.mod_floor(&prime));
             let product = (additive_shares[i].2 + d * additive_shares[i].1 + additive_shares[i].0 * e + d * e * Wrapping(ctx.asymmetric_bit as u64)).0.mod_floor(&prime);
             result.push(product);
         }

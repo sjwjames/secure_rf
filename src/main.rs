@@ -13,7 +13,7 @@ use std::str;
 use serde::{Serialize, Deserialize, Serializer};
 use num::integer::*;
 use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOptions, ConsumerMessage};
-use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue, Xbuffer, send_u64_messages};
+use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue, Xbuffer, send_u64_messages, send_biguint_messages};
 use threadpool::ThreadPool;
 use random_forest_rust::multiplication::multiplication::multiplication_byte;
 use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication, test_batch_multiply_bigint, test_parallel_multiplication_big_integer, test_equality_big_integer, test_comparison, test_comparison_bigint, test_bit_decomposition, test_bit_decomposition_bigint, test_dot_product_bigint, test_or_xor, test_change_binary_to_decimal_field, test_argmax, test_or_xor_bigint, test_change_binary_to_bigint_field, test_dot_product_integer, test_batch_integer_equality};
@@ -147,12 +147,15 @@ fn test_protocols() {
 //                test_argmax(&mut party_context);
 //                test_dot_product_integer(&mut party_context);
 //                test_batch_integer_equality(&mut party_context);
-                let mut b = vec![Wrapping(0u64); 10000];
-                for i in 0..10000 {
-                    b[i] = Wrapping(i as u64);
+                let mut b = Vec::new();
+                for i in 1..1000 {
+                    b.push(BigUint::from_i32(i).unwrap());
                 }
-                let result = send_u64_messages(&mut party_context,&b);
-                println!("{:?}",result[0..10000].to_vec());
+//                let result = send_u64_messages(&mut party_context,&b);
+                let result = send_biguint_messages(&mut party_context,&b);
+                println!("{:?}",result);
+                let a = BigUint::from_str("10000").unwrap();
+                println!("{:?}",a);
             }
         }
         Err(error) => {

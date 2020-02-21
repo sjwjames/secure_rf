@@ -15,6 +15,10 @@ pub mod constants {
     pub const BUF_SIZE: usize = BATCH_SIZE * MULT_ELEMS * SIZEOF_U64;
     pub const U64S_PER_TX: usize = MULT_ELEMS * BATCH_SIZE;
     pub const U8S_PER_TX: usize = 8 * U64S_PER_TX;
+
+    pub const U64S_PER_MINI_TX: usize = 1024;
+    pub const U8S_PER_MINI_TX: usize = 8 * U64S_PER_MINI_TX;
+
     pub const TI_BATCH_SIZE: usize = U64S_PER_TX / 3; // how many trplets in one tx
 
     pub const BINARY_PRIME: usize = 2;

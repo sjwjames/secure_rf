@@ -14,12 +14,17 @@ pub mod utils {
     use std::net::TcpStream;
     use std::io::{Write, Read};
     use std::convert::TryFrom;
-    use crate::constants::constants::{U64S_PER_TX, U8S_PER_TX, TYPE_U8, TYPE_U64, TYPE_BIGINT};
+    use crate::constants::constants::{U64S_PER_TX, U8S_PER_TX, TYPE_U8, TYPE_U64, TYPE_BIGINT, U64S_PER_MINI_TX, U8S_PER_MINI_TX};
     use num::ToPrimitive;
 
     pub union Xbuffer {
         pub u64_buf: [u64; U64S_PER_TX],
         pub u8_buf: [u8; U8S_PER_TX],
+    }
+
+    pub union XbufferMini {
+        pub u64_buf: [u64; U64S_PER_MINI_TX],
+        pub u8_buf: [u8; U8S_PER_MINI_TX],
     }
 
     pub fn big_uint_subtract(x: &BigUint, y: &BigUint, big_int_prime: &BigUint) -> BigUint {
@@ -422,23 +427,23 @@ pub mod utils {
             }
             unsafe {
                 let buf_vec = push_buf.u8_buf.to_vec();
-                let mut part_result =send_batch_message(ctx,&buf_vec);
+                let mut part_result = send_batch_message(ctx, &buf_vec);
                 result.append(&mut (part_result.u8_buf.to_vec()));
             }
 
-            current_batch+=1;
+            current_batch += 1;
         }
         result
     }
 
-    pub fn send_u64_messages(ctx: &mut ComputingParty, data: &Vec<Wrapping<u64>>)->Vec<Wrapping<u64>>{
+    pub fn send_u64_messages(ctx: &mut ComputingParty, data: &Vec<Wrapping<u64>>) -> Vec<Wrapping<u64>> {
         let mut batches: usize = 0;
         let mut data_len = data.len();
         let mut result: Vec<Wrapping<u64>> = Vec::new();
         let mut current_batch = 0;
         let mut push_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
         batches = (data_len as f64 / U64S_PER_TX as f64).ceil() as usize;
-        while current_batch<batches{
+        while current_batch < batches {
             for i in 0..U64S_PER_TX {
                 unsafe {
                     if current_batch * U64S_PER_TX + i < data_len {
@@ -450,41 +455,44 @@ pub mod utils {
             }
             unsafe {
                 let buf_vec = push_buf.u8_buf.to_vec();
-                let mut part_result = send_batch_message(ctx,&buf_vec);
-                for item in part_result.u64_buf.to_vec(){
+                let mut part_result = send_batch_message(ctx, &buf_vec);
+                for item in part_result.u64_buf.to_vec() {
                     result.push(Wrapping(item));
                 }
             }
 
-            current_batch+=1;
+            current_batch += 1;
         }
         result
     }
 
 
-    pub fn send_biguint_messages(ctx: &mut ComputingParty, data: &Vec<BigUint>)->Vec<BigUint>{
+    pub fn send_biguint_messages(ctx: &mut ComputingParty, data: &Vec<BigUint>) -> Vec<BigUint> {
         let mut batches: usize = 0;
         let mut data_len = data.len();
         let mut result: Vec<BigUint> = Vec::new();
         let mut current_batch = 0;
-        let mut push_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
-        batches = data_len;
-        while current_batch<batches{
-            let bytes = data[current_batch].to_bytes_le();
-            for i in 0..bytes.len() {
-                unsafe {
-                    push_buf.u8_buf[i] = bytes[i];
-                }
+        let mut push_buf = Xbuffer { u8_buf: [0u8; U8S_PER_TX] };
+        let mut data_transformed = Vec::new();
+        for i in 0..data_len{
+            if i != data_len{
+                let mut bytes = (data[i].to_string()+";").as_bytes().to_vec();
+                data_transformed.append(&mut bytes);
+            }else{
+                let mut bytes = (data[i].to_string()).as_bytes().to_vec();
+                data_transformed.append(&mut bytes);
             }
-            unsafe {
-                let buf_vec = push_buf.u8_buf.to_vec();
-                let mut part_result = send_batch_message(ctx,&buf_vec);
-                result.push(BigUint::from_bytes_le(&part_result.u8_buf));
-            }
-
-            current_batch+=1;
         }
+        let temp_result = send_u8_messages(ctx,&data_transformed);
+        let mut iter=temp_result.split(|num| *num==59);
+        for item in iter{
+            let bigint_str = String::from_utf8(item.to_vec()).unwrap();
+            result.push(BigUint::from_str(&bigint_str).unwrap());
+            if result.len()==data.len(){
+                break;
+            }
+        }
+
         result
     }
-
 }
