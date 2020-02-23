@@ -1,5 +1,5 @@
 pub mod random_forest {
-    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, reset_share_indices, produce_dt_data, load_dt_raw_data};
+    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, produce_dt_data, load_dt_raw_data};
     use crate::decision_tree::decision_tree;
     use std::sync::{Arc, Mutex};
     use threadpool::ThreadPool;
@@ -17,7 +17,8 @@ pub mod random_forest {
     pub fn random_feature_selection(ctx: &mut ComputingParty) -> Vec<Vec<Wrapping<u64>>> {
         let x = &ctx.dt_data.discretized_x.clone();
         let rfs_shares = &ctx.dt_shares.rfs_shares.clone();
-        let mut result = matrix_multiplication_integer(&x, &rfs_shares, ctx, ctx.dt_training.rfs_field, &ctx.dt_shares.matrix_mul_shares);
+        let matrix_mul_shares = &ctx.dt_shares.matrix_mul_shares;
+        let mut result = matrix_multiplication_integer(&x, &rfs_shares, ctx, ctx.dt_training.rfs_field, matrix_mul_shares );
         let attribute_cnt = ctx.dt_shares.rfs_shares[0].len();
         ctx.dt_training.attribute_bit_vector = vec![1u8; attribute_cnt];
         result
@@ -203,7 +204,7 @@ pub mod random_forest {
 
             dt_ctx.party0_port = current_p0_port;
             dt_ctx.party1_port = current_p1_port;
-            reset_share_indices(&mut dt_ctx);
+
             let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);
             let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr, &dt_ctx.message_manager);
             dt_ctx.in_stream = in_stream;

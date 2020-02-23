@@ -131,20 +131,7 @@ pub mod protocol {
 
         let mut diff_list_received = Vec::new();
         if ctx.raw_tcp_communication {
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write((serialize_biguint_vec(&diff_list) + "\n").as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_list_received = deserialize_biguint_vec(&share_message.as_str());
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_list_received = deserialize_biguint_vec(&share_message.as_str());
-                o_stream.write((serialize_biguint_vec(&diff_list) + "\n").as_bytes());
-            }
+            diff_list_received = send_biguint_messages(ctx,&diff_list);
         } else {
             let mut diff_list_message = String::new();
             let message_id = ctx.thread_hierarchy.join(":");
@@ -201,6 +188,7 @@ pub mod protocol {
     }
 
 
+
     pub fn matrix_multiplication_integer(x: &Vec<Vec<Wrapping<u64>>>, y: &Vec<Vec<Wrapping<u64>>>, ctx: &ComputingParty, prime: u64, matrix_mul_shares: &(Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>)) -> Vec<Vec<Wrapping<u64>>> {
         let mut d_matrix = Vec::new();
         let mut e_matrix = Vec::new();
@@ -219,29 +207,9 @@ pub mod protocol {
 
         e_matrix = local_matrix_computation(y, &v_shares, prime, LOCAL_SUBTRACTION);
 
-        let mut d_matrix_received_str = String::new();
-        let mut d_matrix_received = Vec::new();
-        if ctx.asymmetric_bit == 1 {
-            o_stream.write(format!("{}\n", serde_json::to_string(&d_matrix).unwrap()).as_bytes());
-            reader.read_line(&mut d_matrix_received_str).expect("fail to read share message str");
-            d_matrix_received = serde_json::from_str(&d_matrix_received_str).unwrap();
-        } else {
-            reader.read_line(&mut d_matrix_received_str).expect("fail to read share message str");
-            d_matrix_received = serde_json::from_str(&d_matrix_received_str).unwrap();
-            o_stream.write(format!("{}\n", serde_json::to_string(&d_matrix).unwrap()).as_bytes());
-        }
+        let mut d_matrix_received = send_receive_u64_matrix(&d_matrix,ctx);
 
-        let mut e_matrix_received_str = String::new();
-        let mut e_matrix_received = Vec::new();
-        if ctx.asymmetric_bit == 1 {
-            o_stream.write(format!("{}\n", serde_json::to_string(&e_matrix).unwrap()).as_bytes());
-            reader.read_line(&mut e_matrix_received_str).expect("fail to read share message str");
-            e_matrix_received = serde_json::from_str(&e_matrix_received_str).unwrap();
-        } else {
-            reader.read_line(&mut e_matrix_received_str).expect("fail to read share message str");
-            e_matrix_received = serde_json::from_str(&e_matrix_received_str).unwrap();
-            o_stream.write(format!("{}\n", serde_json::to_string(&e_matrix).unwrap()).as_bytes());
-        }
+        let mut e_matrix_received = send_receive_u64_matrix(&e_matrix,ctx);
 
         let mut d = local_matrix_computation(&d_matrix, &d_matrix_received, prime, LOCAL_ADDITION);
         let mut e = local_matrix_computation(&e_matrix, &e_matrix_received, prime, LOCAL_ADDITION);

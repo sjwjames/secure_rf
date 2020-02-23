@@ -5,7 +5,7 @@ pub mod decision_tree {
     use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint, reveal_bigint_result, reveal_byte_vec_result};
+    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint, reveal_bigint_result, reveal_byte_vec_result, send_u8_messages, send_biguint_messages};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
@@ -214,22 +214,8 @@ pub mod decision_tree {
         // Share major class index
 
         let mut major_class_index_receive: Vec<u8> = Vec::new();
-        let mut o_stream = ctx.o_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
-        let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-        let mut reader = BufReader::new(in_stream);
-        let mut share_message = String::new();
         if ctx.raw_tcp_communication {
-            share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write(format!("{}\n", serde_json::to_string(&major_class_index).unwrap()).as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                major_class_index_receive = serde_json::from_str(&share_message).unwrap();
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                major_class_index_receive = serde_json::from_str(&share_message).unwrap();
-                o_stream.write(format!("{}\n", serde_json::to_string(&major_class_index).unwrap()).as_bytes());
-            }
+            major_class_index_receive = send_u8_messages(ctx,&major_class_index);
         } else {
             ctx.thread_hierarchy.push("share_major_class_index".to_string());
             let message_id = ctx.thread_hierarchy.join(":");
@@ -346,16 +332,8 @@ pub mod decision_tree {
 
         let mut stopping_bit_received = BigUint::zero();
         if ctx.raw_tcp_communication {
-            share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write((serialize_biguint(&stopping_bit) + "\n").as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                stopping_bit_received = deserialize_biguint(&share_message);
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                stopping_bit_received = deserialize_biguint(&share_message);
-                o_stream.write((serialize_biguint(&stopping_bit) + "\n").as_bytes());
-            }
+            let received_list = send_biguint_messages(ctx,&[big_uint_clone(&stopping_bit)].to_vec());
+            stopping_bit_received = big_uint_clone(&received_list[0]);
         } else {
             let message_id = ctx.thread_hierarchy.join(":");
             let message_content = stopping_bit.to_string();
@@ -555,16 +533,8 @@ pub mod decision_tree {
 
         let mut argmax_received = BigUint::zero();
         if ctx.raw_tcp_communication {
-            share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write((serialize_biguint(&gini_argmax) + "\n").as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                argmax_received = deserialize_biguint(&share_message);
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                argmax_received = deserialize_biguint(&share_message);
-                o_stream.write((serialize_biguint(&gini_argmax) + "\n").as_bytes());
-            }
+            let list_received = send_biguint_messages(ctx,&[big_uint_clone(&gini_argmax)].to_vec());
+            argmax_received = big_uint_clone(&list_received[0]);
         } else {
             ctx.thread_hierarchy.push("gini_argmax_public".to_string());
             let message_id = ctx.thread_hierarchy.join(":");

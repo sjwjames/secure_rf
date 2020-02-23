@@ -167,8 +167,8 @@ fn test_protocols() {
 
 fn main() {
 //    test_mq();
-//    run();
-    test_protocols();
+    run();
+//    test_protocols();
 }
 
 

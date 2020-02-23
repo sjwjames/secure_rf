@@ -367,7 +367,7 @@ pub mod utils {
         result
     }
 
-    fn send_batch_message(ctx: &mut ComputingParty, data: &Vec<u8>) -> Xbuffer {
+    fn send_batch_message(ctx: &ComputingParty, data: &Vec<u8>) -> Xbuffer {
         let mut o_stream = ctx.o_stream.try_clone()
             .expect("failed cloning tcp o_stream");
         let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
@@ -408,7 +408,7 @@ pub mod utils {
         recv_buf
     }
 
-    pub fn send_u8_messages(ctx: &mut ComputingParty, data: &Vec<u8>) -> Vec<u8> {
+    pub fn send_u8_messages(ctx: &ComputingParty, data: &Vec<u8>) -> Vec<u8> {
         let mut batches: usize = 0;
         let mut data_len = data.len();
         let mut result: Vec<u8> = Vec::new();
@@ -436,7 +436,7 @@ pub mod utils {
         result
     }
 
-    pub fn send_u64_messages(ctx: &mut ComputingParty, data: &Vec<Wrapping<u64>>) -> Vec<Wrapping<u64>> {
+    pub fn send_u64_messages(ctx: &ComputingParty, data: &Vec<Wrapping<u64>>) -> Vec<Wrapping<u64>> {
         let mut batches: usize = 0;
         let mut data_len = data.len();
         let mut result: Vec<Wrapping<u64>> = Vec::new();
@@ -467,7 +467,7 @@ pub mod utils {
     }
 
 
-    pub fn send_biguint_messages(ctx: &mut ComputingParty, data: &Vec<BigUint>) -> Vec<BigUint> {
+    pub fn send_biguint_messages(ctx: &ComputingParty, data: &Vec<BigUint>) -> Vec<BigUint> {
         let mut batches: usize = 0;
         let mut data_len = data.len();
         let mut result: Vec<BigUint> = Vec::new();
@@ -494,5 +494,47 @@ pub mod utils {
         }
 
         result
+    }
+
+    pub fn send_receive_u64_matrix(matrix_sent:&Vec<Vec<Wrapping<u64>>>,ctx:&ComputingParty)->Vec<Vec<Wrapping<u64>>>{
+        let mut list_sent = Vec::new();
+        let mut matrix_received = Vec::new();
+        for row in matrix_sent{
+            for item in row{
+                list_sent.push(item.clone());
+            }
+        }
+        let list_received = send_u64_messages(ctx,&list_sent);
+        let row_len = matrix_sent[0].len();
+        let matrix_len = matrix_sent.len();
+        for i in 0..matrix_len{
+            let mut row = Vec::new();
+            for j in 0..row_len{
+                row.push(list_received[i*row_len+j]);
+            }
+            matrix_received.push(row);
+        }
+        matrix_received
+    }
+
+    pub fn send_receive_u8_matrix(matrix_sent:&Vec<Vec<u8>>,ctx:&ComputingParty)->Vec<Vec<u8>>{
+        let mut list_sent = Vec::new();
+        let mut matrix_received = Vec::new();
+        for row in matrix_sent{
+            for item in row{
+                list_sent.push(item.clone());
+            }
+        }
+        let list_received = send_u8_messages(ctx,&list_sent);
+        let row_len = matrix_sent[0].len();
+        let matrix_len = matrix_sent.len();
+        for i in 0..matrix_len{
+            let mut row = Vec::new();
+            for j in 0..row_len{
+                row.push(list_received[i*row_len+j]);
+            }
+            matrix_received.push(row);
+        }
+        matrix_received
     }
 }

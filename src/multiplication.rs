@@ -32,29 +32,24 @@ pub mod multiplication {
                             big_uint_subtract(&y_list[i], &ctx.dt_shares.additive_bigint_triples[i].1, &prime)));
         }
 
-        let mut diff_list_str = serialize_biguint_double_vec(&diff_list);
         let mut diff_list_received = Vec::new();
+        let mut diff_list_sent = Vec::new();
+        for item in &diff_list{
+            diff_list_sent.push(big_uint_clone(&item.0));
+            diff_list_sent.push(big_uint_clone(&item.1));
+        }
 
         if ctx.raw_tcp_communication{
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write((diff_list_str + "\n").as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_list_received = deserialize_biguint_double_vec(&share_message);
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_list_received = deserialize_biguint_double_vec(&share_message);
-                o_stream.write((diff_list_str + "\n").as_bytes());
+            let mut list_received = send_biguint_messages(ctx,&diff_list_sent);
+            for i in 0..diff_list.len(){
+                diff_list_received.push((big_uint_clone(&list_received[i*2]),big_uint_clone(&list_received[i*2+1])));
             }
+
         }else{
-            let message_id = ctx.thread_hierarchy.join(":");
-            push_message_to_queue(&ctx.remote_mq_address, &message_id, &diff_list_str);
-            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
-            diff_list_received = deserialize_biguint_double_vec(&message_received[0]);
+//            let message_id = ctx.thread_hierarchy.join(":");
+//            push_message_to_queue(&ctx.remote_mq_address, &message_id, &diff_list_str);
+//            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
+//            diff_list_received = deserialize_biguint_double_vec(&message_received[0]);
 
         }
 
@@ -228,27 +223,14 @@ pub mod multiplication {
 
     pub fn multiplication_byte(x: u8, y: u8, ctx: &mut ComputingParty) -> u8 {
         ctx.thread_hierarchy.push("multiplication_byte".to_string());
-        let mut diff_list = Vec::new();
+        let mut diff_list:Vec<u8> = Vec::new();
         let ti_share_triple = get_current_binary_share(ctx).clone();
         diff_list.push(mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0)).0, BINARY_PRIME as u8));
         diff_list.push(mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1)).0, BINARY_PRIME as u8));
 
         let mut received_list: Vec<u8> = Vec::new();
         if ctx.raw_tcp_communication {
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                received_list = serde_json::from_str(&share_message).unwrap();
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                received_list = serde_json::from_str(&share_message).unwrap();
-                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
-            }
+            received_list = send_u8_messages(ctx,&diff_list);
         } else {
 //            let mut message_id = ctx.thread_hierarchy.join(":");
 //            let message_content = serde_json::to_string(&diff_list).unwrap();
@@ -275,7 +257,7 @@ pub mod multiplication {
     pub fn batch_multiplication_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
         ctx.thread_hierarchy.push("batch_multiplication_byte".to_string());
         let batch_size = x_list.len();
-        let mut diff_list = Vec::new();
+        let mut diff_list:Vec<Vec<u8>> = Vec::new();
         let mut output = Vec::new();
 
         let mut ti_shares = get_binary_shares(ctx,batch_size);
@@ -289,20 +271,8 @@ pub mod multiplication {
 
         let mut diff_list_received: Vec<Vec<u8>> = Vec::new();
         if ctx.raw_tcp_communication {
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_list_received = serde_json::from_str(&share_message).unwrap();
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_list_received = serde_json::from_str(&share_message).unwrap();
-                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
-            }
+            diff_list_received=send_receive_u8_matrix(&diff_list,ctx);
+
         } else {
             let message_id = ctx.thread_hierarchy.join(":");
             let message_content = serde_json::to_string(&diff_list).unwrap();
@@ -342,27 +312,14 @@ pub mod multiplication {
         for i in 0..batch_size {
             let mut new_row = Vec::new();
             let ti_share_triple = ti_shares[i];
-            new_row.push(mod_floor((x_list[i] - ti_share_triple.0).0, ctx.dt_training.dataset_size_prime));
-            new_row.push(mod_floor((y_list[i] - ti_share_triple.1).0, ctx.dt_training.dataset_size_prime));
+            new_row.push(Wrapping(mod_floor((x_list[i] - ti_share_triple.0).0, ctx.dt_training.dataset_size_prime)));
+            new_row.push(Wrapping(mod_floor((y_list[i] - ti_share_triple.1).0, ctx.dt_training.dataset_size_prime)));
             diff_list.push(new_row);
         }
 
         let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
         if ctx.raw_tcp_communication{
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                received_list = serde_json::from_str(&share_message).unwrap();
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                received_list = serde_json::from_str(&share_message).unwrap();
-                o_stream.write((serde_json::to_string(&diff_list).unwrap() + "\n").as_bytes());
-            }
+            received_list = send_receive_u64_matrix(&diff_list,ctx);
         }else{
             let message_id = ctx.thread_hierarchy.join(":");
             let message_content = serde_json::to_string(&diff_list).unwrap();
@@ -405,20 +362,7 @@ pub mod multiplication {
 
         let mut diff_received = Vec::new();
         if ctx.raw_tcp_communication{
-            let mut o_stream = ctx.o_stream.try_clone()
-                .expect("failed cloning tcp o_stream");
-            let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-            let mut reader = BufReader::new(in_stream);
-            let mut share_message = String::new();
-            if ctx.asymmetric_bit == 1 {
-                o_stream.write((serialize_biguint_vec(&diff_list)+ "\n").as_bytes());
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_received = deserialize_biguint_vec(&share_message.as_str());
-            } else {
-                reader.read_line(&mut share_message).expect("fail to read share message str");
-                diff_received = deserialize_biguint_vec(&share_message.as_str());
-                o_stream.write((serialize_biguint_vec(&diff_list)+ "\n").as_bytes());
-            }
+            diff_received = send_biguint_messages(ctx,&diff_list);
         }else{
             let mut diff_list_message = String::new();
             let message_id = ctx.thread_hierarchy.join(":");
