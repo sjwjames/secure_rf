@@ -1,5 +1,5 @@
 pub mod random_forest {
-    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, produce_dt_data, load_dt_raw_data};
+    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, produce_dt_data, load_dt_raw_data, receive_preprocessing_shares};
     use crate::decision_tree::decision_tree;
     use std::sync::{Arc, Mutex};
     use threadpool::ThreadPool;
@@ -101,7 +101,6 @@ pub mod random_forest {
             }
         }
         let result = batch_equality_integer(&equality_x, &equality_y, ctx, prime);
-        println!("result:{:?}", result);
         let mut comparison_results = Vec::new();
         let bit_length = (prime as f64).log2().ceil() as usize;
         for item in result {
@@ -123,7 +122,6 @@ pub mod random_forest {
                 result.push(row);
             }
         }
-        println!("attr_values_bytes:{:?}", result);
         result
     }
 
@@ -143,10 +141,20 @@ pub mod random_forest {
             [Wrapping(1)].to_vec()
         ].to_vec();
         discretize_data(x,ctx);
+        receive_preprocessing_shares(ctx);
+
         let attr_value_count = ctx.dt_data.attr_value_count;
         let rfs_field = ctx.dt_training.rfs_field;
         let class_value_count = ctx.dt_data.class_value_count;
         let bagging_field = ctx.dt_training.bagging_field;
+
+        let ohe_prime = if ctx.dt_training.rfs_field > ctx.dt_data.class_value_count as u64 { ctx.dt_training.rfs_field } else { ctx.dt_data.class_value_count as u64 };
+        let discretized_x= ctx.dt_data.discretized_x.clone();
+        let mut attr_values_bytes = ohe_conversion(&discretized_x,ctx,attr_value_count,ohe_prime);
+        let mut class_values_bytes = ohe_conversion(&y,ctx,class_value_count,ohe_prime);
+        println!("{:?}",attr_values_bytes);
+        println!("{:?}",class_values_bytes);
+
         for current_tree_index in 0..remainder {
             let dt_shares = ti_receive(
                 ctx.ti_stream.try_clone().expect("failed to clone ti recvr"),ctx);

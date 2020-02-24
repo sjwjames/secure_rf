@@ -278,6 +278,7 @@ pub mod ti {
     }
 
     fn send_u64_shares(shares: Vec<Wrapping<u64>>, stream: &mut TcpStream) {
+        let mut stream = stream.try_clone().unwrap();
         let mut batches: usize = 0;
         let mut data_len = shares.len();
         let mut current_batch = 0;
@@ -305,6 +306,7 @@ pub mod ti {
     }
 
     fn send_u8_shares(shares: Vec<u8>, stream: &mut TcpStream) {
+        let mut stream = stream.try_clone().unwrap();
         let mut batches: usize = 0;
         let mut data_len = shares.len();
         let mut current_batch = 0;
@@ -364,7 +366,7 @@ pub mod ti {
 
         print!("preprocessing- generating binary shares...           ");
         let now = SystemTime::now();
-        let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, thread_pool);
+        let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, thread_pool,1000);
         println!("complete -- work time = {:5} (ms)",
                  now.elapsed().unwrap().as_millis());
 
@@ -474,7 +476,7 @@ pub mod ti {
 
                 print!("{} [{}] generating binary shares...           ", &prefix, i);
                 let now = SystemTime::now();
-                let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, &thread_pool);
+                let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, &thread_pool,ctx.binary_shares_per_tree);
                 println!("complete -- work time = {:5} (ms)",
                          now.elapsed().unwrap().as_millis());
 
@@ -688,11 +690,11 @@ pub mod ti {
         Ok(())
     }
 
-    fn generate_binary_shares(ctx: &TI, thread_pool: &ThreadPool) -> (Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>) {
+    fn generate_binary_shares(ctx: &TI, thread_pool: &ThreadPool,amount:usize) -> (Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
-        for i in 0..ctx.binary_shares_per_tree {
+        for i in 0..amount {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
@@ -713,7 +715,7 @@ pub mod ti {
         let mut share0 = Vec::new();
         let mut share1 = Vec::new();
 
-        for i in 0..ctx.binary_shares_per_tree {
+        for i in 0..amount {
             let share0_item = share0_map.get(&i).unwrap().clone();
             share0.push((share0_item.0, share0_item.1, share0_item.2));
             let share1_item = share0_map.get(&i).unwrap().clone();
