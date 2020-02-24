@@ -23,7 +23,7 @@ pub mod ti {
     use std::str::FromStr;
     use threadpool::ThreadPool;
     use std::collections::HashMap;
-    use crate::utils::utils::big_uint_subtract;
+    use crate::utils::utils::{big_uint_subtract, send_u8_messages};
     use std::f64::consts::E;
 
 
@@ -277,6 +277,121 @@ pub mod ti {
         }
     }
 
+    fn send_u64_shares(shares: Vec<Wrapping<u64>>, stream: &mut TcpStream) {
+        let mut batches: usize = 0;
+        let mut data_len = shares.len();
+        let mut current_batch = 0;
+        let mut push_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+        batches = (data_len as f64 / U64S_PER_TX as f64).ceil() as usize;
+        while current_batch < batches {
+            for i in 0..U64S_PER_TX {
+                unsafe {
+                    if current_batch * U64S_PER_TX + i < data_len {
+                        push_buf.u64_buf[i] = shares[current_batch * U64S_PER_TX + i].0;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            let mut bytes_written = 0;
+            while bytes_written < U8S_PER_TX {
+                let current_bytes = unsafe {
+                    stream.write(&push_buf.u8_buf[bytes_written..])
+                };
+                bytes_written += current_bytes.unwrap();
+            }
+            current_batch += 1;
+        }
+    }
+
+    fn send_u8_shares(shares: Vec<u8>, stream: &mut TcpStream) {
+        let mut batches: usize = 0;
+        let mut data_len = shares.len();
+        let mut current_batch = 0;
+        let mut push_buf = Xbuffer { u8_buf: [0u8; U8S_PER_TX] };
+        batches = (data_len as f64 / U8S_PER_TX as f64).ceil() as usize;
+        while current_batch < batches {
+            for i in 0..U8S_PER_TX {
+                unsafe {
+                    if current_batch * U8S_PER_TX + i < data_len {
+                        push_buf.u8_buf[i] = shares[current_batch * U8S_PER_TX + i];
+                    } else {
+                        break;
+                    }
+                }
+            }
+            let mut bytes_written = 0;
+            while bytes_written < U8S_PER_TX {
+                let current_bytes = unsafe {
+                    stream.write(&push_buf.u8_buf[bytes_written..])
+                };
+                bytes_written += current_bytes.unwrap();
+            }
+            current_batch += 1;
+        }
+    }
+
+    fn send_preprocessing_shares(additive_shares: (Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>), binary_shares: (Vec<(u8, u8, u8)>), equality_shares: Vec<Wrapping<u64>>, stream: &mut TcpStream) {
+        let mut additive_shares_sent = Vec::new();
+        for item in &additive_shares {
+            additive_shares_sent.push(item.0.clone());
+            additive_shares_sent.push(item.1.clone());
+            additive_shares_sent.push(item.2.clone());
+        }
+        send_u64_shares(additive_shares_sent, stream);
+
+        let mut binary_shares_sent = Vec::new();
+        for item in &binary_shares {
+            binary_shares_sent.push(item.0);
+            binary_shares_sent.push(item.1);
+            binary_shares_sent.push(item.2);
+        }
+        send_u8_shares(binary_shares_sent, stream);
+
+        send_u64_shares(equality_shares, stream);
+    }
+
+
+    pub fn generate_preprocessing_shares(ctx: &mut TI, thread_pool: &ThreadPool, streams: Vec<&TcpStream>) {
+        let class_val_prime = 2.0_f64.powf((ctx.class_value_cnt as f64).log2().ceil()) as u64;
+        let prime = if ctx.rfs_field > class_val_prime { ctx.rfs_field } else { class_val_prime };
+        // OHE shares
+        print!("preprocessing- generating additive shares...      ");
+        let now = SystemTime::now();
+        let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, prime);
+        println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
+
+
+        print!("preprocessing- generating binary shares...           ");
+        let now = SystemTime::now();
+        let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, thread_pool);
+        println!("complete -- work time = {:5} (ms)",
+                 now.elapsed().unwrap().as_millis());
+
+        print!("preprocessing- generating equality integer shares...           ");
+        let now = SystemTime::now();
+        let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, prime);
+        println!("complete -- work time = {:5} (ms)",
+                 now.elapsed().unwrap().as_millis());
+
+        let mut stream0 = streams[0].try_clone().unwrap();
+        stream0.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+        stream0.set_write_timeout(None).expect("set_write_timeout call failed");
+        stream0.set_read_timeout(None).expect("set_read_timeout call failed");
+        thread_pool.execute(move || {
+            send_preprocessing_shares(add_triples0, binary_triples0, equality_share0, &mut stream0);
+        });
+
+        let mut stream1 = streams[1].try_clone().unwrap();
+        stream1.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+        stream1.set_write_timeout(None).expect("set_write_timeout call failed");
+        stream1.set_read_timeout(None).expect("set_read_timeout call failed");
+        thread_pool.execute(move || {
+            send_preprocessing_shares(add_triples1, binary_triples1, equality_share1, &mut stream1);
+        });
+        thread_pool.join();
+    }
+
     pub fn run_ti_module(ctx: &mut TI) {
         // TODO log module
         let prefix = "main:      ";
@@ -315,6 +430,9 @@ pub mod ti {
         let mut trees_remaining = ctx.tree_count as isize;
         let mut batch_count = 0;
         let thread_pool = ThreadPool::new(ctx.thread_count);
+
+        //preprocess shares, discretization and OHE
+        generate_preprocessing_shares(ctx, &thread_pool, [&in_stream0, &in_stream1].to_vec());
 
         while trees_remaining > 0 {
             let current_batch_size = if trees_remaining >= ctx.tree_training_batch_size as isize { ctx.tree_training_batch_size } else { trees_remaining as usize };

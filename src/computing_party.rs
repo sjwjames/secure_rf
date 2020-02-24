@@ -18,6 +18,7 @@ pub mod computing_party {
     use threadpool::ThreadPool;
     use std::f64::consts::E;
     use self::num::Num;
+    use crate::utils::utils::{receive_u64_triple_shares, receive_u8_triple_shares, receive_u64_shares};
 
 
     union Xbuffer {
@@ -73,9 +74,11 @@ pub mod computing_party {
         pub tree_count: usize,
         pub batch_size: usize,
         pub tree_training_batch_size: usize,
-        pub instance_selected:u64,
-        pub feature_selected:u64,
-
+        pub instance_selected: u64,
+        pub feature_selected: u64,
+        pub ohe_add_shares: u64,
+        pub ohe_binary_shares: u64,
+        pub ohe_equality_shares: u64,
         //multi_thread
         pub thread_hierarchy: Vec<String>,
         pub message_manager: Arc<Mutex<MessageManager>>,
@@ -121,6 +124,9 @@ pub mod computing_party {
                 tree_training_batch_size: self.tree_training_batch_size,
                 instance_selected: self.instance_selected,
                 feature_selected: self.feature_selected,
+                ohe_add_shares: self.ohe_add_shares,
+                ohe_binary_shares: self.ohe_binary_shares,
+                ohe_equality_shares: self.ohe_equality_shares,
                 thread_hierarchy: self.thread_hierarchy.clone(),
                 message_manager: Arc::new(Mutex::new(MessageManager {
                     map: HashMap::new()
@@ -141,12 +147,12 @@ pub mod computing_party {
             let length = item.len();
             let mut x_row = Vec::new();
             let mut y_row = Vec::new();
-            for i in 0..length{
-                if i != length{
-                    let x_item:u64 = item[i].parse().unwrap();
+            for i in 0..length {
+                if i != length {
+                    let x_item: u64 = item[i].parse().unwrap();
                     x_row.push(Wrapping(x_item));
-                }else{
-                    let y_item:u64 = item[i].parse().unwrap();
+                } else {
+                    let y_item: u64 = item[i].parse().unwrap();
                     y_row.push(Wrapping(y_item));
                 }
             }
@@ -154,7 +160,7 @@ pub mod computing_party {
             y.push(y_row);
         }
 
-        (x,y)
+        (x, y)
     }
 
     fn load_dt_training_file(file_path: &String) -> (usize, usize, usize, usize, Vec<Vec<u8>>) {
@@ -525,6 +531,27 @@ pub mod computing_party {
             }
         };
 
+        let ohe_add_shares = match settings.get_int("ohe_add_shares") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing ohe_add_shares: {:?}", error)
+            }
+        };
+
+        let ohe_binary_shares = match settings.get_int("ohe_binary_shares") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing ohe_binary_shares: {:?}", error)
+            }
+        };
+
+        let ohe_equality_shares = match settings.get_int("ohe_equality_shares") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing ohe_equality_shares: {:?}", error)
+            }
+        };
+
 //        let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
 
         let dataset_size_bit_length = (attr_value_count as f64).log2().ceil() as u64;
@@ -654,7 +681,7 @@ pub mod computing_party {
             instance_selected,
             dt_training,
             result_file,
-            raw_data_path:x_input_path,
+            raw_data_path: x_input_path,
             dt_shares: DecisionTreeShares {
                 additive_triples: Default::default(),
                 additive_bigint_triples: vec![],
@@ -697,7 +724,10 @@ pub mod computing_party {
                 discretized_x: vec![],
                 discretized_y: vec![],
             },
-            feature_selected
+            feature_selected,
+            ohe_add_shares,
+            ohe_binary_shares,
+            ohe_equality_shares,
         }
     }
 
@@ -756,7 +786,15 @@ pub mod computing_party {
         (in_stream, o_stream)
     }
 
-    pub fn ti_receive(mut stream: TcpStream,ctx:&mut ComputingParty) -> DecisionTreeShares {
+    pub fn receive_preprocessing_shares(stream: &mut TcpStream, ctx: &mut ComputingParty) -> (Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>, Vec<(u8, u8, u8)>, Vec<Wrapping<u64>>) {
+        let mut additive_shares = receive_u64_triple_shares(stream, ctx.ohe_add_shares);
+        let mut binary_shares = receive_u8_triple_shares(stream,ctx.ohe_binary_shares);
+        let mut equality_shares = receive_u64_shares(stream,ctx.ohe_equality_shares);
+
+        (additive_shares, binary_shares, equality_shares)
+    }
+
+    pub fn ti_receive(mut stream: TcpStream, ctx: &mut ComputingParty) -> DecisionTreeShares {
         stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
         stream.set_write_timeout(None).expect("set_write_timeout call failed");
         stream.set_read_timeout(None).expect("set_read_timeout call failed");
@@ -789,7 +827,7 @@ pub mod computing_party {
         let mut share_message = String::new();
         reader.read_line(&mut share_message).expect("fail to read share message str");
         let ti_shares_message: DecisionTreeTIShareMessage = serde_json::from_str(&share_message).unwrap();
-        let additive_triples: HashMap<u64,Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>= serde_json::from_str(&ti_shares_message.additive_triples).unwrap();
+        let additive_triples: HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>> = serde_json::from_str(&ti_shares_message.additive_triples).unwrap();
 
         let mut additive_bigint_triples = Vec::new();
         let additive_bigint_triple_str_vec: Vec<&str> = ti_shares_message.additive_bigint_triples.split(";").collect();
@@ -846,13 +884,13 @@ pub mod computing_party {
         bagging_matrix_mul_shares.2 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[2]).unwrap();
 
         let mut sequential_equality_integer_index = HashMap::new();
-        sequential_equality_integer_index.insert(ctx.dt_training.rfs_field,0);
-        sequential_equality_integer_index.insert(ctx.dt_training.bagging_field,0);
+        sequential_equality_integer_index.insert(ctx.dt_training.rfs_field, 0);
+        sequential_equality_integer_index.insert(ctx.dt_training.bagging_field, 0);
 
-        let mut sequential_additive_index  = HashMap::new();
-        sequential_additive_index.insert(ctx.dt_training.prime,0);
-        sequential_additive_index.insert(ctx.dt_training.rfs_field,0);
-        sequential_additive_index.insert(ctx.dt_training.bagging_field,0);
+        let mut sequential_additive_index = HashMap::new();
+        sequential_additive_index.insert(ctx.dt_training.prime, 0);
+        sequential_additive_index.insert(ctx.dt_training.rfs_field, 0);
+        sequential_additive_index.insert(ctx.dt_training.bagging_field, 0);
 
         DecisionTreeShares {
             additive_triples,
@@ -977,5 +1015,4 @@ pub mod computing_party {
 //
 //        (add_shares, xor_shares)
     }
-
 }

@@ -41,7 +41,9 @@ alpha = 8
 epsilon = 0.1
 instance_selected = 3
 feature_selected = 2
-
+ohe_add_shares = 1000
+ohe_binary_shares = 1000
+ohe_equality_shares = 1000
 #[BREAST CANCER]
 #batch_size = 176
 #tree_training_batch_size = 20

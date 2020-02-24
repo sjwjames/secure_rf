@@ -7,7 +7,7 @@ pub mod constants {
     pub const SIZEOF_U64: usize = 8;
 
     // can tweak batch size to optimize batch multiplication for different machines
-    pub const BATCH_SIZE: usize = 512;
+    pub const BATCH_SIZE: usize = 3 * 512; // must be the multiple of 3 in RF implementation
     // how many mults can be done in one tx
     pub const REVEAL_BATCH_SIZE: usize = 2 * BATCH_SIZE;
     // how many reveals in one TX

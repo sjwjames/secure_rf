@@ -474,21 +474,21 @@ pub mod utils {
         let mut current_batch = 0;
         let mut push_buf = Xbuffer { u8_buf: [0u8; U8S_PER_TX] };
         let mut data_transformed = Vec::new();
-        for i in 0..data_len{
-            if i != data_len{
-                let mut bytes = (data[i].to_string()+";").as_bytes().to_vec();
+        for i in 0..data_len {
+            if i != data_len {
+                let mut bytes = (data[i].to_string() + ";").as_bytes().to_vec();
                 data_transformed.append(&mut bytes);
-            }else{
+            } else {
                 let mut bytes = (data[i].to_string()).as_bytes().to_vec();
                 data_transformed.append(&mut bytes);
             }
         }
-        let temp_result = send_u8_messages(ctx,&data_transformed);
-        let mut iter=temp_result.split(|num| *num==59);
-        for item in iter{
+        let temp_result = send_u8_messages(ctx, &data_transformed);
+        let mut iter = temp_result.split(|num| *num == 59);
+        for item in iter {
             let bigint_str = String::from_utf8(item.to_vec()).unwrap();
             result.push(BigUint::from_str(&bigint_str).unwrap());
-            if result.len()==data.len(){
+            if result.len() == data.len() {
                 break;
             }
         }
@@ -496,45 +496,129 @@ pub mod utils {
         result
     }
 
-    pub fn send_receive_u64_matrix(matrix_sent:&Vec<Vec<Wrapping<u64>>>,ctx:&ComputingParty)->Vec<Vec<Wrapping<u64>>>{
+    pub fn send_receive_u64_matrix(matrix_sent: &Vec<Vec<Wrapping<u64>>>, ctx: &ComputingParty) -> Vec<Vec<Wrapping<u64>>> {
         let mut list_sent = Vec::new();
         let mut matrix_received = Vec::new();
-        for row in matrix_sent{
-            for item in row{
+        for row in matrix_sent {
+            for item in row {
                 list_sent.push(item.clone());
             }
         }
-        let list_received = send_u64_messages(ctx,&list_sent);
+        let list_received = send_u64_messages(ctx, &list_sent);
         let row_len = matrix_sent[0].len();
         let matrix_len = matrix_sent.len();
-        for i in 0..matrix_len{
+        for i in 0..matrix_len {
             let mut row = Vec::new();
-            for j in 0..row_len{
-                row.push(list_received[i*row_len+j]);
+            for j in 0..row_len {
+                row.push(list_received[i * row_len + j]);
             }
             matrix_received.push(row);
         }
         matrix_received
     }
 
-    pub fn send_receive_u8_matrix(matrix_sent:&Vec<Vec<u8>>,ctx:&ComputingParty)->Vec<Vec<u8>>{
+    pub fn send_receive_u8_matrix(matrix_sent: &Vec<Vec<u8>>, ctx: &ComputingParty) -> Vec<Vec<u8>> {
         let mut list_sent = Vec::new();
         let mut matrix_received = Vec::new();
-        for row in matrix_sent{
-            for item in row{
+        for row in matrix_sent {
+            for item in row {
                 list_sent.push(item.clone());
             }
         }
-        let list_received = send_u8_messages(ctx,&list_sent);
+        let list_received = send_u8_messages(ctx, &list_sent);
         let row_len = matrix_sent[0].len();
         let matrix_len = matrix_sent.len();
-        for i in 0..matrix_len{
+        for i in 0..matrix_len {
             let mut row = Vec::new();
-            for j in 0..row_len{
-                row.push(list_received[i*row_len+j]);
+            for j in 0..row_len {
+                row.push(list_received[i * row_len + j]);
             }
             matrix_received.push(row);
         }
         matrix_received
+    }
+
+
+    pub fn receive_u64_shares(stream: &mut TcpStream, amount: u64) -> Vec<Wrapping<u64>> {
+        let mut recv_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+        let mut result = Vec::new();
+        let mut batches: usize = (amount as f64 / U64S_PER_TX as f64).ceil() as usize;
+        let mut current_batch = 0;
+        while current_batch < batches {
+            unsafe {
+                let mut bytes_read = 0;
+                while bytes_read < recv_buf.u8_buf.len() {
+                    let current_bytes = stream.read(&mut recv_buf.u8_buf[bytes_read..]).unwrap();
+                    bytes_read += current_bytes;
+                }
+
+                for i in 0..U64S_PER_TX {
+                    if result.len() < amount as usize {
+                        result.push(Wrapping(recv_buf.u64_buf[i]));
+                    }
+                }
+            }
+            current_batch += 1;
+        }
+        result
+    }
+
+    pub fn receive_u64_triple_shares(stream: &mut TcpStream, amount: u64) -> Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> {
+        let mut recv_buf = Xbuffer { u64_buf: [0u64; U64S_PER_TX] };
+        let mut result = Vec::new();
+        let mut batches: usize = ((amount * 3) as f64 / U64S_PER_TX as f64).ceil() as usize;
+        let mut current_batch = 0;
+        let triple_cnt_per_buf = U64S_PER_TX / 3;
+        while current_batch < batches {
+            unsafe {
+                let mut bytes_read = 0;
+                while bytes_read < recv_buf.u8_buf.len() {
+                    let current_bytes = stream.read(&mut recv_buf.u8_buf[bytes_read..]).unwrap();
+                    bytes_read += current_bytes;
+                }
+
+                for i in 0..triple_cnt_per_buf {
+                    if result.len() < amount as usize {
+                        let u = Wrapping(recv_buf.u64_buf[i * 3]);
+                        let v = Wrapping(recv_buf.u64_buf[i * 3 + 1]);
+                        let w = Wrapping(recv_buf.u64_buf[i * 3 + 2]);
+                        result.push((u, v, w));
+                    }
+                }
+            }
+
+
+            current_batch += 1;
+        }
+        result
+    }
+
+    pub fn receive_u8_triple_shares(stream: &mut TcpStream, amount: u64) -> Vec<(u8, u8, u8)> {
+        let mut recv_buf = Xbuffer { u8_buf: [0u8; U8S_PER_TX] };
+        let mut result = Vec::new();
+        let mut batches: usize = ((amount * 3) as f64 / U8S_PER_TX as f64).ceil() as usize;
+        let mut current_batch = 0;
+        let triple_cnt_per_buf = U8S_PER_TX / 3;
+        while current_batch < batches {
+            unsafe {
+                let mut bytes_read = 0;
+                while bytes_read < recv_buf.u8_buf.len() {
+                    let current_bytes = stream.read(&mut recv_buf.u8_buf[bytes_read..]).unwrap();
+                    bytes_read += current_bytes;
+                }
+                for i in 0..triple_cnt_per_buf {
+                    if result.len() < amount as usize {
+                        let u = recv_buf.u8_buf[i * 3];
+                        let v = recv_buf.u8_buf[i * 3 + 1];
+                        let w = recv_buf.u8_buf[i * 3 + 2];
+                        result.push((u, v, w));
+                    }
+                }
+            }
+
+
+            current_batch += 1;
+        }
+        result
     }
 }
