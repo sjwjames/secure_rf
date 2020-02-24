@@ -366,7 +366,7 @@ pub mod ti {
 
         print!("preprocessing- generating binary shares...           ");
         let now = SystemTime::now();
-        let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, thread_pool,1000);
+        let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, thread_pool, 1000);
         println!("complete -- work time = {:5} (ms)",
                  now.elapsed().unwrap().as_millis());
 
@@ -476,7 +476,7 @@ pub mod ti {
 
                 print!("{} [{}] generating binary shares...           ", &prefix, i);
                 let now = SystemTime::now();
-                let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, &thread_pool,ctx.binary_shares_per_tree);
+                let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, &thread_pool, ctx.binary_shares_per_tree);
                 println!("complete -- work time = {:5} (ms)",
                          now.elapsed().unwrap().as_millis());
 
@@ -503,7 +503,7 @@ pub mod ti {
                          now.elapsed().unwrap().as_millis());
 
                 let now = SystemTime::now();
-                let (matrix_mul_share0, matrix_mul_share1) = generate_rfs_matrix_shares(&ctx, ctx.instance_cnt as usize, ctx.feature_cnt as usize, ctx.feature_selected as usize, BINARY_PRIME as u64);
+                let (matrix_mul_share0, matrix_mul_share1) = generate_matrix_shares(&ctx, (ctx.attr_value_cnt * ctx.feature_selected) as usize, (ctx.attr_value_cnt * ctx.feature_cnt) as usize, ctx.instance_cnt as usize, BINARY_PRIME as u64);
                 println!("complete -- work time = {:5} (ms)",
                          now.elapsed().unwrap().as_millis());
 
@@ -514,7 +514,7 @@ pub mod ti {
                          now.elapsed().unwrap().as_millis());
 
                 let now = SystemTime::now();
-                let (bagging_matrix_mul_share0, bagging_matrix_mul_share1) = generate_rfs_matrix_shares(&ctx, (ctx.feature_selected * ctx.attr_value_cnt + ctx.class_value_cnt) as usize, ctx.instance_cnt as usize, ctx.instance_selected as usize, BINARY_PRIME as u64);
+                let (bagging_matrix_mul_share0, bagging_matrix_mul_share1) = generate_matrix_shares(&ctx, (ctx.feature_selected * ctx.attr_value_cnt + ctx.class_value_cnt) as usize, ctx.instance_cnt as usize, ctx.instance_selected as usize, BINARY_PRIME as u64);
                 println!("complete -- work time = {:5} (ms)",
                          now.elapsed().unwrap().as_millis());
 
@@ -690,7 +690,7 @@ pub mod ti {
         Ok(())
     }
 
-    fn generate_binary_shares(ctx: &TI, thread_pool: &ThreadPool,amount:usize) -> (Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>) {
+    fn generate_binary_shares(ctx: &TI, thread_pool: &ThreadPool, amount: usize) -> (Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
@@ -852,24 +852,27 @@ pub mod ti {
                 feature_selected_remain -= 1;
             }
         }
-        let mut share0 = vec![vec![Wrapping(0 as u64); ctx.feature_selected as usize]; ctx.feature_cnt as usize];
-        let mut share1 = vec![vec![Wrapping(0 as u64); ctx.feature_selected as usize]; ctx.feature_cnt as usize];
 
-        println!("{:?}", feature_bit_vec);
+        let mut share0 = Vec::new();
+        let mut share1 = Vec::new();
 
-        let mut count = 0;
+
         for i in 0..feature_bit_vec.len() {
             let item = feature_bit_vec[i];
             if item == 1 {
-                for j in 0..feature_bit_vec.len() {
-                    let current_item = if j == i { 1 } else { 0 };
-                    let share0_item: u64 = rng.gen_range(0, ctx.rfs_field);
-                    let share1_item: u64 = (Wrapping(current_item as u64) - Wrapping(share0_item)).0.mod_floor(&ctx.rfs_field);
-                    share0[j][count] = Wrapping(share0_item);
-                    share1[j][count] = Wrapping(share1_item);
+                for j in 0..ctx.attr_value_cnt {
+                    let mut row0 = Vec::new();
+                    let mut row1 = Vec::new();
+                    for k in 0..ctx.feature_cnt * ctx.attr_value_cnt {
+                        let current_item = if k == (i as u64 * ctx.attr_value_cnt + j) { 1 } else { 0 };
+                        let share0_item: u64 = rng.gen_range(0, 2);
+                        let share1_item: u64 = (Wrapping(current_item as u64) - Wrapping(share0_item)).0.mod_floor(&(BINARY_PRIME as u64));
+                        row0.push(Wrapping(share0_item));
+                        row1.push(Wrapping(share1_item));
+                    }
+                    share0.push(row0);
+                    share1.push(row1);
                 }
-
-                count += 1;
             }
         }
 
@@ -908,7 +911,7 @@ pub mod ti {
         (share0, share1)
     }
 
-    fn generate_rfs_matrix_shares(ctx: &TI, instance_cnt: usize, feature_cnt: usize, feature_selected: usize, prime: u64) -> ((Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>), (Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>)) {
+    fn generate_matrix_shares(ctx: &TI, first_row: usize, second_row: usize, second_col: usize, prime: u64) -> ((Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>), (Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>)) {
         let mut rng = rand::thread_rng();
         let mut u = Vec::new();
         let mut v = Vec::new();
@@ -920,11 +923,11 @@ pub mod ti {
         let mut v_share1 = Vec::new();
         let mut w_share1 = Vec::new();
 
-        for i in 0..instance_cnt {
+        for i in 0..first_row {
             let mut share0_row = Vec::new();
             let mut share1_row = Vec::new();
             let mut row = Vec::new();
-            for j in 0..feature_cnt {
+            for j in 0..second_row {
                 let u_item = rng.gen_range(0, prime);
                 //hard_coded for two parties
                 let u_item0 = rng.gen_range(0, prime);
@@ -938,11 +941,11 @@ pub mod ti {
             u.push(row);
         }
 
-        for i in 0..feature_cnt {
+        for i in 0..second_row {
             let mut share0_row = Vec::new();
             let mut share1_row = Vec::new();
             let mut row = Vec::new();
-            for j in 0..feature_selected {
+            for j in 0..second_col {
                 let v_item = rng.gen_range(0, prime);
                 //hard_coded for two parties
                 let v_item0 = rng.gen_range(0, prime);
@@ -957,13 +960,13 @@ pub mod ti {
         }
 
 
-        for i in 0..instance_cnt {
+        for i in 0..first_row {
             let mut share0_row = Vec::new();
             let mut share1_row = Vec::new();
             let mut row = Vec::new();
-            for j in 0..feature_selected {
+            for j in 0..second_col {
                 let mut w_item = Wrapping(0);
-                for k in 0..feature_cnt {
+                for k in 0..second_row {
                     let w_temp = u[i][k] * v[k][j];
                     w_item += w_temp;
                 }

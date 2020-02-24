@@ -219,14 +219,14 @@ pub mod protocol {
         let w_eu = local_matrix_computation(&w_shares, &eu, prime, LOCAL_ADDITION);
         let w_eu_dv = local_matrix_computation(&w_eu, &dv, prime, LOCAL_ADDITION);
         let result = if ctx.asymmetric_bit == 1 { local_matrix_computation(&w_eu_dv, &de, prime, LOCAL_ADDITION) } else { w_eu_dv.clone() };
-        println!("d:{:?}", d);
-        println!("e:{:?}", e);
-        println!("de:{:?}", de);
-        println!("eu:{:?}", eu);
-        println!("dv:{:?}", dv);
-        println!("w_eu:{:?}", w_eu);
-        println!("w_eu_dv:{:?}", w_eu_dv);
-        println!("rfs result{:?}", result);
+//        println!("d:{:?}", d);
+//        println!("e:{:?}", e);
+//        println!("de:{:?}", de);
+//        println!("eu:{:?}", eu);
+//        println!("dv:{:?}", dv);
+//        println!("w_eu:{:?}", w_eu);
+//        println!("w_eu_dv:{:?}", w_eu_dv);
+//        println!("rfs result{:?}", result);
         result
     }
 

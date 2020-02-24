@@ -14,18 +14,33 @@ pub mod random_forest {
     use crate::comparison::comparison::comparison;
     use crate::constants::constants::BINARY_PRIME;
 
-    pub fn random_feature_selection(ctx: &mut ComputingParty) -> Vec<Vec<Wrapping<u64>>> {
-        let x = &ctx.dt_data.discretized_x.clone();
+    pub fn random_feature_selection(attr_values:&Vec<Vec<u8>>,ctx: &mut ComputingParty) -> Vec<Vec<u8>> {
+        let mut transformed_attr_values = Vec::new();
+        for row in attr_values{
+            let mut row_new = Vec::new();
+            for item in row{
+                row_new.push(Wrapping(*item as u64));
+            }
+            transformed_attr_values.push(row_new);
+        }
         let rfs_shares = &ctx.dt_shares.rfs_shares.clone();
         let matrix_mul_shares = &ctx.dt_shares.matrix_mul_shares;
-        let mut result = matrix_multiplication_integer(&x, &rfs_shares, ctx, ctx.dt_training.rfs_field, matrix_mul_shares );
-        let attribute_cnt = ctx.dt_shares.rfs_shares[0].len();
+        let mut result = matrix_multiplication_integer(&rfs_shares,&transformed_attr_values , ctx, BINARY_PRIME as u64, matrix_mul_shares );
+        let attribute_cnt = ctx.dt_shares.rfs_shares.len()/ctx.dt_data.attr_value_count;
         ctx.dt_training.attribute_bit_vector = vec![1u8; attribute_cnt];
-        result
+        let mut result_transformed = Vec::new();
+        for row in result{
+            let mut row_new = Vec::new();
+            for item in row{
+                row_new.push(item.0 as u8);
+            }
+            result_transformed.push(row_new);
+        }
+        result_transformed
     }
 
     pub fn sample_with_replacement(ctx: &mut ComputingParty, attr_value_vec: &Vec<Vec<u8>>) {
-        println!("{:?}", ctx.dt_shares.bagging_shares);
+        println!("bagging shares {:?}", ctx.dt_shares.bagging_shares);
         let bagging_shares = ctx.dt_shares.bagging_shares.clone();
         let mut temp = attr_value_vec.clone();
         let mut class_values = ctx.dt_data.class_values_bytes.clone();
@@ -49,7 +64,7 @@ pub mod random_forest {
         }
         let class_value_count = ctx.dt_data.class_value_count;
         let instance_cnt = ctx.dt_shares.bagging_shares[0].len();
-        let attribute_cnt = ctx.dt_shares.rfs_shares[0].len();
+        let attribute_cnt =  ctx.dt_shares.rfs_shares.len()/ctx.dt_data.attr_value_count;
         ctx.dt_data = produce_dt_data(result_u8, ctx.dt_data.class_value_count, ctx.dt_data.attr_value_count, attribute_cnt, instance_cnt, ctx.asymmetric_bit);
 
         ctx.dt_training.subset_transaction_bit_vector = vec![ctx.asymmetric_bit as u8; instance_cnt];
@@ -152,21 +167,17 @@ pub mod random_forest {
         let discretized_x= ctx.dt_data.discretized_x.clone();
         let mut attr_values_bytes = ohe_conversion(&discretized_x,ctx,attr_value_count,ohe_prime);
         let mut class_values_bytes = ohe_conversion(&y,ctx,class_value_count,ohe_prime);
-        println!("{:?}",attr_values_bytes);
-        println!("{:?}",class_values_bytes);
 
         for current_tree_index in 0..remainder {
             let dt_shares = ti_receive(
                 ctx.ti_stream.try_clone().expect("failed to clone ti recvr"),ctx);
             let mut dt_ctx = ctx.clone();
             dt_ctx.dt_shares = dt_shares;
-            dt_ctx.dt_data.class_values_bytes = ohe_conversion(&y,&mut dt_ctx,class_value_count,bagging_field);
 
+            let mut rfs_x = random_feature_selection(&attr_values_bytes,&mut dt_ctx);
+            rfs_x.append(&mut class_values_bytes);
 
-            let rfs_x = random_feature_selection(&mut dt_ctx);
-            let mut attr_values_bytes = ohe_conversion(&rfs_x,&mut dt_ctx,attr_value_count,rfs_field);
-
-            sample_with_replacement(&mut dt_ctx, &attr_values_bytes);
+            sample_with_replacement(&mut dt_ctx, &rfs_x);
 //
 //            thread_pool.execute(move || {
 //                dt_ctx.party0_port = current_p0_port;
