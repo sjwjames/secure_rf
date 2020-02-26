@@ -161,8 +161,9 @@ pub mod utils {
         let bigint_shares = &ctx.dt_shares.additive_bigint_triples;
         if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_additive_bigint_index;
-//            ctx.dt_shares.sequential_additive_bigint_index += 1;
-            let current_bigint_share = &bigint_shares[current_index];
+            ctx.dt_shares.sequential_additive_bigint_index += 1;
+//            let current_bigint_share = &bigint_shares[current_index];
+            let current_bigint_share = &bigint_shares[0];
             return big_uint_triple_clone(current_bigint_share);
         } else {
             let current_index = *(ctx.dt_shares.current_additive_bigint_index.lock().unwrap());
@@ -176,8 +177,9 @@ pub mod utils {
         let shares = &ctx.dt_shares.equality_shares;
         if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_equality_index;
-//            ctx.dt_shares.sequential_additive_bigint_index += 1;
-            let current_share = &shares[current_index];
+            ctx.dt_shares.sequential_additive_bigint_index += 1;
+//            let current_share = &shares[current_index];
+            let current_share = &shares[0];
             return big_uint_clone(&current_share);
         } else {
             let current_index = *(ctx.dt_shares.current_equality_index.lock().unwrap());
@@ -189,7 +191,9 @@ pub mod utils {
 
     pub fn get_current_equality_integer_shares(ctx: &mut ComputingParty, range: usize, prime: u64) -> Vec<Wrapping<u64>> {
         let current_index = ctx.dt_shares.sequential_equality_integer_index.get(&prime).unwrap();
-        let shares = ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[*current_index..(current_index + range)].to_vec();
+//        let shares = ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[*current_index..(current_index + range)].to_vec();
+        let share = ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[0];
+        let shares = vec![share;range];
         ctx.dt_shares.sequential_equality_integer_index.insert(prime, current_index + range);
         return shares;
     }
@@ -198,8 +202,10 @@ pub mod utils {
         let shares = ctx.dt_shares.additive_triples.get(&prime).unwrap();
         if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_additive_index.get(&prime).unwrap();
-//            ctx.dt_shares.sequential_additive_index.insert(prime,current_index+1);
-            return shares[*current_index];
+            ctx.dt_shares.sequential_additive_index.insert(prime,current_index+1);
+//            let share = shares[*current_index];
+            let share = shares[0];
+            return share
         } else {
             let current_index = *(ctx.dt_shares.current_additive_index.lock().unwrap());
             let result = shares[current_index];
@@ -212,8 +218,10 @@ pub mod utils {
         let shares = &ctx.dt_shares.binary_triples;
         if ctx.raw_tcp_communication {
             let current_index = ctx.dt_shares.sequential_binary_index;
-//            ctx.dt_shares.sequential_binary_index += 1;
-            return shares[current_index];
+            ctx.dt_shares.sequential_binary_index += 1;
+//            let share = shares[current_index];
+            let share = shares[0];
+            return share;
         } else {
             let current_index = *(ctx.dt_shares.current_binary_index.lock().unwrap());
             let result = shares[current_index];
@@ -224,15 +232,18 @@ pub mod utils {
 
     pub fn get_binary_shares(ctx: &mut ComputingParty, range: usize) -> Vec<(u8, u8, u8)> {
         let current_index = ctx.dt_shares.sequential_binary_index;
-        let shares = ctx.dt_shares.binary_triples[current_index..current_index + range].to_vec();
-
+//        let shares = ctx.dt_shares.binary_triples[current_index..current_index + range].to_vec();
+        let share = ctx.dt_shares.binary_triples[0];
+        let shares = vec![share;range];
         ctx.dt_shares.sequential_binary_index += range;
         return shares;
     }
 
     pub fn get_additive_shares(ctx: &mut ComputingParty, range: usize, prime: u64) -> Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)> {
         let current_index = ctx.dt_shares.sequential_additive_index.get(&prime).unwrap();
-        let shares = ctx.dt_shares.additive_triples.get(&prime).unwrap()[*current_index..current_index + range].to_vec();
+//        let shares = ctx.dt_shares.additive_triples.get(&prime).unwrap()[*current_index..current_index + range].to_vec();
+        let share = ctx.dt_shares.additive_triples.get(&prime).unwrap()[0];
+        let shares = vec![share;range];
         ctx.dt_shares.sequential_additive_index.insert(prime, current_index + range);
         return shares;
     }

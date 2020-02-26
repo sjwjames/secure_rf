@@ -39,43 +39,45 @@ thread_count = 40
 max_depth = 1
 alpha = 8
 epsilon = 0.1
-instance_selected = 3
-feature_selected = 2
+instance_selected = 21
+feature_selected = 5
 ohe_add_shares = 1000
 ohe_binary_shares = 1000
 ohe_equality_shares = 1000
+
 #[BREAST CANCER]
-#batch_size = 176
-#tree_training_batch_size = 20
-#attr_value_count = 10
-#class_value_count = 2
-#attribute_count = 30
-#instance_count = 100
-#asymmetric_bit = 0
-#prime = 512
-#big_int_prime = "47890485652059026823698344598447161988085597568237568"
-#dataset_size_prime = 512
-#big_int_ti_index = 0
-#bit_length = 175
-#x_input_path = "/Users/sjw/Projects/2019summer/idash2019/breast_cancer/shared_fold_1_train-0.csv"
-#output_path = "/Users/sjw/Desktop/PPML/idash/secure-mpc-rust/weights/BC_TCGA_5_folds/fold_1_weights.csv"
+batch_size = 176
+tree_training_batch_size = 20
+attr_value_count = 6
+class_value_count = 2
+attribute_count = 30
+instance_count = 455
+asymmetric_bit = 0
+prime = 512
+big_int_prime = "47890485652059026823698344598447161988085597568237568"
+dataset_size_prime = 512
+big_int_ti_index = 0
+bit_length = 175
+x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainX1_0.csv"
+y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy1_0.csv"
+output_path = "fold_1_trees_0.txt"
 
 
 #[RANDOM DATA]
-batch_size = 34
-tree_training_batch_size = 20
-attr_value_count = 2
-class_value_count = 2
-attribute_count = 3
-instance_count = 4
-asymmetric_bit = 0
-prime = 8
-big_int_prime = "8589934592"
-dataset_size_prime = 8
-big_int_ti_index = 0
-bit_length = 33
-x_input_path = "/Users/sjw/Desktop/PPML/preprocess/james/shared_fold_2_train-0.csv"
-output_path = "fold_1_trees_0.txt"
+#batch_size = 34
+#tree_training_batch_size = 20
+#attr_value_count = 2
+#class_value_count = 2
+#attribute_count = 3
+#instance_count = 4
+#asymmetric_bit = 0
+#prime = 8
+#big_int_prime = "8589934592"
+#dataset_size_prime = 8
+#big_int_ti_index = 0
+#bit_length = 33
+#x_input_path = "/Users/sjw/Desktop/PPML/preprocess/james/shared_fold_2_train-0.csv"
+#output_path = "fold_1_trees_0.txt"
 
 #[GSE2034]
 

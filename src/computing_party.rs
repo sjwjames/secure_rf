@@ -61,7 +61,8 @@ pub mod computing_party {
 
         /* DT training Data*/
         pub dt_data: DecisionTreeData,
-        pub raw_data_path: String,
+        pub x_input_path: String,
+        pub y_input_path: String,
 
         /* DT training*/
         pub dt_training: DecisionTreeTraining,
@@ -111,7 +112,8 @@ pub mod computing_party {
                 output_path: self.output_path.clone(),
 
                 dt_data: self.dt_data.clone(),
-                raw_data_path: self.raw_data_path.clone(),
+                x_input_path: self.x_input_path.clone(),
+                y_input_path: self.y_input_path.clone(),
                 dt_training: self.dt_training.clone(),
                 dt_shares: self.dt_shares.clone(),
                 dt_results: self.dt_results.clone(),
@@ -136,31 +138,24 @@ pub mod computing_party {
         }
     }
 
-    pub fn load_dt_raw_data(file_path: &String) -> (Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>) {
-        let file = File::open(file_path).expect("input file not found");
-        let reader = BufReader::new(file);
+    pub fn load_dt_raw_data(x_path: &String) -> Vec<Vec<Wrapping<u64>>>{
+        let x_file = File::open(x_path).expect("input file not found");
+        let reader = BufReader::new(x_file);
         let mut x = Vec::new();
-        let mut y = Vec::new();
+
         for line in reader.lines() {
             let line = line.unwrap();
             let item: Vec<&str> = line.split(",").collect();
             let length = item.len();
             let mut x_row = Vec::new();
-            let mut y_row = Vec::new();
             for i in 0..length {
-                if i != length {
-                    let x_item: u64 = item[i].parse().unwrap();
-                    x_row.push(Wrapping(x_item));
-                } else {
-                    let y_item: u64 = item[i].parse().unwrap();
-                    y_row.push(Wrapping(y_item));
-                }
+                let x_item: u64 = item[i].parse().unwrap();
+                x_row.push(Wrapping(x_item));
             }
             x.push(x_row);
-            y.push(y_row);
         }
 
-        (x, y)
+        x
     }
 
     fn load_dt_training_file(file_path: &String) -> (usize, usize, usize, usize, Vec<Vec<u8>>) {
@@ -385,6 +380,13 @@ pub mod computing_party {
             Ok(string) => string,
             Err(error) => {
                 panic!("Encountered a problem while parsing x_input_path: {:?}", error)
+            }
+        };
+
+        let y_input_path = match settings.get_str("y_input_path") {
+            Ok(string) => string,
+            Err(error) => {
+                panic!("Encountered a problem while parsing y_input_path: {:?}", error)
             }
         };
 
@@ -681,7 +683,8 @@ pub mod computing_party {
             instance_selected,
             dt_training,
             result_file,
-            raw_data_path: x_input_path,
+            x_input_path,
+            y_input_path,
             dt_shares: DecisionTreeShares {
                 additive_triples: Default::default(),
                 additive_bigint_triples: vec![],

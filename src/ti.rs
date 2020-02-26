@@ -35,6 +35,9 @@ pub mod ti {
         pub add_shares_bigint_per_tree: usize,
         pub equality_shares_per_tree: usize,
         pub binary_shares_per_tree: usize,
+        pub ohe_add_shares: u64,
+        pub ohe_binary_shares: u64,
+        pub ohe_equality_shares: u64,
         pub tree_count: usize,
         pub batch_size: usize,
         pub tree_training_batch_size: usize,
@@ -72,6 +75,9 @@ pub mod ti {
                 add_shares_bigint_per_tree: self.add_shares_bigint_per_tree,
                 equality_shares_per_tree: self.equality_shares_per_tree,
                 binary_shares_per_tree: self.equality_shares_per_tree,
+                ohe_add_shares: self.ohe_add_shares,
+                ohe_binary_shares: self.ohe_binary_shares,
+                ohe_equality_shares: self.ohe_equality_shares,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
                 tree_training_batch_size: self.tree_training_batch_size,
@@ -243,6 +249,27 @@ pub mod ti {
             }
         };
 
+        let ohe_add_shares = match settings.get_int("ohe_add_shares") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing ohe_add_shares: {:?}", error)
+            }
+        };
+
+        let ohe_binary_shares = match settings.get_int("ohe_binary_shares") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing ohe_binary_shares: {:?}", error)
+            }
+        };
+
+        let ohe_equality_shares = match settings.get_int("ohe_equality_shares") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing ohe_equality_shares: {:?}", error)
+            }
+        };
+
 
         let rfs_field = 2.0_f64.powf((attr_value_cnt as f64).log2().ceil()) as u64;
 
@@ -258,6 +285,9 @@ pub mod ti {
             add_shares_bigint_per_tree,
             equality_shares_per_tree,
             binary_shares_per_tree,
+            ohe_add_shares,
+            ohe_binary_shares,
+            ohe_equality_shares,
             tree_count,
             batch_size,
             tree_training_batch_size,
@@ -366,7 +396,7 @@ pub mod ti {
 
         print!("preprocessing- generating binary shares...           ");
         let now = SystemTime::now();
-        let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, thread_pool, 1000);
+        let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, thread_pool, ctx.ohe_binary_shares as usize);
         println!("complete -- work time = {:5} (ms)",
                  now.elapsed().unwrap().as_millis());
 

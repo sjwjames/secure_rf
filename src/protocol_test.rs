@@ -287,6 +287,14 @@ pub mod protocol_test {
 //        assert_eq!(result_revealed, 0);
     }
 
+    pub fn test_batch_bit_decomposition(){
+
+
+    }
+
+    pub fn test_batch_comparison(){
+
+    }
 
     pub fn test_comparison_bigint(ctx: &mut ComputingParty) {
         let mut result = BigUint::zero();
@@ -353,16 +361,16 @@ pub mod protocol_test {
 
     pub fn test_or_xor(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
-            let x = vec![Wrapping(1), Wrapping(1), Wrapping(0), Wrapping(1)];
-            let y = vec![Wrapping(0), Wrapping(0), Wrapping(0), Wrapping(1)];
-            let result = or_xor(&x, &y, ctx, 2,ctx.dt_training.dataset_size_prime);
+            let x = vec![Wrapping(1), Wrapping(7), Wrapping(4), Wrapping(0)];
+            let y = vec![Wrapping(1), Wrapping(1), Wrapping(1), Wrapping(1)];
+            let result = or_xor(&x, &y, ctx, 2,2);
             println!("{:?}", result);
 //            let result_revealed = reveal_byte_vec_result(&result,ctx);
 //            println!("{}",result_revealed.to_string());
         } else {
-            let x = vec![Wrapping(0), Wrapping(1), Wrapping(0), Wrapping(0)];
-            let y = vec![Wrapping(1), Wrapping(0), Wrapping(0), Wrapping(0)];
-            let result = or_xor(&x, &y, ctx, 2,ctx.dt_training.dataset_size_prime);
+            let x = vec![Wrapping(0), Wrapping(1), Wrapping(4), Wrapping(0)];
+            let y = vec![Wrapping(0), Wrapping(0), Wrapping(0), Wrapping(0)];
+            let result = or_xor(&x, &y, ctx, 2,2);
             println!("{:?}", result);
 //            let result_revealed = reveal_bigint_result(&result,ctx);
 //            println!("{}",result_revealed.to_string());

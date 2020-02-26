@@ -10,28 +10,31 @@ pub mod random_forest {
     use std::num::Wrapping;
     use crate::protocol::protocol::{matrix_multiplication_integer, batch_equality_integer};
     use crate::utils::utils::get_additive_shares;
-    use crate::bit_decomposition::bit_decomposition::bit_decomposition;
-    use crate::comparison::comparison::comparison;
+    use crate::bit_decomposition::bit_decomposition::{bit_decomposition, batch_bit_decomposition};
+    use crate::comparison::comparison::{comparison, batch_comparison};
     use crate::constants::constants::BINARY_PRIME;
+    use std::fs::File;
+    use std::io::{BufReader, BufRead};
+    use crate::or_xor::or_xor::or_xor;
 
-    pub fn random_feature_selection(attr_values:&Vec<Vec<u8>>,ctx: &mut ComputingParty) -> Vec<Vec<u8>> {
+    pub fn random_feature_selection(attr_values: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<Vec<u8>> {
         let mut transformed_attr_values = Vec::new();
-        for row in attr_values{
+        for row in attr_values {
             let mut row_new = Vec::new();
-            for item in row{
+            for item in row {
                 row_new.push(Wrapping(*item as u64));
             }
             transformed_attr_values.push(row_new);
         }
         let rfs_shares = &ctx.dt_shares.rfs_shares.clone();
         let matrix_mul_shares = &ctx.dt_shares.matrix_mul_shares;
-        let mut result = matrix_multiplication_integer(&rfs_shares,&transformed_attr_values , ctx, BINARY_PRIME as u64, matrix_mul_shares );
-        let attribute_cnt = ctx.dt_shares.rfs_shares.len()/ctx.dt_data.attr_value_count;
+        let mut result = matrix_multiplication_integer(&rfs_shares, &transformed_attr_values, ctx, BINARY_PRIME as u64, matrix_mul_shares);
+        let attribute_cnt = ctx.dt_shares.rfs_shares.len() / ctx.dt_data.attr_value_count;
         ctx.dt_training.attribute_bit_vector = vec![1u8; attribute_cnt];
         let mut result_transformed = Vec::new();
-        for row in result{
+        for row in result {
             let mut row_new = Vec::new();
-            for item in row{
+            for item in row {
                 row_new.push(item.0 as u8);
             }
             result_transformed.push(row_new);
@@ -64,36 +67,38 @@ pub mod random_forest {
         }
         let class_value_count = ctx.dt_data.class_value_count;
         let instance_cnt = ctx.dt_shares.bagging_shares[0].len();
-        let attribute_cnt =  ctx.dt_shares.rfs_shares.len()/ctx.dt_data.attr_value_count;
+        let attribute_cnt = ctx.dt_shares.rfs_shares.len() / ctx.dt_data.attr_value_count;
         ctx.dt_data = produce_dt_data(result_u8, ctx.dt_data.class_value_count, ctx.dt_data.attr_value_count, attribute_cnt, instance_cnt, ctx.asymmetric_bit);
 
         ctx.dt_training.subset_transaction_bit_vector = vec![ctx.asymmetric_bit as u8; instance_cnt];
         ctx.dt_training.cutoff_transaction_set_size = (ctx.dt_training.epsilon * instance_cnt as f64) as usize;
     }
 
-    pub fn discretize_data(x:Vec<Vec<Wrapping<u64>>>,ctx:&mut ComputingParty){
-        if ctx.asymmetric_bit == 1 {
-            ctx.dt_data.discretized_x = {
-                [
-                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
-                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
-                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec()
-                ].to_vec()
-            };
-        } else {
-            ctx.dt_data.discretized_x = {
-                [
-                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-                    [Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)].to_vec(),
-                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-                    [Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(0 as u64)].to_vec()
-                ].to_vec()
-            };
-        }
+    pub fn discretize_data(x: Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty) {
+        //temporarily
+        ctx.dt_data.discretized_x = x;
+//        if ctx.asymmetric_bit == 1 {
+//            ctx.dt_data.discretized_x = {
+//                [
+//                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
+//                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+//                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
+//                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec()
+//                ].to_vec()
+//            };
+//        } else {
+//            ctx.dt_data.discretized_x = {
+//                [
+//                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+//                    [Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)].to_vec(),
+//                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+//                    [Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(0 as u64)].to_vec()
+//                ].to_vec()
+//            };
+//        }
     }
 
-    pub fn ohe_conversion(x:&Vec<Vec<Wrapping<u64>>>,ctx: &mut ComputingParty,category:usize,prime:u64)->Vec<Vec<u8>>{
+    pub fn ohe_conversion(x: &Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty, category: usize, prime: u64) -> Vec<Vec<u8>> {
         let rows = x.len();
         let cols = x[0].len();
         let mut equality_x = Vec::new();
@@ -116,14 +121,11 @@ pub mod random_forest {
             }
         }
         let result = batch_equality_integer(&equality_x, &equality_y, ctx, prime);
-        let mut comparison_results = Vec::new();
         let bit_length = (prime as f64).log2().ceil() as usize;
-        for item in result {
-            let bits = bit_decomposition(item, ctx, bit_length);
-            let mut compared = vec![0; bits.len()];
-            let comparison_result = comparison(&compared, &bits, ctx);
-            comparison_results.push(comparison_result);
-        }
+
+        let mut bits_list = batch_bit_decomposition(&result,ctx,bit_length);
+        let mut compared = vec![vec![0u8; bit_length];bits_list.len()];
+        let comparison_results = batch_comparison(&mut compared,&mut bits_list,ctx,bit_length);
 
         let mut count = 0;
         let mut result = Vec::new();
@@ -147,15 +149,10 @@ pub mod random_forest {
         let mut remainder = ctx.tree_count;
         let mut current_p0_port = ctx.party0_port + 1;
         let mut current_p1_port = ctx.party1_port + 1;
-        let (x,mut y) = load_dt_raw_data(&ctx.raw_data_path);
+        let mut x = load_dt_raw_data(&ctx.x_input_path);
+        let mut y = load_dt_raw_data(&ctx.y_input_path);
 
-        y= [
-            [Wrapping(1)].to_vec(),
-            [Wrapping(0)].to_vec(),
-            [Wrapping(0)].to_vec(),
-            [Wrapping(1)].to_vec()
-        ].to_vec();
-        discretize_data(x,ctx);
+        discretize_data(x, ctx);
         receive_preprocessing_shares(ctx);
 
         let attr_value_count = ctx.dt_data.attr_value_count;
@@ -164,17 +161,17 @@ pub mod random_forest {
         let bagging_field = ctx.dt_training.bagging_field;
 
         let ohe_prime = if ctx.dt_training.rfs_field > ctx.dt_data.class_value_count as u64 { ctx.dt_training.rfs_field } else { ctx.dt_data.class_value_count as u64 };
-        let discretized_x= ctx.dt_data.discretized_x.clone();
-        let mut attr_values_bytes = ohe_conversion(&discretized_x,ctx,attr_value_count,ohe_prime);
-        let mut class_values_bytes = ohe_conversion(&y,ctx,class_value_count,ohe_prime);
+        let discretized_x = ctx.dt_data.discretized_x.clone();
+        let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count, ohe_prime);
+        let mut class_values_bytes = ohe_conversion(&y, ctx, class_value_count, ohe_prime);
 
         for current_tree_index in 0..remainder {
             let dt_shares = ti_receive(
-                ctx.ti_stream.try_clone().expect("failed to clone ti recvr"),ctx);
+                ctx.ti_stream.try_clone().expect("failed to clone ti recvr"), ctx);
             let mut dt_ctx = ctx.clone();
             dt_ctx.dt_shares = dt_shares;
 
-            let mut rfs_x = random_feature_selection(&attr_values_bytes,&mut dt_ctx);
+            let mut rfs_x = random_feature_selection(&attr_values_bytes, &mut dt_ctx);
             rfs_x.append(&mut class_values_bytes);
 
             sample_with_replacement(&mut dt_ctx, &rfs_x);

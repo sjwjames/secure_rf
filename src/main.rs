@@ -4,7 +4,7 @@ extern crate serde;
 use std::time::{SystemTime, Duration};
 use std::{env, thread};
 use random_forest_rust::ti::ti::{TI, initialize_ti_context, run_ti_module};
-use random_forest_rust::computing_party::computing_party::{initialize_party_context, ti_receive};
+use random_forest_rust::computing_party::computing_party::{initialize_party_context, ti_receive, receive_preprocessing_shares};
 use random_forest_rust::random_forest::random_forest;
 use num::{BigUint, Zero, FromPrimitive};
 use std::net::{TcpListener, TcpStream, SocketAddr};
@@ -119,6 +119,7 @@ fn test_protocols() {
                 run_ti_module(&mut ti_context);
             } else {
                 let mut party_context = initialize_party_context(settings_file.clone());
+                receive_preprocessing_shares(&mut party_context);
                 let dt_shares = ti_receive(
                     party_context.ti_stream.try_clone().expect("failed to clone ti recvr"), &mut party_context);
                 party_context.dt_shares = dt_shares;
@@ -147,15 +148,15 @@ fn test_protocols() {
 //                test_argmax(&mut party_context);
 //                test_dot_product_integer(&mut party_context);
 //                test_batch_integer_equality(&mut party_context);
-                let mut b = Vec::new();
-                for i in 1..1000 {
-                    b.push(BigUint::from_i32(i).unwrap());
-                }
-//                let result = send_u64_messages(&mut party_context,&b);
-                let result = send_biguint_messages(&mut party_context,&b);
-                println!("{:?}",result);
-                let a = BigUint::from_str("10000").unwrap();
-                println!("{:?}",a);
+//                let mut b = Vec::new();
+//                for i in 1..1000 {
+//                    b.push(BigUint::from_i32(i).unwrap());
+//                }
+////                let result = send_u64_messages(&mut party_context,&b);
+//                let result = send_biguint_messages(&mut party_context,&b);
+//                println!("{:?}",result);
+//                let a = BigUint::from_str("10000").unwrap();
+//                println!("{:?}",a);
             }
         }
         Err(error) => {

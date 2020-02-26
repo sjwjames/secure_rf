@@ -48,6 +48,40 @@ pub mod bit_decomposition {
         x_shares
     }
 
+    pub fn batch_bit_decomposition(input_vec:&Vec<Wrapping<u64>>,ctx: &mut ComputingParty,bit_length:usize)->Vec<Vec<u8>>{
+        let mut input_share_list = Vec::new();
+        for input in input_vec{
+            let binary_str = format!("{:b}", input.0);
+            let reversed_binary_vec:Vec<char> = binary_str.chars().rev().collect();
+            let mut temp = Vec::new();
+            for item in reversed_binary_vec {
+                let item_parsed:u8 = format!("{}",item).parse().unwrap();
+                temp.push(item_parsed);
+            }
+            let mut temp0 = vec![0u8; bit_length];
+            let diff = abs(bit_length as isize - temp.len() as isize);
+            for i in 0..diff {
+                temp.push(0);
+            }
+            let mut input_shares = Vec::new();
+            for i in 0..2 {
+                let mut temp = temp.clone();
+                let mut temp0 = temp0.clone();
+                if i == ctx.party_id {
+                    input_shares.push(temp);
+                } else {
+                    input_shares.push(temp0);
+                }
+            }
+            input_share_list.push(input_shares)
+        }
+
+        let x_shares = generate_bit_decomposition_batch(bit_length,&mut input_share_list,ctx);
+
+        x_shares
+    }
+
+
     pub fn bit_decomposition_bigint(input: &BigUint, ctx: &mut ComputingParty) -> Vec<u8> {
         let bit_length = ctx.dt_training.bit_length as usize;
         let prime = BINARY_PRIME as u8;
@@ -78,6 +112,57 @@ pub mod bit_decomposition {
         let x_shares = generate_bit_decomposition(bit_length,&input_shares,ctx);
         // pop bit_decomposition
         ctx.thread_hierarchy.pop();
+        x_shares
+    }
+
+    fn generate_bit_decomposition_batch(bit_length:usize,input_shares:&mut Vec<Vec<Vec<u8>>>,ctx:&mut ComputingParty)->Vec<Vec<u8>>{
+        let list_len = input_shares.len();
+        let mut e_shares = vec![vec![0u8;bit_length as usize];list_len];
+        let mut d_shares = vec![vec![0u8;bit_length as usize];list_len];
+        let mut c_shares = vec![vec![0u8;bit_length as usize];list_len];
+        let mut x_shares = vec![vec![0u8;bit_length as usize];list_len];
+        let mut y_shares = vec![vec![0u8;bit_length as usize];list_len];
+
+        let mut first_c_multiple = Vec::new();
+        let mut first_c_multiplicand = Vec::new();
+        let mut input_share0 = Vec::new();
+        let mut input_share1 = Vec::new();
+        for j in 0..list_len{
+            for i in 0..bit_length{
+                let y = input_shares[j][0][i]+input_shares[j][1][i];
+                y_shares[j][i] = mod_floor(y, BINARY_PRIME as u8);
+            }
+            input_share0.append(&mut input_shares[j][0]);
+            input_share1.append(&mut input_shares[j][1]);
+
+            first_c_multiple.push(input_share0[0]);
+            first_c_multiplicand.push(input_share0[0]);
+            x_shares[j][0] = y_shares[j][0] as u8;
+        }
+        //Initialize c[1]
+        let first_c_shares = batch_multiplication_byte(&first_c_multiple, &first_c_multiplicand, ctx);
+        for i in 0..first_c_shares.len(){
+            c_shares[i][0] = mod_floor(first_c_shares[i], BINARY_PRIME as u8);
+        }
+        let mut i = 0;
+        let mut batch_mul_result = batch_multiplication_byte(&input_share0, &input_share1, ctx);
+        for j in 0..list_len{
+            for i in 0..bit_length{
+                d_shares[j][i]=mod_floor(batch_mul_result[j*bit_length+i] + ctx.asymmetric_bit,BINARY_PRIME as u8);
+            }
+        }
+        let mut e_shares = vec![vec![0u8; bit_length];list_len];
+        for j in 0..list_len{
+            for i in 1..bit_length{
+                let e_result = (Wrapping(multiplication_byte(y_shares[j][i], c_shares[j][i - 1], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
+                e_shares[j][i] = mod_floor(e_result, BINARY_PRIME as u8);
+                let x_result = (Wrapping(y_shares[j][i]) + Wrapping(c_shares[j][i - 1])).0;
+                x_shares[j][i] = mod_floor(x_result, BINARY_PRIME as u8);
+                let c_result = (Wrapping(multiplication_byte(e_shares[j][i], d_shares[j][i], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
+                c_shares[j][i] = mod_floor(c_result, BINARY_PRIME as u8);
+            }
+        }
+
         x_shares
     }
 

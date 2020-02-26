@@ -230,7 +230,7 @@ pub mod protocol {
         result
     }
 
-    pub fn batch_equality_integer(x: &Vec<Wrapping<u64>>, y: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty, prime: u64) -> Vec<u64> {
+    pub fn batch_equality_integer(x: &Vec<Wrapping<u64>>, y: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty, prime: u64) -> Vec<Wrapping<u64>> {
         let range = x.len();
         let mut xy_diff = Vec::new();
         let mut diff_list = vec![vec![Wrapping(0 as u64); 2]; range];
@@ -271,7 +271,7 @@ pub mod protocol {
             let d = Wrapping((diff_list[i][0] + received_list[i*2]).0.mod_floor(&prime));
             let e = Wrapping((diff_list[i][1] + received_list[i*2+1]).0.mod_floor(&prime));
             let product = (additive_shares[i].2 + d * additive_shares[i].1 + additive_shares[i].0 * e + d * e * Wrapping(ctx.asymmetric_bit as u64)).0.mod_floor(&prime);
-            result.push(product);
+            result.push(Wrapping(product));
         }
 
         result
