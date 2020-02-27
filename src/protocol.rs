@@ -195,9 +195,9 @@ pub mod protocol {
         let u_shares = matrix_mul_shares.0.clone();
         let v_shares = matrix_mul_shares.1.clone();
         let w_shares = matrix_mul_shares.2.clone();
-        println!("{:?}", u_shares);
-        println!("{:?}", v_shares);
-        println!("{:?}", w_shares);
+//        println!("{:?}", u_shares);
+//        println!("{:?}", v_shares);
+//        println!("{:?}", w_shares);
 
         let mut o_stream = ctx.o_stream.try_clone()
             .expect("failed cloning tcp o_stream");

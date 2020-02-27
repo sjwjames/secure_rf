@@ -19,6 +19,7 @@ pub mod computing_party {
     use std::f64::consts::E;
     use self::num::Num;
     use crate::utils::utils::{receive_u64_triple_shares, receive_u8_triple_shares, receive_u64_shares};
+    use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
 
 
     union Xbuffer {
@@ -138,7 +139,7 @@ pub mod computing_party {
         }
     }
 
-    pub fn load_dt_raw_data(x_path: &String) -> Vec<Vec<Wrapping<u64>>>{
+    pub fn load_dt_raw_data(x_path: &String) -> Vec<Vec<Wrapping<u64>>> {
         let x_file = File::open(x_path).expect("input file not found");
         let reader = BufReader::new(x_file);
         let mut x = Vec::new();
@@ -228,37 +229,72 @@ pub mod computing_party {
         }
     }
 
-    pub fn produce_dt_data(one_hot_encoding_data: Vec<Vec<u8>>, class_value_count: usize, attr_value_count: usize, attribute_count: usize, instance_count: usize, asymmetric_bit: u8) -> DecisionTreeData {
-        let mut attr_values_bytes = Vec::new();
-        let mut class_values_bytes = Vec::new();
+    pub fn produce_dt_data(one_hot_encoding_data: Vec<Vec<u8>>, ctx: &mut ComputingParty) {
+//        let mut attr_values = Vec::new();
+//        let mut class_values = Vec::new();
+
+//        for i in 0..attribute_count {
+//            let mut attr_data = Vec::new();
+//            for j in 0..attr_value_count {
+//                let item_copied = one_hot_encoding_data[i * attr_value_count + j].clone();
+//                attr_data.push(item_copied);
+//            }
+//            attr_values.push(attr_data);
+//        }
+//
+//        for i in 0..class_value_count {
+//            let item_copied = one_hot_encoding_data[attr_value_count * attribute_count + i].clone();
+//            class_values.push(item_copied);
+//        }
+//
+//        dt_ctx.thread_hierarchy.push(format!("{}", current_tree_index));
+
+        let attribute_count = ctx.feature_selected as usize;
+        let attr_value_count = ctx.dt_data.attr_value_count;
+        let class_value_count = ctx.dt_data.class_value_count;
+        let dataset_size_prime = ctx.dt_training.dataset_size_prime;
+        let mut attr_values_trans_vec = Vec::new();
         for i in 0..attribute_count {
             let mut attr_data = Vec::new();
             for j in 0..attr_value_count {
                 let item_copied = one_hot_encoding_data[i * attr_value_count + j].clone();
                 attr_data.push(item_copied);
             }
-            attr_values_bytes.push(attr_data);
+            attr_values_trans_vec.push(attr_data);
         }
+        ctx.dt_data.attr_values_trans_vec = attr_values_trans_vec.clone();
 
+        let mut class_values_trans_vec = Vec::new();
         for i in 0..class_value_count {
             let item_copied = one_hot_encoding_data[attr_value_count * attribute_count + i].clone();
-            class_values_bytes.push(item_copied);
+            class_values_trans_vec.push(item_copied);
         }
 
-        DecisionTreeData {
-            attr_value_count,
-            class_value_count,
-            attribute_count,
-            instance_count,
-            attr_values: vec![],
-            class_values: vec![],
-            attr_values_bytes,
-            class_values_bytes,
-            attr_values_big_integer: vec![],
-            class_values_big_integer: vec![],
-            discretized_x: vec![],
-            discretized_y: vec![],
+        ctx.dt_data.class_values_trans_vec = class_values_trans_vec.clone();
+
+        let mut attr_values_bigint = Vec::new();
+        let mut attr_values_integer = Vec::new();
+        for i in 0..attribute_count {
+            let mut row = Vec::new();
+            let mut row_integer = Vec::new();
+            for j in 0..attr_value_count {
+                row.push(change_binary_to_bigint_field(&attr_values_trans_vec[i][j], ctx));
+                row_integer.push(change_binary_to_decimal_field(&attr_values_trans_vec[i][j], ctx,dataset_size_prime));
+            }
+            attr_values_bigint.push(row);
+            attr_values_integer.push(row_integer);
         }
+        ctx.dt_data.attr_values_big_integer = attr_values_bigint;
+        ctx.dt_data.attr_values = attr_values_integer;
+
+        let mut class_values_bigint = Vec::new();
+        let mut class_values_integer = Vec::new();
+        for i in 0..class_value_count {
+            class_values_bigint.push(change_binary_to_bigint_field(&class_values_trans_vec[i], ctx));
+            class_values_integer.push(change_binary_to_decimal_field(&class_values_trans_vec[i],ctx,dataset_size_prime));
+        }
+        ctx.dt_data.class_values_big_integer = class_values_bigint;
+        ctx.dt_data.class_values = class_values_integer;
     }
 
 
@@ -631,9 +667,9 @@ pub mod computing_party {
 
         let bagging_field = 2.0_f64.powf((instance_selected as f64).log2().ceil()) as u64;
 
-        let subset_transaction_bit_vector = vec![asymmetric_bit as u8; instance_count];
-        let cutoff_transaction_set_size = (epsilon * instance_count as f64) as usize;
-        let attribute_bit_vector = vec![1u8; attribute_count];
+        let subset_transaction_bit_vector = vec![asymmetric_bit as u8; instance_selected as usize];
+        let cutoff_transaction_set_size = (epsilon * instance_selected as f64) as usize;
+        let attribute_bit_vector = vec![1u8; feature_selected as usize];
         let dt_training = DecisionTreeTraining {
             max_depth,
             alpha,
@@ -720,8 +756,8 @@ pub mod computing_party {
                 instance_count,
                 attr_values: vec![],
                 class_values: vec![],
-                attr_values_bytes: vec![],
-                class_values_bytes: vec![],
+                attr_values_trans_vec: vec![],
+                class_values_trans_vec: vec![],
                 attr_values_big_integer: vec![],
                 class_values_big_integer: vec![],
                 discretized_x: vec![],
@@ -789,13 +825,14 @@ pub mod computing_party {
         (in_stream, o_stream)
     }
 
-    pub fn receive_preprocessing_shares(ctx: &mut ComputingParty){
+    pub fn receive_preprocessing_shares(ctx: &mut ComputingParty) {
         let mut stream = ctx.ti_stream.try_clone().unwrap();
         let mut additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares);
-        let mut binary_shares = receive_u8_triple_shares(&mut stream,ctx.ohe_binary_shares);
-        let mut equality_shares = receive_u64_shares(&mut stream,ctx.ohe_equality_shares);
+        let mut binary_shares = receive_u8_triple_shares(&mut stream, ctx.ohe_binary_shares);
+        let mut equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares);
 
-        let prime = if ctx.dt_training.rfs_field > ctx.dt_data.class_value_count as u64 { ctx.dt_training.rfs_field } else { ctx.dt_data.class_value_count as u64 };
+        let class_val_prime = 2.0_f64.powf((ctx.dt_data.class_value_count as f64).log2().ceil()) as u64;
+        let prime = if ctx.dt_training.rfs_field > class_val_prime as u64 { ctx.dt_training.rfs_field } else { class_val_prime as u64 };
         ctx.dt_shares.additive_triples.insert(prime,additive_shares);
         ctx.dt_shares.equality_integer_shares.insert(prime,equality_shares);
         ctx.dt_shares.binary_triples.append(&mut binary_shares);
@@ -804,6 +841,13 @@ pub mod computing_party {
         ctx.dt_shares.sequential_equality_integer_index = HashMap::new();
         ctx.dt_shares.sequential_equality_integer_index.insert(prime,0);
         ctx.dt_shares.sequential_binary_index = 0;
+//
+//        let mut y_additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares);
+//        let mut y_equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares);
+//        ctx.dt_shares.sequential_additive_index.insert(ctx.dt_data.class_value_count as u64, 0);
+//        ctx.dt_shares.sequential_equality_integer_index.insert(ctx.dt_data.class_value_count as u64, 0);
+//        ctx.dt_shares.additive_triples.insert(ctx.dt_data.class_value_count as u64, y_additive_shares);
+//        ctx.dt_shares.equality_integer_shares.insert(ctx.dt_data.class_value_count as u64, y_equality_shares);
     }
 
     pub fn ti_receive(mut stream: TcpStream, ctx: &mut ComputingParty) -> DecisionTreeShares {

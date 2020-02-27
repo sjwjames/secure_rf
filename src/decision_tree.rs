@@ -31,8 +31,8 @@ pub mod decision_tree {
         pub instance_count: usize,
         pub attr_values: Vec<Vec<Vec<Wrapping<u64>>>>,
         pub class_values: Vec<Vec<Wrapping<u64>>>,
-        pub attr_values_bytes: Vec<Vec<Vec<u8>>>,
-        pub class_values_bytes: Vec<Vec<u8>>,
+        pub attr_values_trans_vec: Vec<Vec<Vec<u8>>>,
+        pub class_values_trans_vec: Vec<Vec<u8>>,
         pub attr_values_big_integer: Vec<Vec<Vec<BigUint>>>,
         pub class_values_big_integer: Vec<Vec<BigUint>>,
         pub discretized_x: Vec<Vec<Wrapping<u64>>>,
@@ -113,8 +113,8 @@ pub mod decision_tree {
                 instance_count: self.instance_count,
                 attr_values: self.attr_values.clone(),
                 class_values: self.class_values.clone(),
-                attr_values_bytes: self.attr_values_bytes.clone(),
-                class_values_bytes: self.class_values_bytes.clone(),
+                attr_values_trans_vec: self.attr_values_trans_vec.clone(),
+                class_values_trans_vec: self.class_values_trans_vec.clone(),
                 attr_values_big_integer: self.attr_values_big_integer.clone(),
                 class_values_big_integer: self.class_values_big_integer.clone(),
                 discretized_x: self.discretized_x.clone(),
@@ -357,7 +357,7 @@ pub mod decision_tree {
 
         println!("Base case not reached. Continuing.");
 
-        let mut class_value_trans_vector = ctx.dt_data.class_values_bytes.clone();
+        let mut class_value_trans_vector = ctx.dt_data.class_values_trans_vec.clone();
         let mut u_list = Vec::new();
         //todo multi-thread
         for i in 0..class_value_count {
@@ -554,9 +554,10 @@ pub mod decision_tree {
         if ctx.raw_tcp_communication {
             let mut dt_ctx = ctx.clone();
             let mut result_map = HashMap::new();
+            let attr_values_trans_vec = &ctx.dt_data.attr_values_trans_vec;
             for j in 0..attr_val_count {
-                let attr_values_bytes = &ctx.dt_data.attr_values_bytes;
-                let batch_multi = batch_multiplication_byte(&subset_transaction, &attr_values_bytes[shared_gini_argmax][j], &mut dt_ctx);
+                println!("attr_values_trans_vec:{:?}",attr_values_trans_vec[shared_gini_argmax][j]);
+                let batch_multi = batch_multiplication_byte(&subset_transaction, &attr_values_trans_vec[shared_gini_argmax][j], &mut dt_ctx);
                 result_map.insert(j, batch_multi);
             }
             for j in 0..attr_val_count {
@@ -572,8 +573,8 @@ pub mod decision_tree {
                 let mut batch_multi_result_cp = Arc::clone(&batch_multi_result_map);
                 let mut subset_transaction_cp = subset_transaction.clone();
                 thread_pool.execute(move || {
-                    let attr_values_bytes = &dt_ctx.dt_data.attr_values_bytes;
-                    let temp_value = attr_values_bytes[shared_gini_argmax][j].clone();
+                    let attr_values_trans_vec = &dt_ctx.dt_data.attr_values_trans_vec;
+                    let temp_value = attr_values_trans_vec[shared_gini_argmax][j].clone();
                     let batch_multi = batch_multiplication_byte(&subset_transaction_cp, &temp_value, &mut dt_ctx);
                     let mut batch_multi_result_cp = batch_multi_result_cp.lock().unwrap();
                     (*batch_multi_result_cp).insert(j, batch_multi);

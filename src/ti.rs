@@ -422,6 +422,35 @@ pub mod ti {
             send_preprocessing_shares(add_triples1, binary_triples1, equality_share1, &mut stream1);
         });
         thread_pool.join();
+
+        // OHE shares
+//        print!("preprocessing- generating additive shares...      ");
+//        let now = SystemTime::now();
+//        let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, ctx.class_value_cnt);
+//        println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
+//
+//        print!("preprocessing- generating equality integer shares...           ");
+//        let now = SystemTime::now();
+//        let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, ctx.class_value_cnt);
+//        println!("complete -- work time = {:5} (ms)",
+//                 now.elapsed().unwrap().as_millis());
+//
+//        let mut stream0 = streams[0].try_clone().unwrap();
+//        stream0.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+//        stream0.set_write_timeout(None).expect("set_write_timeout call failed");
+//        stream0.set_read_timeout(None).expect("set_read_timeout call failed");
+//        thread_pool.execute(move || {
+//            send_preprocessing_shares(add_triples0, vec![], equality_share0, &mut stream0);
+//        });
+//
+//        let mut stream1 = streams[1].try_clone().unwrap();
+//        stream1.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+//        stream1.set_write_timeout(None).expect("set_write_timeout call failed");
+//        stream1.set_read_timeout(None).expect("set_read_timeout call failed");
+//        thread_pool.execute(move || {
+//            send_preprocessing_shares(add_triples1, vec![], equality_share1, &mut stream1);
+//        });
+//        thread_pool.join();
     }
 
     pub fn run_ti_module(ctx: &mut TI) {
@@ -849,6 +878,9 @@ pub mod ti {
             let mut share1_item = share1_map.get(&i).unwrap().clone();
             share1.push(share1_item);
         }
+        println!("share0:{:?}",share0);
+        println!("share1:{:?}",share1);
+
         (share0, share1)
     }
 

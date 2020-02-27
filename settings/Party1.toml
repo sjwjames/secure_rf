@@ -39,13 +39,13 @@ thread_count = 40
 max_depth = 1
 alpha = 8
 epsilon = 0.1
-instance_selected = 21
-feature_selected = 5
 ohe_add_shares = 1000
 ohe_binary_shares = 1000
 ohe_equality_shares = 1000
 
 #[BREAST CANCER]
+instance_selected = 21
+feature_selected = 5
 batch_size = 176
 tree_training_batch_size = 20
 attr_value_count = 6
@@ -58,12 +58,14 @@ big_int_prime = "47890485652059026823698344598447161988085597568237568"
 dataset_size_prime = 512
 big_int_ti_index = 0
 bit_length = 175
-x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainX1_1.csv"
-y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy1_1.csv"
-output_path = "fold_1_trees_1.txt"
+x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainX2_1.csv"
+y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy2_1.csv"
+output_path = "fold_2_trees_1.txt"
 
 
 #[RANDOM DATA]
+#instance_selected = 3
+#feature_selected = 2
 #batch_size = 34
 #tree_training_batch_size = 20
 #attr_value_count = 2
@@ -77,6 +79,7 @@ output_path = "fold_1_trees_1.txt"
 #big_int_ti_index = 0
 #bit_length = 33
 #x_input_path = "/Users/sjw/Desktop/PPML/preprocess/james/shared_fold_2_train-1.csv"
+#y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy2_0.csv"
 #output_path = "fold_1_trees_1.txt"
 
 #[GSE2034]
