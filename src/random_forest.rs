@@ -124,18 +124,18 @@ pub mod random_forest {
 //            comparison_results.push(comparison_result);
 //        }
 
-        let mut comparison_results = Vec::new();
-        for mut bits in bits_list {
-            let mut compared = vec![0u8; bit_length];
-            let comparison_result = comparison(&mut compared, &mut bits, ctx);
-            comparison_results.push(comparison_result);
-        }
-        println!("comparison_results:{:?}", comparison_results);
+//        let mut comparison_results = Vec::new();
+//        for mut bits in bits_list {
+//            let mut compared = vec![0u8; bit_length];
+//            let comparison_result = comparison(&mut compared, &mut bits, ctx);
+//            comparison_results.push(comparison_result);
+//        }
+//        println!("comparison_results:{:?}", comparison_results);
 
 
-//        let mut compared = vec![vec![0u8; bit_length];bits_list.len()];
-//        let comparison_results = batch_comparison(&mut compared,&mut bits_list,ctx,bit_length);
-//        println!("comparison_results:{:?}",comparison_results);
+        let mut compared = vec![vec![0u8; bit_length];bits_list.len()];
+        let comparison_results = batch_comparison(&mut compared,&mut bits_list,ctx,bit_length);
+        println!("comparison_results:{:?}",comparison_results);
 
         let mut count = 0;
         let mut result = Vec::new();

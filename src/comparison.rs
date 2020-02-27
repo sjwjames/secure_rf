@@ -283,7 +283,7 @@ pub mod comparison {
         let mult_result = batch_multiplication_byte(&x_list_1d, &y_list_1d, ctx);
         for j in 0..list_len {
             for i in 0..bit_length {
-                d_shares[j][i] = mod_floor(mult_result[j * bit_length + i], BINARY_PRIME as u8);
+                d_shares[j][i] = mod_floor((Wrapping(y_list[j][i]) - Wrapping(mult_result[j * bit_length + i])).0, BINARY_PRIME as u8);
             }
         }
 
