@@ -52,30 +52,30 @@ pub mod decision_tree {
         pub dataset_size_bit_length: u64,
         pub bit_length: u64,
         pub big_int_ti_index: u64,
-        pub rfs_field:u64,
-        pub bagging_field:u64
+        pub rfs_field: u64,
+        pub bagging_field: u64,
     }
 
     pub struct DecisionTreeShares {
-        pub additive_triples: HashMap<u64,Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>,
+        pub additive_triples: HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>,
         pub additive_bigint_triples: Vec<(BigUint, BigUint, BigUint)>,
         pub rfs_shares: Vec<Vec<Wrapping<u64>>>,
         pub bagging_shares: Vec<Vec<Wrapping<u64>>>,
         pub binary_triples: Vec<(u8, u8, u8)>,
         pub equality_shares: Vec<(BigUint)>,
-        pub equality_integer_shares:HashMap<u64,Vec<Wrapping<u64>>>,
+        pub equality_integer_shares: HashMap<u64, Vec<Wrapping<u64>>>,
         pub current_additive_index: Arc<Mutex<usize>>,
         pub current_additive_bigint_index: Arc<Mutex<usize>>,
         pub current_equality_index: Arc<Mutex<usize>>,
         pub current_binary_index: Arc<Mutex<usize>>,
-        pub sequential_additive_index: HashMap<u64,usize>,
+        pub sequential_additive_index: HashMap<u64, usize>,
         pub sequential_additive_bigint_index: usize,
         pub sequential_equality_index: usize,
         pub sequential_binary_index: usize,
-        pub sequential_equality_integer_index:HashMap<u64,usize>,
-        pub sequential_ohe_additive_index:usize,
-        pub matrix_mul_shares:(Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>),
-        pub bagging_matrix_mul_shares:(Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>,Vec<Vec<Wrapping<u64>>>),
+        pub sequential_equality_integer_index: HashMap<u64, usize>,
+        pub sequential_ohe_additive_index: usize,
+        pub matrix_mul_shares: (Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>),
+        pub bagging_matrix_mul_shares: (Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>),
     }
 
 
@@ -87,9 +87,9 @@ pub mod decision_tree {
         pub equality_shares: String,
         pub rfs_shares: String,
         pub bagging_shares: String,
-        pub matrix_mul_shares:String,
-        pub bagging_matrix_mul_shares:String,
-        pub equality_integer_shares:String,
+        pub matrix_mul_shares: String,
+        pub bagging_matrix_mul_shares: String,
+        pub equality_integer_shares: String,
     }
 
     pub struct DecisionTreeResult {
@@ -139,7 +139,7 @@ pub mod decision_tree {
                 bit_length: self.bit_length,
                 big_int_ti_index: self.big_int_ti_index,
                 rfs_field: self.rfs_field,
-                bagging_field: self.bagging_field
+                bagging_field: self.bagging_field,
             }
         }
     }
@@ -162,7 +162,6 @@ pub mod decision_tree {
             }
 
 
-
             for item in self.binary_triples.iter() {
                 binary_triples.push((item.0.clone(), item.1.clone(), item.2.clone()));
             }
@@ -177,7 +176,7 @@ pub mod decision_tree {
             }
 
             DecisionTreeShares {
-                additive_triples:self.additive_triples.clone(),
+                additive_triples: self.additive_triples.clone(),
                 additive_bigint_triples,
                 rfs_shares,
                 bagging_shares,
@@ -215,7 +214,7 @@ pub mod decision_tree {
 
         let mut major_class_index_receive: Vec<u8> = Vec::new();
         if ctx.raw_tcp_communication {
-            major_class_index_receive = send_u8_messages(ctx,&major_class_index);
+            major_class_index_receive = send_u8_messages(ctx, &major_class_index);
         } else {
             ctx.thread_hierarchy.push("share_major_class_index".to_string());
             let message_id = ctx.thread_hierarchy.join(":");
@@ -254,7 +253,9 @@ pub mod decision_tree {
         if r == 0 {
             println!("Exited on base case: Recursion Level == 0");
 //            ctx.dt_results.result_list.push(format!("class={}", major_index));
-            ctx.result_file.write_all(format!("class={}", major_index).as_bytes());
+            if ctx.asymmetric_bit == 1 {
+                ctx.result_file.write_all(format!("class={},", major_index).as_bytes());
+            }
 //            ctx.thread_hierarchy.pop();
             return ctx.dt_results.clone();
         }
@@ -332,7 +333,7 @@ pub mod decision_tree {
 
         let mut stopping_bit_received = BigUint::zero();
         if ctx.raw_tcp_communication {
-            let received_list = send_biguint_messages(ctx,&[big_uint_clone(&stopping_bit)].to_vec());
+            let received_list = send_biguint_messages(ctx, &[big_uint_clone(&stopping_bit)].to_vec());
             stopping_bit_received = big_uint_clone(&received_list[0]);
         } else {
             let message_id = ctx.thread_hierarchy.join(":");
@@ -348,7 +349,9 @@ pub mod decision_tree {
         if stopping_check.eq(&BigUint::one()) {
             println!("Exited on base case: All transactions predict same outcome");
 //            ctx.dt_results.result_list.push(format!("class={}", major_index));
-            ctx.result_file.write_all(format!("class={}", major_index).as_bytes());
+            if ctx.asymmetric_bit == 1 {
+                ctx.result_file.write_all(format!("class={},", major_index).as_bytes());
+            }
 
             ctx.thread_hierarchy.pop();
             return ctx.dt_results.clone();
@@ -371,7 +374,6 @@ pub mod decision_tree {
             let bigint_u = change_binary_to_bigint_field(&u_list[i], ctx);
             u_decimal.push(bigint_u);
         }
-
 
 
         let attr_count = ctx.dt_data.attribute_count;
@@ -533,7 +535,7 @@ pub mod decision_tree {
 
         let mut argmax_received = BigUint::zero();
         if ctx.raw_tcp_communication {
-            let list_received = send_biguint_messages(ctx,&[big_uint_clone(&gini_argmax)].to_vec());
+            let list_received = send_biguint_messages(ctx, &[big_uint_clone(&gini_argmax)].to_vec());
             argmax_received = big_uint_clone(&list_received[0]);
         } else {
             ctx.thread_hierarchy.push("gini_argmax_public".to_string());
@@ -547,7 +549,9 @@ pub mod decision_tree {
 
         let mut shared_gini_argmax = gini_argmax.add(&argmax_received).mod_floor(&bigint_prime).to_usize().unwrap();
         attributes[shared_gini_argmax] = 0;
-        ctx.result_file.write_all(format!("attr={}", shared_gini_argmax).as_bytes());
+        if ctx.asymmetric_bit == 1 {
+            ctx.result_file.write_all(format!("attr={},", shared_gini_argmax).as_bytes());
+        }
 //        ctx.dt_results.result_list.push(format!("attr={}", shared_gini_argmax));
         ctx.dt_training.attribute_bit_vector = attributes;
 
@@ -556,7 +560,6 @@ pub mod decision_tree {
             let mut result_map = HashMap::new();
             let attr_values_trans_vec = &ctx.dt_data.attr_values_trans_vec;
             for j in 0..attr_val_count {
-                println!("attr_values_trans_vec:{:?}",attr_values_trans_vec[shared_gini_argmax][j]);
                 let batch_multi = batch_multiplication_byte(&subset_transaction, &attr_values_trans_vec[shared_gini_argmax][j], &mut dt_ctx);
                 result_map.insert(j, batch_multi);
             }
@@ -610,7 +613,7 @@ pub mod decision_tree {
             }
             for i in 0..ctx.dt_data.class_value_count {
                 let s_copied = s[i];
-                let bd_result = bit_decomposition(s[i], ctx,ctx.dt_training.bit_length as usize);
+                let bd_result = bit_decomposition(s[i], ctx, ctx.dt_training.bit_length as usize);
                 bit_shares.push(bd_result);
             }
             argmax_result = arg_max(&bit_shares, ctx);
@@ -653,7 +656,7 @@ pub mod decision_tree {
                 ctx.thread_hierarchy.push(format!("{}", i));
                 let s_copied = s[i];
                 thread_pool.execute(move || {
-                    let bd_result = bit_decomposition(s_copied, &mut ctx,bit_length);
+                    let bd_result = bit_decomposition(s_copied, &mut ctx, bit_length);
                     let mut bd_result_map = bd_result_map.lock().unwrap();
                     (*bd_result_map).insert(i, bd_result);
                 });

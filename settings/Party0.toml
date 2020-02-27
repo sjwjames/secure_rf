@@ -34,7 +34,7 @@ integer_precision = 15
 learning_rate = 0.001
 
 #[RANDOM FOREST]
-tree_count = 1
+tree_count = 100
 thread_count = 40
 max_depth = 1
 alpha = 8
@@ -58,9 +58,9 @@ big_int_prime = "47890485652059026823698344598447161988085597568237568"
 dataset_size_prime = 512
 big_int_ti_index = 0
 bit_length = 175
-x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainX2_0.csv"
-y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy2_0.csv"
-output_path = "fold_2_trees_0.txt"
+x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainX1_0.csv"
+y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy1_0.csv"
+output_path = "breast_cancer_results/fold1/fold_1_trees.txt"
 
 
 #[RANDOM DATA]

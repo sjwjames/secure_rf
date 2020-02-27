@@ -32,6 +32,7 @@ feature_selected = 5
 instance_selected = 21
 instance_cnt = 455
 feature_cnt = 30
+output_path = "breast_cancer_results/fold1/"
 
 
 

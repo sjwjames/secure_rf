@@ -25,6 +25,7 @@ pub mod ti {
     use std::collections::HashMap;
     use crate::utils::utils::{big_uint_subtract, send_u8_messages};
     use std::f64::consts::E;
+    use std::fs::File;
 
 
     pub struct TI {
@@ -54,6 +55,9 @@ pub mod ti {
         pub dataset_size_prime: u64,
         pub instance_cnt: u64,
         pub feature_cnt: u64,
+        pub output_path: String,
+        pub fs_selection_file: File,
+        pub sampling_file: File,
     }
 
     const TI_BATCH_SIZE: usize = constants::TI_BATCH_SIZE;
@@ -94,6 +98,9 @@ pub mod ti {
                 dataset_size_prime: self.dataset_size_prime,
                 instance_cnt: self.instance_cnt,
                 feature_cnt: self.feature_cnt,
+                output_path: self.output_path.clone(),
+                fs_selection_file: self.fs_selection_file.try_clone().unwrap(),
+                sampling_file: self.sampling_file.try_clone().unwrap(),
             }
         }
     }
@@ -270,6 +277,15 @@ pub mod ti {
             }
         };
 
+        let output_path = match settings.get_str("output_path") {
+            Ok(string) => string,
+            Err(error) => {
+                panic!("Encountered a problem while parsring weights_output_path: {:?}", error)
+            }
+        };
+
+        let mut fs_file = File::create(output_path.clone() + "fs_selection.csv").unwrap();
+        let mut sampling_file = File::create(output_path.clone() + "sampling_selection.csv").unwrap();
 
         let rfs_field = 2.0_f64.powf((attr_value_cnt as f64).log2().ceil()) as u64;
 
@@ -304,6 +320,9 @@ pub mod ti {
             dataset_size_prime,
             instance_cnt,
             feature_cnt,
+            output_path,
+            fs_selection_file: fs_file,
+            sampling_file,
         }
     }
 
@@ -878,8 +897,6 @@ pub mod ti {
             let mut share1_item = share1_map.get(&i).unwrap().clone();
             share1.push(share1_item);
         }
-        println!("share0:{:?}",share0);
-        println!("share1:{:?}",share1);
 
         (share0, share1)
     }
@@ -907,14 +924,20 @@ pub mod ti {
         let mut feature_selected_remain = ctx.feature_selected;
         let mut feature_bit_vec = vec![0u8; ctx.feature_cnt as usize];
         let mut rng = rand::thread_rng();
+        let mut vec_to_record = Vec::new();
         while feature_selected_remain != 0 {
             let index: usize = rng.gen_range(0, ctx.feature_cnt as usize);
             if feature_bit_vec[index] == 0 {
+                vec_to_record.push(format!("{}", index));
                 feature_bit_vec[index] = 1;
                 feature_selected_remain -= 1;
             }
         }
+        //hard-coded
 
+        vec_to_record.sort();
+        let mut file = ctx.fs_selection_file.try_clone().unwrap();
+        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
         let mut share0 = Vec::new();
         let mut share1 = Vec::new();
 
@@ -946,12 +969,16 @@ pub mod ti {
         let mut instance_selected_remain = ctx.instance_selected;
         let mut instance_selected_vec = vec![0u32; ctx.instance_cnt as usize];
         let mut rng = rand::thread_rng();
+        let mut vec_to_record = Vec::new();
         while instance_selected_remain != 0 {
             let index: usize = rng.gen_range(0, ctx.instance_cnt as usize);
             instance_selected_vec[index] += 1;
+            vec_to_record.push(format!("{}", index));
             instance_selected_remain -= 1;
         }
-
+        vec_to_record.sort();
+        let mut file = ctx.sampling_file.try_clone().unwrap();
+        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
         let mut share0 = vec![vec![Wrapping(0u64); ctx.instance_selected as usize]; ctx.instance_cnt as usize];
         let mut share1 = vec![vec![Wrapping(0u64); ctx.instance_selected as usize]; ctx.instance_cnt as usize];
 
@@ -1044,9 +1071,7 @@ pub mod ti {
             w_share1.push(share1_row);
             w.push(row);
         }
-        println!("u{:?}", u);
-        println!("v{:?}", v);
-        println!("w{:?}", w);
+
         ((u_share0, v_share0, w_share0), (u_share1, v_share1, w_share1))
     }
 
