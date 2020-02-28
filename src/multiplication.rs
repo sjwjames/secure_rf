@@ -308,7 +308,7 @@ pub mod multiplication {
         let mut diff_list = Vec::new();
         let mut output = Vec::new();
 
-        let mut ti_shares = get_additive_shares(ctx,batch_size,ctx.dt_training.prime);
+        let mut ti_shares = get_additive_shares(ctx,batch_size,ctx.dt_training.dataset_size_prime);
         for i in 0..batch_size {
             let mut new_row = Vec::new();
             let ti_share_triple = ti_shares[i];

@@ -262,6 +262,8 @@ pub mod computing_party {
             }
             attr_values_trans_vec.push(attr_data);
         }
+        println!("{:?}",&attr_values_trans_vec);
+
         ctx.dt_data.attr_values_trans_vec = attr_values_trans_vec.clone();
 
         let mut class_values_trans_vec = Vec::new();
@@ -592,7 +594,7 @@ pub mod computing_party {
 
 //        let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
 
-        let dataset_size_bit_length = (attr_value_count as f64).log2().ceil() as u64;
+        let dataset_size_bit_length = (instance_selected as f64).log2().ceil() as u64;
 
         let dataset_size_prime = 2.0_f64.powf(dataset_size_bit_length as f64) as u64;
 
@@ -945,7 +947,7 @@ pub mod computing_party {
         sequential_equality_integer_index.insert(ctx.dt_training.bagging_field, 0);
 
         let mut sequential_additive_index = HashMap::new();
-        sequential_additive_index.insert(ctx.dt_training.prime, 0);
+        sequential_additive_index.insert(ctx.dt_training.dataset_size_prime, 0);
         sequential_additive_index.insert(ctx.dt_training.rfs_field, 0);
         sequential_additive_index.insert(ctx.dt_training.bagging_field, 0);
 

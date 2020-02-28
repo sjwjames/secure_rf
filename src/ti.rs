@@ -291,7 +291,7 @@ pub mod ti {
 
         let bagging_field = 2.0_f64.powf((instance_selected as f64).log2().ceil()) as u64;
 
-        let dataset_size_prime = 2.0_f64.powf((instance_cnt as f64).log2().ceil()) as u64;
+        let dataset_size_prime = 2.0_f64.powf((instance_selected as f64).log2().ceil()) as u64;
 
         TI {
             ti_ip,
@@ -839,21 +839,21 @@ pub mod ti {
     fn generate_additive_shares(ctx: &TI, thread_pool: &ThreadPool) -> (HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>, HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>) {
         let mut result0 = HashMap::new();
         let mut result1 = HashMap::new();
-        let (mut general0, mut general1) = additive_share_helper(ctx, thread_pool, ctx.prime);
+        let (mut general0, mut general1) = additive_share_helper(ctx, thread_pool, ctx.dataset_size_prime);
         let (mut feature0, mut feature1) = additive_share_helper(ctx, thread_pool, ctx.rfs_field);
         let (mut class0, mut class1) = additive_share_helper(ctx, thread_pool, ctx.bagging_field);
-        result0.insert(ctx.prime, general0);
-        result1.insert(ctx.prime, general1);
-        if ctx.prime == ctx.rfs_field {
-            result0.get_mut(&ctx.prime).unwrap().append(&mut feature0);
-            result1.get_mut(&ctx.prime).unwrap().append(&mut feature1);
+        result0.insert(ctx.dataset_size_prime, general0);
+        result1.insert(ctx.dataset_size_prime, general1);
+        if ctx.dataset_size_prime == ctx.rfs_field {
+            result0.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut feature0);
+            result1.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut feature1);
         } else {
             result0.insert(ctx.rfs_field, feature0);
             result1.insert(ctx.rfs_field, feature1);
         }
-        if ctx.prime == ctx.bagging_field {
-            result0.get_mut(&ctx.prime).unwrap().append(&mut class0);
-            result1.get_mut(&ctx.prime).unwrap().append(&mut class1);
+        if ctx.dataset_size_prime == ctx.bagging_field {
+            result0.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut class0);
+            result1.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut class1);
         } else {
             if ctx.rfs_field == ctx.bagging_field {
                 result0.get_mut(&ctx.rfs_field).unwrap().append(&mut class0);
@@ -933,6 +933,7 @@ pub mod ti {
                 feature_selected_remain -= 1;
             }
         }
+
         //hard-coded
 
         vec_to_record.sort();
@@ -976,6 +977,7 @@ pub mod ti {
             vec_to_record.push(format!("{}", index));
             instance_selected_remain -= 1;
         }
+        //temp
         vec_to_record.sort();
         let mut file = ctx.sampling_file.try_clone().unwrap();
         file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());

@@ -34,7 +34,7 @@ integer_precision = 15
 learning_rate = 0.001
 
 #[RANDOM FOREST]
-tree_count = 100
+tree_count = 10
 thread_count = 40
 max_depth = 1
 alpha = 8
@@ -44,7 +44,7 @@ ohe_binary_shares = 1000
 ohe_equality_shares = 1000
 
 #[BREAST CANCER]
-#instance_selected = 21
+#instance_selected = 10
 #feature_selected = 5
 #batch_size = 176
 #tree_training_batch_size = 20
@@ -73,14 +73,14 @@ class_value_count = 2
 attribute_count = 3
 instance_count = 4
 asymmetric_bit = 0
-prime = 8
+prime = 4
 big_int_prime = "8589934592"
-dataset_size_prime = 8
+dataset_size_prime = 4
 big_int_ti_index = 0
 bit_length = 33
 x_input_path = "/Users/sjw/Desktop/PPML/preprocess/james/shared_fold_2_train-0.csv"
 y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy2_0.csv"
-output_path = "fold_1_trees_0.txt"
+output_path = "breast_cancer_results/fold1/"
 
 #[GSE2034]
 

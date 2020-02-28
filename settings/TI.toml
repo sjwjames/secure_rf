@@ -9,7 +9,7 @@ ti_port0  = 4000
 ti_port1  = 8000
 
 #[random forest]
-tree_count = 100
+tree_count = 10
 tree_training_batch_size = 20
 thread_count = 40
 
@@ -29,7 +29,7 @@ thread_count = 40
 #attr_value_cnt = 6
 #class_value_cnt = 2
 #feature_selected = 5
-#instance_selected = 21
+#instance_selected = 10
 #instance_cnt = 455
 #feature_cnt = 30
 #output_path = "breast_cancer_results/fold1/"

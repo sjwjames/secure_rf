@@ -327,9 +327,11 @@ pub mod decision_tree {
 //        let eq_test_revealed = reveal_bigint_result(&eq_test_result, ctx);
 //        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_revealed.to_string());
 
-        ctx.thread_hierarchy.push("early_stop_criteria".to_string());
-        let mut compute_result = BigUint::one();
-        let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
+//        ctx.thread_hierarchy.push("early_stop_criteria".to_string());
+//        let mut compute_result = BigUint::one();
+//        let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
+
+        let stopping_bit = eq_test_result;
 
         let mut stopping_bit_received = BigUint::zero();
         if ctx.raw_tcp_communication {
@@ -346,7 +348,7 @@ pub mod decision_tree {
 
         println!("Stopping bit received:{}", stopping_bit_received.to_string());
         let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
-        if stopping_check.eq(&BigUint::one()) {
+        if stopping_check.eq(&BigUint::zero()) {
             println!("Exited on base case: All transactions predict same outcome");
 //            ctx.dt_results.result_list.push(format!("class={}", major_index));
             if ctx.asymmetric_bit == 1 {
@@ -525,9 +527,9 @@ pub mod decision_tree {
                 new_assignments_bin[1] =  big_uint_clone(&new_assignments_bin[0]).add(&(if ctx.asymmetric_bit == 1 { BigUint::one() } else { BigUint::zero() })).mod_floor(&BigUint::from_usize(BINARY_PRIME).unwrap());
                 let new_assignments_bin_converted = [new_assignments_bin[0].to_u8().unwrap(),new_assignments_bin[1].to_u8().unwrap()].to_vec();
                 let new_assignments_bin_converted_big_binary = change_binary_to_bigint_field(&new_assignments_bin_converted,ctx);
-                println!("gini_argmaxes:{:?}",gini_argmaxes);
-                println!("new_assignments_bin:{:?}",new_assignments_bin_converted_big_binary);
+
                 gini_argmax = dot_product_bigint(&new_assignments_bin_converted_big_binary, &gini_argmaxes.to_vec(), ctx);
+                println!("gini_argmax:{}",gini_argmax.to_string());
                 gini_max_numerator = dot_product_bigint(&new_assignments_bin_converted_big_binary, &numerators.to_vec(), ctx);
                 gini_max_denominator = dot_product_bigint(&new_assignments_bin_converted_big_binary, &denominators.to_vec(), ctx);
             }
@@ -616,7 +618,7 @@ pub mod decision_tree {
             }
             for i in 0..ctx.dt_data.class_value_count {
                 let s_copied = s[i];
-                let bd_result = bit_decomposition(s[i], ctx, ctx.dt_training.bit_length as usize);
+                let bd_result = bit_decomposition(s[i], ctx, ctx.dt_training.dataset_size_bit_length as usize);
                 bit_shares.push(bd_result);
             }
             argmax_result = arg_max(&bit_shares, ctx);

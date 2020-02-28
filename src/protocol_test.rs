@@ -42,24 +42,7 @@ pub mod protocol_test {
         let mut x_pub_vec: Vec<u8> = Vec::new();
         let mut y_pub_vec: Vec<u8> = Vec::new();
 
-        for i in 0..2 {
-            for j in 0..2 {
-                for m in 0..2 {
-                    for n in 0..2 {
-                        if ctx.party_id == 0 {
-                            x_vec.push(i as u8);
-                            y_vec.push(j as u8);
-                        } else {
-                            x_vec.push(m as u8);
-                            y_vec.push(n as u8);
-                        }
-                        x_pub_vec.push(i ^ m);
-                        y_pub_vec.push(j ^ n);
-                        result_vec.push((i ^ m) * (j ^ n));
-                    }
-                }
-            }
-        }
+
 //        println!("x_pub_vec {:?}", x_pub_vec);
 //        println!("y_pub_vec {:?}", y_pub_vec);
 //        println!("result_vec {:?}", result_vec);
