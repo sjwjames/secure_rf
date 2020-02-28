@@ -345,31 +345,45 @@ pub mod protocol_test {
 
     pub fn test_dot_product_bigint(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
-            let x = vec![BigUint::from_u32(1).unwrap(), BigUint::from_u32(2).unwrap(), BigUint::from_u32(3).unwrap(), BigUint::from_u32(4).unwrap()];
-            let y = vec![BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap()];
+            let x = vec![BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap()];
+            let y = vec![BigUint::from_u32(1).unwrap(), BigUint::from_u32(1).unwrap()];
             let result = dot_product_bigint(&x, &y, ctx);
-            let result_revealed = reveal_bigint_result(&result, ctx);
-            println!("{}", result_revealed.to_string());
+            let result_bytes = result.to_bytes_le();
+            println!("{:?}",result_bytes);
+            let changed = change_binary_to_bigint_field(&result_bytes,ctx);
+
+
+//            let result_revealed = reveal_bigint_result(&result, ctx);
+//            println!("{}", result_revealed.to_string());
+            for item in changed{
+                println!("{}", item.to_string());
+            }
         } else {
-            let x = vec![BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap(), BigUint::from_u32(0).unwrap()];
-            let y = vec![BigUint::from_u32(1).unwrap(), BigUint::from_u32(1).unwrap(), BigUint::from_u32(1).unwrap(), BigUint::from_u32(1).unwrap()];
+            let x = vec![BigUint::from_u32(1).unwrap(), BigUint::from_u32(0).unwrap()];
+            let y = vec![BigUint::from_u32(1).unwrap(), BigUint::from_u32(0).unwrap()];
             let result = dot_product_bigint(&x, &y, ctx);
-            let result_revealed = reveal_bigint_result(&result, ctx);
-            println!("{}", result_revealed.to_string());
+            let result_bytes = result.to_bytes_le();
+            println!("{:?}",result_bytes);
+            let changed = change_binary_to_bigint_field(&result_bytes,ctx);
+//            let result_revealed = reveal_bigint_result(&result, ctx);
+//            println!("{}", result_revealed.to_string());
+            for item in changed{
+                println!("{}", item.to_string());
+            }
         }
     }
 
     pub fn test_or_xor(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
-            let x = vec![Wrapping(1), Wrapping(7), Wrapping(4), Wrapping(0)];
-            let y = vec![Wrapping(1), Wrapping(1), Wrapping(1), Wrapping(1)];
+            let x = vec![Wrapping(1), Wrapping(1)];
+            let y = vec![Wrapping(0), Wrapping(0)];
             let result = or_xor(&x, &y, ctx, 2,2);
             println!("{:?}", result);
 //            let result_revealed = reveal_byte_vec_result(&result,ctx);
 //            println!("{}",result_revealed.to_string());
         } else {
-            let x = vec![Wrapping(0), Wrapping(1), Wrapping(4), Wrapping(0)];
-            let y = vec![Wrapping(0), Wrapping(0), Wrapping(0), Wrapping(0)];
+            let x = vec![Wrapping(1), Wrapping(0)];
+            let y = vec![Wrapping(0), Wrapping(0)];
             let result = or_xor(&x, &y, ctx, 2,2);
             println!("{:?}", result);
 //            let result_revealed = reveal_bigint_result(&result,ctx);
@@ -379,19 +393,19 @@ pub mod protocol_test {
 
     pub fn test_or_xor_bigint(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
-            let x = vec![BigUint::one(), BigUint::one(), BigUint::zero(), BigUint::one()];
-            let y = vec![BigUint::zero(), BigUint::zero(), BigUint::zero(), BigUint::one()];
+            let x = vec![BigUint::one()];
+            let y = vec![BigUint::zero()];
             let result = or_xor_bigint(&x, &y, ctx, &BigUint::from_u32(2).unwrap());
-//            println!("{:?}", result);
-            let result_revealed = reveal_bigint_vec_result(&result, ctx);
-            println!("{:?}", result_revealed);
+            println!("{}", result[0].to_string());
+//            let result_revealed = reveal_bigint_vec_result(&result, ctx);
+//            println!("{:?}", result_revealed);
         } else {
-            let x = vec![BigUint::zero(), BigUint::one(), BigUint::zero(), BigUint::zero()];
-            let y = vec![BigUint::one(), BigUint::zero(), BigUint::zero(), BigUint::zero()];
+            let x = vec![BigUint::one()];
+            let y = vec![BigUint::zero()];
             let result = or_xor_bigint(&x, &y, ctx, &BigUint::from_u32(2).unwrap());
-//            println!("{:?}", result);
-            let result_revealed = reveal_bigint_vec_result(&result, ctx);
-            println!("{:?}", result_revealed);
+            println!("{}", result[0].to_string());
+//            let result_revealed = reveal_bigint_vec_result(&result, ctx);
+//            println!("{:?}", result_revealed);
         }
     }
 
@@ -410,14 +424,17 @@ pub mod protocol_test {
 
     pub fn test_change_binary_to_bigint_field(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
-            let input = vec![1, 0, 0, 1];
+            let input = vec![1, 1];
             let result = change_binary_to_bigint_field(&input, ctx);
-            println!("{:?}", result);
+            for item in result{
+                println!("{}", item.to_string());
+            }
         } else {
-            let input = vec![0, 1, 1, 1];
+            let input = vec![1, 0];
             let result = change_binary_to_bigint_field(&input, ctx);
-            println!("{:?}", result);
-        }
+            for item in result{
+                println!("{}", item.to_string());
+            }        }
     }
 
     pub fn test_argmax(ctx: &mut ComputingParty) {

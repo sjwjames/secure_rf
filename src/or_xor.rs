@@ -71,12 +71,10 @@ pub mod or_xor{
         }
 
         ctx.thread_hierarchy.pop();
-        println!("or_xor ends");
         output
     }
 
     pub fn or_xor_bigint(x_list: &Vec<BigUint>, y_list: &Vec<BigUint>, ctx: &mut ComputingParty, constant_multiplier: &BigUint) -> Vec<BigUint> {
-        println!("or_xor_bigint starts");
         ctx.thread_hierarchy.push("or_xor_bigint".to_string());
         let bit_length = x_list.len();
         let mut output = Vec::new();
@@ -129,7 +127,6 @@ pub mod or_xor{
 
 
         ctx.thread_hierarchy.pop();
-        println!("or_xor_bigint ends");
         output
     }
 }

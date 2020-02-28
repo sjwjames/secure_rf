@@ -15,45 +15,46 @@ thread_count = 40
 
 
 #[breast Cancer]
-batch_size = 176
-add_shares_per_tree = 1000
-add_shares_bigint_per_tree = 1000
-equality_shares_per_tree = 1000
-binary_shares_per_tree = 1000
-ohe_add_shares = 1000
-ohe_binary_shares = 1000
-ohe_equality_shares = 1000
-big_int_prime = "47890485652059026823698344598447161988085597568237568"
-prime = 512
-bigint_bit_size = 175
-attr_value_cnt = 6
-class_value_cnt = 2
-feature_selected = 5
-instance_selected = 21
-instance_cnt = 455
-feature_cnt = 30
-output_path = "breast_cancer_results/fold1/"
+#batch_size = 176
+#add_shares_per_tree = 1000
+#add_shares_bigint_per_tree = 1000
+#equality_shares_per_tree = 1000
+#binary_shares_per_tree = 1000
+#ohe_add_shares = 1000
+#ohe_binary_shares = 1000
+#ohe_equality_shares = 1000
+#big_int_prime = "47890485652059026823698344598447161988085597568237568"
+#prime = 512
+#bigint_bit_size = 175
+#attr_value_cnt = 6
+#class_value_cnt = 2
+#feature_selected = 5
+#instance_selected = 21
+#instance_cnt = 455
+#feature_cnt = 30
+#output_path = "breast_cancer_results/fold1/"
 
 
 
 #[random data]
-#batch_size = 34
-#add_shares_per_tree = 1000
-#add_shares_bigint_per_tree = 1000
-#equality_shares_per_tree = 1000
-#binary_shares_per_tree = 10000
-#ohe_add_shares = 1000
-#ohe_binary_shares = 1000
-#ohe_equality_shares = 1000
-#big_int_prime = "8589934592"
-#prime = 8
-#bigint_bit_size = 33
-#attr_value_cnt = 2
-#class_value_cnt = 2
-#feature_selected = 2
-#instance_selected = 3
-#instance_cnt = 4
-#feature_cnt = 3
+batch_size = 34
+add_shares_per_tree = 1000
+add_shares_bigint_per_tree = 1000
+equality_shares_per_tree = 1000
+binary_shares_per_tree = 10000
+ohe_add_shares = 1000
+ohe_binary_shares = 1000
+ohe_equality_shares = 1000
+big_int_prime = "8589934592"
+prime = 8
+bigint_bit_size = 33
+attr_value_cnt = 2
+class_value_cnt = 2
+feature_selected = 2
+instance_selected = 3
+instance_cnt = 4
+feature_cnt = 3
+output_path = "breast_cancer_results/fold1/"
 
 #[BC-TCGA]
 

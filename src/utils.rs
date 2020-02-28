@@ -12,7 +12,7 @@ pub mod utils {
     use std::time::Duration;
     use std::str::FromStr;
     use std::net::TcpStream;
-    use std::io::{Write, Read};
+    use std::io::{Write, Read, BufReader, BufRead};
     use std::convert::TryFrom;
     use crate::constants::constants::{U64S_PER_TX, U8S_PER_TX, TYPE_U8, TYPE_U64, TYPE_BIGINT, U64S_PER_MINI_TX, U8S_PER_MINI_TX};
     use num::ToPrimitive;
@@ -479,29 +479,42 @@ pub mod utils {
 
 
     pub fn send_biguint_messages(ctx: &ComputingParty, data: &Vec<BigUint>) -> Vec<BigUint> {
-        let mut batches: usize = 0;
-        let mut data_len = data.len();
+//        let mut batches: usize = 0;
+//        let mut data_len = data.len();
+//        let mut result: Vec<BigUint> = Vec::new();
+//        let mut current_batch = 0;
+//        let mut push_buf = Xbuffer { u8_buf: [0u8; U8S_PER_TX] };
+//        let mut data_transformed = Vec::new();
+//        for i in 0..data_len {
+//            let mut bytes = (data[i].to_string() + ";").as_bytes().to_vec();
+//            data_transformed.append(&mut bytes);
+//        }
+//        let temp_result = send_u8_messages(ctx, &data_transformed);
+//
+//        let mut iter = temp_result.split(|num| *num == 59);
+//        for item in iter {
+//
+//            let bigint_str = String::from_utf8(item.to_vec()).unwrap();
+//            result.push(BigUint::from_str(&bigint_str).unwrap());
+//            if result.len() == data.len() {
+//                break;
+//            }
+//        }
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+        let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+        let mut reader = BufReader::new(in_stream);
+        let mut share_message = String::new();
         let mut result: Vec<BigUint> = Vec::new();
-        let mut current_batch = 0;
-        let mut push_buf = Xbuffer { u8_buf: [0u8; U8S_PER_TX] };
-        let mut data_transformed = Vec::new();
-        for i in 0..data_len {
-            if i != data_len {
-                let mut bytes = (data[i].to_string() + ";").as_bytes().to_vec();
-                data_transformed.append(&mut bytes);
-            } else {
-                let mut bytes = (data[i].to_string()).as_bytes().to_vec();
-                data_transformed.append(&mut bytes);
-            }
-        }
-        let temp_result = send_u8_messages(ctx, &data_transformed);
-        let mut iter = temp_result.split(|num| *num == 59);
-        for item in iter {
-            let bigint_str = String::from_utf8(item.to_vec()).unwrap();
-            result.push(BigUint::from_str(&bigint_str).unwrap());
-            if result.len() == data.len() {
-                break;
-            }
+        share_message = String::new();
+        if ctx.asymmetric_bit == 1 {
+            o_stream.write(format!("{}\n", serialize_biguint_vec(data)).as_bytes());
+            reader.read_line(&mut share_message).expect("fail to read share message str");
+            result = deserialize_biguint_vec(&share_message);
+        } else {
+            reader.read_line(&mut share_message).expect("fail to read share message str");
+            result = deserialize_biguint_vec(&share_message);
+            o_stream.write(format!("{}\n", serialize_biguint_vec(data)).as_bytes());
         }
 
         result

@@ -144,7 +144,7 @@ fn test_protocols() {
 //                test_or_xor(&mut party_context);
 //                test_or_xor_bigint(&mut party_context);
 //                test_change_binary_to_decimal_field(&mut party_context);
-//                test_change_binary_to_bigint_field(&mut party_context);
+                test_change_binary_to_bigint_field(&mut party_context);
 //                test_argmax(&mut party_context);
 //                test_dot_product_integer(&mut party_context);
 //                test_batch_integer_equality(&mut party_context);

@@ -521,13 +521,15 @@ pub mod decision_tree {
                 let mut left_operand = mult0;
                 let mut right_operand = mult1;
 
-                new_assignments_bin[0] = compare_bigint(&left_operand, &right_operand, ctx);
+                new_assignments_bin[0] = compare_bigint(&left_operand, &right_operand, ctx).mod_floor(&BigUint::from_usize(BINARY_PRIME).unwrap());
                 new_assignments_bin[1] =  big_uint_clone(&new_assignments_bin[0]).add(&(if ctx.asymmetric_bit == 1 { BigUint::one() } else { BigUint::zero() })).mod_floor(&BigUint::from_usize(BINARY_PRIME).unwrap());
-
-
-                gini_argmax = dot_product_bigint(&new_assignments_bin, &gini_argmaxes.to_vec(), ctx);
-                gini_max_numerator = dot_product_bigint(&new_assignments_bin, &numerators.to_vec(), ctx);
-                gini_max_denominator = dot_product_bigint(&new_assignments_bin, &denominators.to_vec(), ctx);
+                let new_assignments_bin_converted = [new_assignments_bin[0].to_u8().unwrap(),new_assignments_bin[1].to_u8().unwrap()].to_vec();
+                let new_assignments_bin_converted_big_binary = change_binary_to_bigint_field(&new_assignments_bin_converted,ctx);
+                println!("gini_argmaxes:{:?}",gini_argmaxes);
+                println!("new_assignments_bin:{:?}",new_assignments_bin_converted_big_binary);
+                gini_argmax = dot_product_bigint(&new_assignments_bin_converted_big_binary, &gini_argmaxes.to_vec(), ctx);
+                gini_max_numerator = dot_product_bigint(&new_assignments_bin_converted_big_binary, &numerators.to_vec(), ctx);
+                gini_max_denominator = dot_product_bigint(&new_assignments_bin_converted_big_binary, &denominators.to_vec(), ctx);
             }
             k += 1;
         }
