@@ -9,7 +9,7 @@ ti_port0  = 4000
 ti_port1  = 8000
 
 #[random forest]
-tree_count = 300
+tree_count = 100
 tree_training_batch_size = 20
 thread_count = 40
 

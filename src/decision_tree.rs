@@ -506,7 +506,7 @@ pub mod decision_tree {
 
         let mut gini_max_numerator = big_uint_clone(&gini_numerators[k]);
         let mut gini_max_denominator = big_uint_clone(&gini_denominators[k]);
-        let mut gini_argmax = BigUint::from(k);
+        let mut gini_argmax = if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero()};
         k += 1;
         ctx.thread_hierarchy.push("gini_argmax_computation".to_string());
         while k < attr_count {
