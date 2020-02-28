@@ -60,7 +60,7 @@ big_int_ti_index = 0
 bit_length = 175
 x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainX1_0.csv"
 y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy1_0.csv"
-output_path = "breast_cancer_results/fold1/fold_1_trees.txt"
+output_path = "breast_cancer_results/fold1/"
 
 
 #[RANDOM DATA]

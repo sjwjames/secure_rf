@@ -249,7 +249,10 @@ pub mod random_forest {
 
         thread_pool.join();
         ctx.thread_hierarchy.pop();
-        println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
+        let runtime =now.elapsed().unwrap().as_millis();
+        println!("complete -- work time = {:5} (ms)", runtime);
+        let mut file = File::create(ctx.output_path.clone()+&format!("{}_", ctx.tree_count).to_string()+"runtime.txt").unwrap();
+        file.write_all(format!("{}",runtime).as_bytes());
 //        println!("{:?}",result_vec);
 //        if ctx.asymmetric_bit==1{
 //            let mut result_to_write = Vec::new();

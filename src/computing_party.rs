@@ -279,7 +279,7 @@ pub mod computing_party {
             let mut row_integer = Vec::new();
             for j in 0..attr_value_count {
                 row.push(change_binary_to_bigint_field(&attr_values_trans_vec[i][j], ctx));
-                row_integer.push(change_binary_to_decimal_field(&attr_values_trans_vec[i][j], ctx,dataset_size_prime));
+                row_integer.push(change_binary_to_decimal_field(&attr_values_trans_vec[i][j], ctx, dataset_size_prime));
             }
             attr_values_bigint.push(row);
             attr_values_integer.push(row_integer);
@@ -291,7 +291,7 @@ pub mod computing_party {
         let mut class_values_integer = Vec::new();
         for i in 0..class_value_count {
             class_values_bigint.push(change_binary_to_bigint_field(&class_values_trans_vec[i], ctx));
-            class_values_integer.push(change_binary_to_decimal_field(&class_values_trans_vec[i],ctx,dataset_size_prime));
+            class_values_integer.push(change_binary_to_decimal_field(&class_values_trans_vec[i], ctx, dataset_size_prime));
         }
         ctx.dt_data.class_values_big_integer = class_values_bigint;
         ctx.dt_data.class_values = class_values_integer;
@@ -688,7 +688,8 @@ pub mod computing_party {
         };
         let local_mq_address = format!("amqp://guest:guest@{}:{}", local_mq_ip.clone(), local_mq_port);
         let remote_mq_address = format!("amqp://guest:guest@{}:{}", remote_mq_ip.clone(), remote_mq_port);
-        let mut result_file = File::create(output_path.clone()).unwrap();
+
+        let mut result_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "trees.txt").unwrap();
         ComputingParty {
             debug_output,
             raw_tcp_communication,
@@ -833,13 +834,13 @@ pub mod computing_party {
 
         let class_val_prime = 2.0_f64.powf((ctx.dt_data.class_value_count as f64).log2().ceil()) as u64;
         let prime = if ctx.dt_training.rfs_field > class_val_prime as u64 { ctx.dt_training.rfs_field } else { class_val_prime as u64 };
-        ctx.dt_shares.additive_triples.insert(prime,additive_shares);
-        ctx.dt_shares.equality_integer_shares.insert(prime,equality_shares);
+        ctx.dt_shares.additive_triples.insert(prime, additive_shares);
+        ctx.dt_shares.equality_integer_shares.insert(prime, equality_shares);
         ctx.dt_shares.binary_triples.append(&mut binary_shares);
         ctx.dt_shares.sequential_additive_index = HashMap::new();
-        ctx.dt_shares.sequential_additive_index.insert(prime,0);
+        ctx.dt_shares.sequential_additive_index.insert(prime, 0);
         ctx.dt_shares.sequential_equality_integer_index = HashMap::new();
-        ctx.dt_shares.sequential_equality_integer_index.insert(prime,0);
+        ctx.dt_shares.sequential_equality_integer_index.insert(prime, 0);
         ctx.dt_shares.sequential_binary_index = 0;
 //
 //        let mut y_additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares);

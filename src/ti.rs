@@ -284,8 +284,8 @@ pub mod ti {
             }
         };
 
-        let mut fs_file = File::create(output_path.clone() + "fs_selection.csv").unwrap();
-        let mut sampling_file = File::create(output_path.clone() + "sampling_selection.csv").unwrap();
+        let mut fs_file = File::create(output_path.clone()+&format!("{}_", tree_count).to_string() + "fs_selection.csv").unwrap();
+        let mut sampling_file = File::create(output_path.clone()+&format!("{}_", tree_count).to_string() + "sampling_selection.csv").unwrap();
 
         let rfs_field = 2.0_f64.powf((attr_value_cnt as f64).log2().ceil()) as u64;
 

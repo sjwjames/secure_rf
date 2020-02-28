@@ -19,7 +19,7 @@ pub mod decision_tree {
     use crate::constants::constants::BINARY_PRIME;
     use crate::message::message::{RFMessage, search_pop_message};
     use crate::multiplication::multiplication::{batch_multiply_bigint, multiplication_bigint, batch_multiplication_byte, parallel_multiplication_big_integer};
-    use num::{Zero, ToPrimitive, One};
+    use num::{Zero, ToPrimitive, One, FromPrimitive};
     use std::ops::{Add, Mul};
     use crate::comparison::comparison::compare_bigint;
     use std::str::FromStr;
@@ -506,28 +506,28 @@ pub mod decision_tree {
 
         let mut gini_max_numerator = big_uint_clone(&gini_numerators[k]);
         let mut gini_max_denominator = big_uint_clone(&gini_denominators[k]);
-        let mut gini_argmax = if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero() };
+        let mut gini_argmax = BigUint::from(k);
         k += 1;
         ctx.thread_hierarchy.push("gini_argmax_computation".to_string());
         while k < attr_count {
             if attributes[k] == 1 {
-                let mut left_operand = BigUint::zero();
-                let mut right_operand = BigUint::zero();
                 let mut gini_argmaxes = [if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero() }, big_uint_clone(&gini_argmax)];
                 let mut numerators = [big_uint_clone(&gini_numerators[k]), big_uint_clone(&gini_max_numerator)];
                 let mut denominators = [big_uint_clone(&gini_denominators[k]), big_uint_clone(&gini_max_denominator)];
                 let mut new_assignments_bin = vec![BigUint::zero(); 2];
-                let mut new_assignments = vec![BigUint::zero(); 2];
 
                 let mult0 = multiplication_bigint(&numerators[0], &denominators[1], ctx);
                 let mult1 = multiplication_bigint(&numerators[1], &denominators[0], ctx);
+                let mut left_operand = mult0;
+                let mut right_operand = mult1;
 
                 new_assignments_bin[0] = compare_bigint(&left_operand, &right_operand, ctx);
-                new_assignments_bin[1] = compare_bigint(&new_assignments_bin[0], &(if ctx.asymmetric_bit == 1 { BigUint::one() } else { BigUint::zero() }), ctx);
+                new_assignments_bin[1] =  big_uint_clone(&new_assignments_bin[0]).add(&(if ctx.asymmetric_bit == 1 { BigUint::one() } else { BigUint::zero() })).mod_floor(&BigUint::from_usize(BINARY_PRIME).unwrap());
 
-                gini_argmax = dot_product_bigint(&new_assignments, &gini_argmaxes.to_vec(), ctx);
-                gini_max_numerator = dot_product_bigint(&new_assignments, &numerators.to_vec(), ctx);
-                gini_max_denominator = dot_product_bigint(&new_assignments, &denominators.to_vec(), ctx);
+
+                gini_argmax = dot_product_bigint(&new_assignments_bin, &gini_argmaxes.to_vec(), ctx);
+                gini_max_numerator = dot_product_bigint(&new_assignments_bin, &numerators.to_vec(), ctx);
+                gini_max_denominator = dot_product_bigint(&new_assignments_bin, &denominators.to_vec(), ctx);
             }
             k += 1;
         }
@@ -547,7 +547,8 @@ pub mod decision_tree {
             ctx.thread_hierarchy.pop();
         }
 
-        let mut shared_gini_argmax = gini_argmax.add(&argmax_received).mod_floor(&bigint_prime).to_usize().unwrap();
+        let shared_gini_argmax = gini_argmax.add(&argmax_received).mod_floor(&bigint_prime);
+        let mut shared_gini_argmax = shared_gini_argmax.to_usize().unwrap();
         attributes[shared_gini_argmax] = 0;
         if ctx.asymmetric_bit == 1 {
             ctx.result_file.write_all(format!("attr={},", shared_gini_argmax).as_bytes());
