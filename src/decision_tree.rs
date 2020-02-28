@@ -260,31 +260,35 @@ pub mod decision_tree {
             return ctx.dt_results.clone();
         }
 
-        let mut major_class_index_decimal = if ctx.asymmetric_bit == 1 {
-            let mut result = change_binary_to_bigint_field(&major_class_index_shared, ctx);
-            result
-        } else {
-            let mut result = change_binary_to_bigint_field(&vec![0u8; ctx.dt_data.class_value_count], ctx);
-            result
-        };
+//        let mut major_class_index_decimal = if ctx.asymmetric_bit == 1 {
+//            let mut result = change_binary_to_bigint_field(&major_class_index_shared, ctx);
+//            result
+//        } else {
+//            let mut result = change_binary_to_bigint_field(&vec![0u8; ctx.dt_data.class_value_count], ctx);
+//            result
+//        };
         let mut subset_transaction = ctx.dt_training.subset_transaction_bit_vector.clone();
-        ctx.thread_hierarchy.push("change_subset_trans".to_string());
         let mut transactions_decimal = change_binary_to_bigint_field(&subset_transaction, ctx);
-        ctx.thread_hierarchy.pop();
 
         let class_value_count = ctx.dt_data.class_value_count;
-
-        let mut major_class_trans_count = BigUint::zero();
-        let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
         let dataset_size = ctx.dt_data.instance_count;
+
+        let mut  major_class_index_decimal= if ctx.asymmetric_bit==1{
+            vec![BigUint::one(); dataset_size]
+        }else{
+            vec![BigUint::zero(); dataset_size]
+        };
+        let mut major_class_trans_count = dot_product_bigint(&ctx.dt_data.class_values_big_integer[major_index].clone(),&major_class_index_decimal,ctx);
+        let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
+
         let thread_pool = ThreadPool::new(ctx.thread_count);
 
         if ctx.raw_tcp_communication {
-            for i in 0..class_value_count {
-                let major_class_index_value = big_uint_clone(&major_class_index_decimal[i]);
-                let mut dp_result = dot_product_bigint(&transactions_decimal, &vec![major_class_index_value; dataset_size], ctx);
-                major_class_trans_count = major_class_trans_count.add(&dp_result).mod_floor(&bigint_prime);
-            }
+//            for i in 0..class_value_count {
+//                let major_class_index_value = big_uint_clone(&major_class_index_decimal[i]);
+//                let mut dp_result = dot_product_bigint(&transactions_decimal, &vec![major_class_index_value; dataset_size], ctx);
+//                major_class_trans_count = major_class_trans_count.add(&dp_result).mod_floor(&bigint_prime);
+//            }
         } else {
             let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
             ctx.thread_hierarchy.push("major_class_trans_count".to_string());
@@ -327,11 +331,9 @@ pub mod decision_tree {
 //        let eq_test_revealed = reveal_bigint_result(&eq_test_result, ctx);
 //        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_revealed.to_string());
 
-//        ctx.thread_hierarchy.push("early_stop_criteria".to_string());
-//        let mut compute_result = BigUint::one();
-//        let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
-
-        let stopping_bit = eq_test_result;
+        ctx.thread_hierarchy.push("early_stop_criteria".to_string());
+        let mut compute_result = BigUint::one();
+        let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
 
         let mut stopping_bit_received = BigUint::zero();
         if ctx.raw_tcp_communication {

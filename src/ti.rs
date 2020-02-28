@@ -933,7 +933,8 @@ pub mod ti {
                 feature_selected_remain -= 1;
             }
         }
-
+        //temp
+        feature_bit_vec = [0,1,1,0].to_vec();
         //hard-coded
 
         vec_to_record.sort();
@@ -978,6 +979,7 @@ pub mod ti {
             instance_selected_remain -= 1;
         }
         //temp
+        instance_selected_vec = [1,2,0,0].to_vec();
         vec_to_record.sort();
         let mut file = ctx.sampling_file.try_clone().unwrap();
         file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());

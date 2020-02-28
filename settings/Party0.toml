@@ -44,7 +44,7 @@ ohe_binary_shares = 1000
 ohe_equality_shares = 1000
 
 #[BREAST CANCER]
-#instance_selected = 10
+#instance_selected = 21
 #feature_selected = 5
 #batch_size = 176
 #tree_training_batch_size = 20
