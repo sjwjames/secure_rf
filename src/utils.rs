@@ -444,7 +444,7 @@ pub mod utils {
 
             current_batch += 1;
         }
-        result[0..data.len()].to_vec()
+        result
     }
 
     pub fn send_u64_messages(ctx: &ComputingParty, data: &Vec<Wrapping<u64>>) -> Vec<Wrapping<u64>> {
@@ -474,7 +474,7 @@ pub mod utils {
 
             current_batch += 1;
         }
-        result[0..data.len()].to_vec()
+        result
     }
 
 

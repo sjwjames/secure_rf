@@ -284,8 +284,8 @@ pub mod ti {
             }
         };
 
-        let mut fs_file = File::create(output_path.clone()+&format!("{}_", tree_count).to_string() + "fs_selection.csv").unwrap();
-        let mut sampling_file = File::create(output_path.clone()+&format!("{}_", tree_count).to_string() + "sampling_selection.csv").unwrap();
+        let mut fs_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "fs_selection.csv").unwrap();
+        let mut sampling_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "sampling_selection.csv").unwrap();
 
         let rfs_field = 2.0_f64.powf((attr_value_cnt as f64).log2().ceil()) as u64;
 
@@ -404,24 +404,32 @@ pub mod ti {
 
 
     pub fn generate_preprocessing_shares(ctx: &mut TI, thread_pool: &ThreadPool, streams: Vec<&TcpStream>) {
+        let mut add_amount = ctx.ohe_add_shares as usize;
+        let mut eq_amount = ctx.ohe_equality_shares as usize;
+        let mut binary_amount = ctx.ohe_binary_shares as usize;
         let class_val_prime = 2.0_f64.powf((ctx.class_value_cnt as f64).log2().ceil()) as u64;
-        let prime = if ctx.rfs_field > class_val_prime { ctx.rfs_field } else { class_val_prime };
-        // OHE shares
+
+        if class_val_prime == ctx.rfs_field {
+            add_amount = add_amount * 2;
+            eq_amount = eq_amount * 2;
+            binary_amount = binary_amount * 2;
+        }
+        // OHE shares of attrs
         print!("preprocessing- generating additive shares...      ");
         let now = SystemTime::now();
-        let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, prime);
+        let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, ctx.rfs_field, add_amount);
         println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
 
 
         print!("preprocessing- generating binary shares...           ");
         let now = SystemTime::now();
-        let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, thread_pool, ctx.ohe_binary_shares as usize);
+        let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, thread_pool, binary_amount);
         println!("complete -- work time = {:5} (ms)",
                  now.elapsed().unwrap().as_millis());
 
         print!("preprocessing- generating equality integer shares...           ");
         let now = SystemTime::now();
-        let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, prime);
+        let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, ctx.rfs_field, eq_amount);
         println!("complete -- work time = {:5} (ms)",
                  now.elapsed().unwrap().as_millis());
 
@@ -442,34 +450,36 @@ pub mod ti {
         });
         thread_pool.join();
 
-        // OHE shares
-//        print!("preprocessing- generating additive shares...      ");
-//        let now = SystemTime::now();
-//        let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, ctx.class_value_cnt);
-//        println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
-//
-//        print!("preprocessing- generating equality integer shares...           ");
-//        let now = SystemTime::now();
-//        let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, ctx.class_value_cnt);
-//        println!("complete -- work time = {:5} (ms)",
-//                 now.elapsed().unwrap().as_millis());
-//
-//        let mut stream0 = streams[0].try_clone().unwrap();
-//        stream0.set_ttl(std::u32::MAX).expect("set_ttl call failed");
-//        stream0.set_write_timeout(None).expect("set_write_timeout call failed");
-//        stream0.set_read_timeout(None).expect("set_read_timeout call failed");
-//        thread_pool.execute(move || {
-//            send_preprocessing_shares(add_triples0, vec![], equality_share0, &mut stream0);
-//        });
-//
-//        let mut stream1 = streams[1].try_clone().unwrap();
-//        stream1.set_ttl(std::u32::MAX).expect("set_ttl call failed");
-//        stream1.set_write_timeout(None).expect("set_write_timeout call failed");
-//        stream1.set_read_timeout(None).expect("set_read_timeout call failed");
-//        thread_pool.execute(move || {
-//            send_preprocessing_shares(add_triples1, vec![], equality_share1, &mut stream1);
-//        });
-//        thread_pool.join();
+        // OHE shares of classes
+        if class_val_prime != ctx.rfs_field {
+            print!("preprocessing- generating additive shares...      ");
+            let now = SystemTime::now();
+            let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, class_val_prime, add_amount);
+            println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
+
+            print!("preprocessing- generating equality integer shares...           ");
+            let now = SystemTime::now();
+            let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, class_val_prime, eq_amount);
+            println!("complete -- work time = {:5} (ms)",
+                     now.elapsed().unwrap().as_millis());
+
+            let mut stream0 = streams[0].try_clone().unwrap();
+            stream0.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+            stream0.set_write_timeout(None).expect("set_write_timeout call failed");
+            stream0.set_read_timeout(None).expect("set_read_timeout call failed");
+            thread_pool.execute(move || {
+                send_preprocessing_shares(add_triples0, vec![], equality_share0, &mut stream0);
+            });
+
+            let mut stream1 = streams[1].try_clone().unwrap();
+            stream1.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+            stream1.set_write_timeout(None).expect("set_write_timeout call failed");
+            stream1.set_read_timeout(None).expect("set_read_timeout call failed");
+            thread_pool.execute(move || {
+                send_preprocessing_shares(add_triples1, vec![], equality_share1, &mut stream1);
+            });
+            thread_pool.join();
+        }
     }
 
     pub fn run_ti_module(ctx: &mut TI) {
@@ -802,13 +812,13 @@ pub mod ti {
         (share0, share1)
     }
 
-    fn additive_share_helper(ctx: &TI, thread_pool: &ThreadPool, prime: u64) -> (Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>) {
+    fn additive_share_helper(ctx: &TI, thread_pool: &ThreadPool, prime: u64, amount: usize) -> (Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share0 = Vec::new();
         let mut share1 = Vec::new();
 
-        for i in 0..ctx.add_shares_per_tree {
+        for i in 0..amount {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
@@ -827,7 +837,7 @@ pub mod ti {
         let mut share1_map = &(*(share1_arc.lock().unwrap())).clone();
 
 
-        for i in 0..ctx.add_shares_per_tree {
+        for i in 0..amount {
             let share0_item = share0_map.get(&i).unwrap().clone();
             share0.push((Wrapping(share0_item.0), Wrapping(share0_item.1), Wrapping(share0_item.2)));
             let share1_item = share1_map.get(&i).unwrap().clone();
@@ -839,39 +849,39 @@ pub mod ti {
     fn generate_additive_shares(ctx: &TI, thread_pool: &ThreadPool) -> (HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>, HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>) {
         let mut result0 = HashMap::new();
         let mut result1 = HashMap::new();
-        let (mut general0, mut general1) = additive_share_helper(ctx, thread_pool, ctx.dataset_size_prime);
-        let (mut feature0, mut feature1) = additive_share_helper(ctx, thread_pool, ctx.rfs_field);
-        let (mut class0, mut class1) = additive_share_helper(ctx, thread_pool, ctx.bagging_field);
+        let (mut general0, mut general1) = additive_share_helper(ctx, thread_pool, ctx.dataset_size_prime, ctx.add_shares_per_tree);
+//        let (mut feature0, mut feature1) = additive_share_helper(ctx, thread_pool, ctx.rfs_field);
+//        let (mut class0, mut class1) = additive_share_helper(ctx, thread_pool, ctx.bagging_field);
         result0.insert(ctx.dataset_size_prime, general0);
         result1.insert(ctx.dataset_size_prime, general1);
-        if ctx.dataset_size_prime == ctx.rfs_field {
-            result0.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut feature0);
-            result1.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut feature1);
-        } else {
-            result0.insert(ctx.rfs_field, feature0);
-            result1.insert(ctx.rfs_field, feature1);
-        }
-        if ctx.dataset_size_prime == ctx.bagging_field {
-            result0.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut class0);
-            result1.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut class1);
-        } else {
-            if ctx.rfs_field == ctx.bagging_field {
-                result0.get_mut(&ctx.rfs_field).unwrap().append(&mut class0);
-                result1.get_mut(&ctx.rfs_field).unwrap().append(&mut class1);
-            } else {
-                result0.insert(ctx.bagging_field, class0);
-                result1.insert(ctx.bagging_field, class1);
-            }
-        }
+//        if ctx.dataset_size_prime == ctx.rfs_field {
+//            result0.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut feature0);
+//            result1.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut feature1);
+//        } else {
+//            result0.insert(ctx.rfs_field, feature0);
+//            result1.insert(ctx.rfs_field, feature1);
+//        }
+//        if ctx.dataset_size_prime == ctx.bagging_field {
+//            result0.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut class0);
+//            result1.get_mut(&ctx.dataset_size_prime).unwrap().append(&mut class1);
+//        } else {
+//            if ctx.rfs_field == ctx.bagging_field {
+//                result0.get_mut(&ctx.rfs_field).unwrap().append(&mut class0);
+//                result1.get_mut(&ctx.rfs_field).unwrap().append(&mut class1);
+//            } else {
+//                result0.insert(ctx.bagging_field, class0);
+//                result1.insert(ctx.bagging_field, class1);
+//            }
+//        }
 
         (result0, result1)
     }
 
-    fn equality_integer_shares_helper(ctx: &TI, thread_pool: &ThreadPool, prime: u64) -> (Vec<Wrapping<u64>>, Vec<Wrapping<u64>>) {
+    fn equality_integer_shares_helper(ctx: &TI, thread_pool: &ThreadPool, prime: u64, amount: usize) -> (Vec<Wrapping<u64>>, Vec<Wrapping<u64>>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
-        for i in 0..ctx.equality_shares_per_tree {
+        for i in 0..amount {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
@@ -891,7 +901,7 @@ pub mod ti {
         let mut share1 = Vec::new();
         let share0_map = &(*(share0_arc.lock().unwrap()));
         let share1_map = &(*(share1_arc.lock().unwrap()));
-        for i in 0..ctx.equality_shares_per_tree {
+        for i in 0..amount {
             let mut share0_item = share0_map.get(&i).unwrap().clone();
             share0.push(share0_item);
             let mut share1_item = share1_map.get(&i).unwrap().clone();
@@ -904,8 +914,8 @@ pub mod ti {
     fn generate_equality_integer_shares(ctx: &TI, thread_pool: &ThreadPool) -> (HashMap<u64, Vec<Wrapping<u64>>>, HashMap<u64, Vec<Wrapping<u64>>>) {
         let mut result0 = HashMap::new();
         let mut result1 = HashMap::new();
-        let (mut feature_eq0, mut feature_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.rfs_field);
-        let (mut class_eq0, mut class_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.bagging_field);
+        let (mut feature_eq0, mut feature_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.rfs_field, ctx.ohe_equality_shares as usize);
+        let (mut class_eq0, mut class_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.bagging_field, ctx.ohe_equality_shares as usize);
         result0.insert(ctx.rfs_field, feature_eq0);
         result1.insert(ctx.rfs_field, feature_eq1);
 
@@ -933,8 +943,7 @@ pub mod ti {
                 feature_selected_remain -= 1;
             }
         }
-        //temp
-        feature_bit_vec = [0,1,1,0].to_vec();
+
         //hard-coded
 
         vec_to_record.sort();
@@ -979,7 +988,6 @@ pub mod ti {
             instance_selected_remain -= 1;
         }
         //temp
-        instance_selected_vec = [1,2,0,0].to_vec();
         vec_to_record.sort();
         let mut file = ctx.sampling_file.try_clone().unwrap();
         file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());

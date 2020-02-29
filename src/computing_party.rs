@@ -262,7 +262,6 @@ pub mod computing_party {
             }
             attr_values_trans_vec.push(attr_data);
         }
-        println!("{:?}",&attr_values_trans_vec);
 
         ctx.dt_data.attr_values_trans_vec = attr_values_trans_vec.clone();
 
@@ -830,27 +829,43 @@ pub mod computing_party {
 
     pub fn receive_preprocessing_shares(ctx: &mut ComputingParty) {
         let mut stream = ctx.ti_stream.try_clone().unwrap();
-        let mut additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares);
-        let mut binary_shares = receive_u8_triple_shares(&mut stream, ctx.ohe_binary_shares);
-        let mut equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares);
-
+        let prime = ctx.dt_training.rfs_field;
         let class_val_prime = 2.0_f64.powf((ctx.dt_data.class_value_count as f64).log2().ceil()) as u64;
-        let prime = if ctx.dt_training.rfs_field > class_val_prime as u64 { ctx.dt_training.rfs_field } else { class_val_prime as u64 };
-        ctx.dt_shares.additive_triples.insert(prime, additive_shares);
-        ctx.dt_shares.equality_integer_shares.insert(prime, equality_shares);
-        ctx.dt_shares.binary_triples.append(&mut binary_shares);
-        ctx.dt_shares.sequential_additive_index = HashMap::new();
-        ctx.dt_shares.sequential_additive_index.insert(prime, 0);
-        ctx.dt_shares.sequential_equality_integer_index = HashMap::new();
-        ctx.dt_shares.sequential_equality_integer_index.insert(prime, 0);
-        ctx.dt_shares.sequential_binary_index = 0;
-//
-//        let mut y_additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares);
-//        let mut y_equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares);
-//        ctx.dt_shares.sequential_additive_index.insert(ctx.dt_data.class_value_count as u64, 0);
-//        ctx.dt_shares.sequential_equality_integer_index.insert(ctx.dt_data.class_value_count as u64, 0);
-//        ctx.dt_shares.additive_triples.insert(ctx.dt_data.class_value_count as u64, y_additive_shares);
-//        ctx.dt_shares.equality_integer_shares.insert(ctx.dt_data.class_value_count as u64, y_equality_shares);
+        if prime==class_val_prime{
+            let mut additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares*2);
+            let mut binary_shares = receive_u8_triple_shares(&mut stream, ctx.ohe_binary_shares*2);
+            let mut equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares*2);
+
+            ctx.dt_shares.additive_triples.insert(prime, additive_shares);
+            ctx.dt_shares.equality_integer_shares.insert(prime, equality_shares);
+            ctx.dt_shares.binary_triples.append(&mut binary_shares);
+            ctx.dt_shares.sequential_additive_index = HashMap::new();
+            ctx.dt_shares.sequential_additive_index.insert(prime, 0);
+            ctx.dt_shares.sequential_equality_integer_index = HashMap::new();
+            ctx.dt_shares.sequential_equality_integer_index.insert(prime, 0);
+            ctx.dt_shares.sequential_binary_index = 0;
+        }else{
+            let mut additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares);
+            let mut binary_shares = receive_u8_triple_shares(&mut stream, ctx.ohe_binary_shares);
+            let mut equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares);
+
+            ctx.dt_shares.additive_triples.insert(prime, additive_shares);
+            ctx.dt_shares.equality_integer_shares.insert(prime, equality_shares);
+            ctx.dt_shares.binary_triples.append(&mut binary_shares);
+            ctx.dt_shares.sequential_additive_index = HashMap::new();
+            ctx.dt_shares.sequential_additive_index.insert(prime, 0);
+            ctx.dt_shares.sequential_equality_integer_index = HashMap::new();
+            ctx.dt_shares.sequential_equality_integer_index.insert(prime, 0);
+            ctx.dt_shares.sequential_binary_index = 0;
+
+            let mut y_additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares);
+            let mut y_equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares);
+            ctx.dt_shares.sequential_additive_index.insert(class_val_prime, 0);
+            ctx.dt_shares.sequential_equality_integer_index.insert(class_val_prime, 0);
+            ctx.dt_shares.additive_triples.insert(class_val_prime, y_additive_shares);
+            ctx.dt_shares.equality_integer_shares.insert(class_val_prime, y_equality_shares);
+        }
+
     }
 
     pub fn ti_receive(mut stream: TcpStream, ctx: &mut ComputingParty) -> DecisionTreeShares {

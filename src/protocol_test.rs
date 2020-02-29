@@ -2,7 +2,7 @@ pub mod protocol_test {
     use crate::computing_party::computing_party::ComputingParty;
     use std::num::Wrapping;
     use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte, batch_multiplication_integer, multiplication_bigint, multi_thread_batch_mul_byte, parallel_multiplication, batch_multiply_bigint, parallel_multiplication_big_integer};
-    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result, reveal_int_result};
+    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result, reveal_int_result, send_u8_messages};
     use rand::{random, Rng};
     use num::integer::*;
     use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
@@ -38,21 +38,21 @@ pub mod protocol_test {
     pub fn test_batch_multiplication_byte(ctx: &mut ComputingParty) {
         let mut x_vec: Vec<u8> = Vec::new();
         let mut y_vec: Vec<u8> = Vec::new();
-        let mut result_vec: Vec<u8> = Vec::new();
-        let mut x_pub_vec: Vec<u8> = Vec::new();
-        let mut y_pub_vec: Vec<u8> = Vec::new();
 
-
+        if ctx.asymmetric_bit == 1 {
+            x_vec = [1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1].to_vec();
+            y_vec = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].to_vec();
+        } else {
+            x_vec = [1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0].to_vec();
+            y_vec = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].to_vec();
+        }
 //        println!("x_pub_vec {:?}", x_pub_vec);
 //        println!("y_pub_vec {:?}", y_pub_vec);
 //        println!("result_vec {:?}", result_vec);
         let result = batch_multiplication_byte(&x_vec, &y_vec, ctx);
 //        println!("computed result {:?}", &result);
 
-        let result_revealed = reveal_byte_vec_result(&result, ctx);
-//        println!("result_revealed {:?}", result_revealed);
-
-        assert!(result_vec.iter().zip(result_revealed.iter()).all(|(a, b)| a == b), "Arrays are not equal");
+        println!("result {:?}", result);
     }
 
     pub fn test_batch_multiplication_integer(ctx: &mut ComputingParty) {
@@ -230,9 +230,10 @@ pub mod protocol_test {
 
     pub fn test_comparison(ctx: &mut ComputingParty) {
         let mut result = 0;
-        if ctx.party_id == 0 {
-            let x: Vec<u8> = vec![0, 0, 0, 0];
-            let y: Vec<u8> = vec![0, 0, 0, 0];
+        for i in 0..20{
+            if ctx.party_id == 0 {
+                let x: Vec<u8> = vec![0, 0, 0, 0];
+                let y: Vec<u8> = vec![0, 0, 0, 0];
 //            let e_shares = compute_e_shares(&x, &y, ctx);
 //            assert_eq!(e_shares, [1, 1, 0, 0]);
 //            let d_shares = compute_d_shares(&x, &y, ctx);
@@ -246,10 +247,10 @@ pub mod protocol_test {
 //            println!("c_share:{:?}", c_share);
 //            let c_share_revealed = reveal_byte_vec_result(&c_share, ctx);
 //            assert_eq!(c_share_revealed, [0, 0, 0, 0]);
-            result = comparison(&x, &y, ctx);
-        } else {
-            let x: Vec<u8> = vec![0, 0, 0, 0];
-            let y: Vec<u8> = vec![1, 0, 0, 0];
+                result = comparison(&x, &y, ctx);
+            } else {
+                let x: Vec<u8> = vec![0, 0, 0, 0];
+                let y: Vec<u8> = vec![0, 0, 0, 0];
 //            let e_shares = compute_e_shares(&x, &y, ctx);
 //            assert_eq!(e_shares, [0, 1, 1, 1]);
 //            let d_shares = compute_d_shares(&x, &y, ctx);
@@ -263,21 +264,19 @@ pub mod protocol_test {
 //            println!("c_share:{:?}", c_share);
 //            let c_share_revealed = reveal_byte_vec_result(&c_share, ctx);
 //            assert_eq!(c_share_revealed, [0, 0, 0, 0]);
-            result = comparison(&x, &y, ctx);
+                result = comparison(&x, &y, ctx);
+            }
+            let received = send_u8_messages(ctx,&[result].to_vec())[0];
+            println!("{}", received^result);
         }
-         println!("{:?}",result);
+
 //        let result_revealed = reveal_byte_result(result, ctx);
 //        assert_eq!(result_revealed, 0);
     }
 
-    pub fn test_batch_bit_decomposition(){
+    pub fn test_batch_bit_decomposition() {}
 
-
-    }
-
-    pub fn test_batch_comparison(){
-
-    }
+    pub fn test_batch_comparison() {}
 
     pub fn test_comparison_bigint(ctx: &mut ComputingParty) {
         let mut result = BigUint::zero();
@@ -299,16 +298,16 @@ pub mod protocol_test {
         let bit_length = (ctx.dt_training.rfs_field as f64).log2().ceil() as usize;
         if ctx.party_id == 0 {
             let input = 1;
-            let bit_decomposed = bit_decomposition(input, ctx,bit_length);
+            let bit_decomposed = bit_decomposition(input, ctx, bit_length);
 //            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
 //            println!("{:?}", bit_decomposed_revealed);
-            println!("{:?}",bit_decomposed);
+            println!("{:?}", bit_decomposed);
         } else {
             let input = 1;
-            let bit_decomposed = bit_decomposition(input, ctx,bit_length);
+            let bit_decomposed = bit_decomposition(input, ctx, bit_length);
 //            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
 //            println!("{:?}", bit_decomposed_revealed);
-            println!("{:?}",bit_decomposed);
+            println!("{:?}", bit_decomposed);
         }
     }
 
@@ -332,13 +331,13 @@ pub mod protocol_test {
             let y = vec![BigUint::from_u32(1).unwrap(), BigUint::from_u32(1).unwrap()];
             let result = dot_product_bigint(&x, &y, ctx);
             let result_bytes = result.to_bytes_le();
-            println!("{:?}",result_bytes);
-            let changed = change_binary_to_bigint_field(&result_bytes,ctx);
+            println!("{:?}", result_bytes);
+            let changed = change_binary_to_bigint_field(&result_bytes, ctx);
 
 
 //            let result_revealed = reveal_bigint_result(&result, ctx);
 //            println!("{}", result_revealed.to_string());
-            for item in changed{
+            for item in changed {
                 println!("{}", item.to_string());
             }
         } else {
@@ -346,11 +345,11 @@ pub mod protocol_test {
             let y = vec![BigUint::from_u32(1).unwrap(), BigUint::from_u32(0).unwrap()];
             let result = dot_product_bigint(&x, &y, ctx);
             let result_bytes = result.to_bytes_le();
-            println!("{:?}",result_bytes);
-            let changed = change_binary_to_bigint_field(&result_bytes,ctx);
+            println!("{:?}", result_bytes);
+            let changed = change_binary_to_bigint_field(&result_bytes, ctx);
 //            let result_revealed = reveal_bigint_result(&result, ctx);
 //            println!("{}", result_revealed.to_string());
-            for item in changed{
+            for item in changed {
                 println!("{}", item.to_string());
             }
         }
@@ -360,14 +359,14 @@ pub mod protocol_test {
         if ctx.party_id == 0 {
             let x = vec![Wrapping(1), Wrapping(1)];
             let y = vec![Wrapping(0), Wrapping(0)];
-            let result = or_xor(&x, &y, ctx, 2,2);
+            let result = or_xor(&x, &y, ctx, 2, 2);
             println!("{:?}", result);
 //            let result_revealed = reveal_byte_vec_result(&result,ctx);
 //            println!("{}",result_revealed.to_string());
         } else {
             let x = vec![Wrapping(1), Wrapping(0)];
             let y = vec![Wrapping(0), Wrapping(0)];
-            let result = or_xor(&x, &y, ctx, 2,2);
+            let result = or_xor(&x, &y, ctx, 2, 2);
             println!("{:?}", result);
 //            let result_revealed = reveal_bigint_result(&result,ctx);
 //            println!("{}",result_revealed.to_string());
@@ -396,11 +395,11 @@ pub mod protocol_test {
     pub fn test_change_binary_to_decimal_field(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
             let input = vec![1, 0, 0, 1];
-            let result = change_binary_to_decimal_field(&input, ctx,ctx.dt_training.dataset_size_prime);
+            let result = change_binary_to_decimal_field(&input, ctx, ctx.dt_training.dataset_size_prime);
             println!("{:?}", result);
         } else {
             let input = vec![0, 1, 1, 1];
-            let result = change_binary_to_decimal_field(&input, ctx,ctx.dt_training.dataset_size_prime);
+            let result = change_binary_to_decimal_field(&input, ctx, ctx.dt_training.dataset_size_prime);
             println!("{:?}", result);
         }
     }
@@ -409,15 +408,16 @@ pub mod protocol_test {
         if ctx.party_id == 0 {
             let input = vec![1, 1];
             let result = change_binary_to_bigint_field(&input, ctx);
-            for item in result{
+            for item in result {
                 println!("{}", item.to_string());
             }
         } else {
             let input = vec![1, 0];
             let result = change_binary_to_bigint_field(&input, ctx);
-            for item in result{
+            for item in result {
                 println!("{}", item.to_string());
-            }        }
+            }
+        }
     }
 
     pub fn test_argmax(ctx: &mut ComputingParty) {
@@ -436,36 +436,36 @@ pub mod protocol_test {
         }
     }
 
-    pub fn test_dot_product_integer(ctx: &mut ComputingParty){
+    pub fn test_dot_product_integer(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
-            let x = vec![Wrapping(1 as u64),Wrapping(2 as u64),Wrapping(3 as u64),Wrapping(1 as u64)];
-            let y = vec![Wrapping(1 as u64),Wrapping(0 as u64),Wrapping(2 as u64),Wrapping(1 as u64)];
-            let result = dot_product_integer(&x,&y,ctx);
+            let x = vec![Wrapping(1 as u64), Wrapping(2 as u64), Wrapping(3 as u64), Wrapping(1 as u64)];
+            let y = vec![Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(2 as u64), Wrapping(1 as u64)];
+            let result = dot_product_integer(&x, &y, ctx);
             println!("{:?}", result);
 //            let result_revealed = reveal_int_result(&result, ctx);
 //            println!("{:?}", result_revealed);
         } else {
-            let x = vec![Wrapping(1 as u64),Wrapping(1 as u64),Wrapping(2 as u64),Wrapping(0 as u64)];
-            let y =  vec![Wrapping(3 as u64),Wrapping(0 as u64),Wrapping(3 as u64),Wrapping(3 as u64)];
-            let result = dot_product_integer(&x,&y,ctx);
+            let x = vec![Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(2 as u64), Wrapping(0 as u64)];
+            let y = vec![Wrapping(3 as u64), Wrapping(0 as u64), Wrapping(3 as u64), Wrapping(3 as u64)];
+            let result = dot_product_integer(&x, &y, ctx);
             println!("{:?}", result);
 //            let result_revealed = reveal_int_result(&result, ctx);
 //            println!("{:?}", result_revealed);
         }
     }
 
-    pub fn test_batch_integer_equality(ctx: &mut ComputingParty){
+    pub fn test_batch_integer_equality(ctx: &mut ComputingParty) {
         if ctx.party_id == 0 {
-            let x = vec![Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64)];
-            let y = vec![Wrapping(1 as u64),Wrapping(1 as u64),Wrapping(1 as u64),Wrapping(1 as u64)];
-            let result = batch_equality_integer(&x,&y,ctx,2);
+            let x = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
+            let y = vec![Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)];
+            let result = batch_equality_integer(&x, &y, ctx, 2);
             println!("{:?}", result);
 //            let result_revealed = reveal_int_result(&result, ctx);
 //            println!("{:?}", result_revealed);
         } else {
-            let x = vec![Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64)];
-            let y =  vec![Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64),Wrapping(0 as u64)];
-            let result = batch_equality_integer(&x,&y,ctx,2);
+            let x = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
+            let y = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
+            let result = batch_equality_integer(&x, &y, ctx, 2);
             println!("{:?}", result);
 //            let result_revealed = reveal_int_result(&result, ctx);
 //            println!("{:?}", result_revealed);

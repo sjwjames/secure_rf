@@ -70,25 +70,25 @@ pub mod random_forest {
         //temporarily
         ctx.dt_data.discretized_x = x;
 
-        if ctx.asymmetric_bit == 1 {
-            ctx.dt_data.discretized_x = {
-                [
-                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
-                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
-                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec()
-                ].to_vec()
-            };
-        } else {
-            ctx.dt_data.discretized_x = {
-                [
-                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-                    [Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)].to_vec(),
-                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-                    [Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(0 as u64)].to_vec()
-                ].to_vec()
-            };
-        }
+//        if ctx.asymmetric_bit == 1 {
+//            ctx.dt_data.discretized_x = {
+//                [
+//                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
+//                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+//                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
+//                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec()
+//                ].to_vec()
+//            };
+//        } else {
+//            ctx.dt_data.discretized_x = {
+//                [
+//                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+//                    [Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)].to_vec(),
+//                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
+//                    [Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(0 as u64)].to_vec()
+//                ].to_vec()
+//            };
+//        }
     }
 
     pub fn ohe_conversion(x: &Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty, category: usize, prime: u64) -> Vec<Vec<u8>> {
@@ -131,7 +131,6 @@ pub mod random_forest {
             let comparison_result = comparison(&mut compared, &mut bits, ctx);
             comparison_results.push(comparison_result);
         }
-//        println!("comparison_results:{:?}", comparison_results);
 
 
 //        let mut compared = vec![vec![0u8; bit_length]; bits_list.len()];
@@ -164,21 +163,21 @@ pub mod random_forest {
         let mut current_p1_port = ctx.party1_port + 1;
         let mut x = load_dt_raw_data(&ctx.x_input_path);
         let mut y = load_dt_raw_data(&ctx.y_input_path);
-        if ctx.asymmetric_bit == 1 {
-            y = [
-                [Wrapping(1)].to_vec(),
-                [Wrapping(0)].to_vec(),
-                [Wrapping(0)].to_vec(),
-                [Wrapping(1)].to_vec()
-            ].to_vec();
-        } else {
-            y = [
-                [Wrapping(0)].to_vec(),
-                [Wrapping(0)].to_vec(),
-                [Wrapping(0)].to_vec(),
-                [Wrapping(0)].to_vec()
-            ].to_vec();
-        }
+//        if ctx.asymmetric_bit == 1 {
+//            y = [
+//                [Wrapping(1)].to_vec(),
+//                [Wrapping(0)].to_vec(),
+//                [Wrapping(0)].to_vec(),
+//                [Wrapping(1)].to_vec()
+//            ].to_vec();
+//        } else {
+//            y = [
+//                [Wrapping(0)].to_vec(),
+//                [Wrapping(0)].to_vec(),
+//                [Wrapping(0)].to_vec(),
+//                [Wrapping(0)].to_vec()
+//            ].to_vec();
+//        }
 
         discretize_data(x, ctx);
         receive_preprocessing_shares(ctx);
@@ -191,7 +190,6 @@ pub mod random_forest {
         let discretized_x = ctx.dt_data.discretized_x.clone();
         let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count, ohe_prime);
         let mut class_values_bytes = ohe_conversion(&y, ctx, class_value_count, ohe_prime);
-
 
 //        let mut result_vec = Vec::new();
         for current_tree_index in 0..remainder {

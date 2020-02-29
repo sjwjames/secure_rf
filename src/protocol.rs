@@ -199,10 +199,10 @@ pub mod protocol {
 //        println!("{:?}", v_shares);
 //        println!("{:?}", w_shares);
 
-        let mut o_stream = ctx.o_stream.try_clone()
-            .expect("failed cloning tcp o_stream");
-        let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
-        let mut reader = BufReader::new(in_stream);
+//        let mut o_stream = ctx.o_stream.try_clone()
+//            .expect("failed cloning tcp o_stream");
+//        let mut in_stream = ctx.in_stream.try_clone().expect("failed cloning tcp o_stream");
+//        let mut reader = BufReader::new(in_stream);
         d_matrix = local_matrix_computation(x, &u_shares, prime, LOCAL_SUBTRACTION);
 
         e_matrix = local_matrix_computation(y, &v_shares, prime, LOCAL_SUBTRACTION);
