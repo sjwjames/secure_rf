@@ -2,7 +2,7 @@ pub mod protocol_test {
     use crate::computing_party::computing_party::ComputingParty;
     use std::num::Wrapping;
     use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte, batch_multiplication_integer, multiplication_bigint, multi_thread_batch_mul_byte, parallel_multiplication, batch_multiply_bigint, parallel_multiplication_big_integer};
-    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result, reveal_int_result, send_u8_messages};
+    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result, reveal_int_result, send_u8_messages, send_u64_messages};
     use rand::{random, Rng};
     use num::integer::*;
     use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
@@ -10,7 +10,7 @@ pub mod protocol_test {
     use crate::protocol::protocol::{equality_big_integer, arg_max, batch_equality_integer};
     use crate::comparison::comparison::{compare_bigint, comparison, compute_e_shares, compute_d_shares, compute_multi_e_parallel, compute_c_shares};
     use std::ops::BitAnd;
-    use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint};
+    use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint, batch_bit_decomposition};
     use crate::dot_product::dot_product::{dot_product_bigint, dot_product_integer};
     use crate::or_xor::or_xor::{or_xor, or_xor_bigint};
     use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
@@ -81,7 +81,7 @@ pub mod protocol_test {
         let mut time = 0;
         for i in 0..5 {
             let mut now = SystemTime::now();
-            let result = batch_multiplication_integer(&x_vec, &y_vec, ctx);
+            let result = batch_multiplication_integer(&x_vec, &y_vec, ctx,ctx.dt_training.dataset_size_prime);
             time += now.elapsed().unwrap().as_millis();
 //            let result_revealed = reveal_int_vec_result(&result, ctx);
 //            assert!(result_pub.iter().zip(result_revealed.iter()).all(|(a, b)| a.0 == *b), "Arrays are not equal");
@@ -216,12 +216,12 @@ pub mod protocol_test {
     pub fn test_equality_big_integer(ctx: &mut ComputingParty) {
         let mut result = BigUint::zero();
         if ctx.party_id == 0 {
-            let x = BigUint::from_u32(5).unwrap();
-            let y = BigUint::from_u32(3).unwrap();
+            let x = BigUint::from_u32(0).unwrap();
+            let y = BigUint::from_u32(0).unwrap();
             result = equality_big_integer(&x, &y, ctx);
         } else {
-            let x = BigUint::from_u32(5).unwrap();
-            let y = BigUint::from_u32(7).unwrap();
+            let x = BigUint::from_u32(0).unwrap();
+            let y = BigUint::from_u32(0).unwrap();
             result = equality_big_integer(&x, &y, ctx);
         }
         let result_revealed = reveal_bigint_result(&result, ctx);
@@ -274,8 +274,19 @@ pub mod protocol_test {
 //        assert_eq!(result_revealed, 0);
     }
 
-    pub fn test_batch_bit_decomposition() {}
+    pub fn test_batch_bit_decomposition(ctx: &mut ComputingParty) {
+        let length = 3;
+        let mut result = Vec::new();
+        if ctx.party_id == 0 {
+            let x = vec![Wrapping(1 as u64), Wrapping(3 as u64), Wrapping(2 as u64), Wrapping(1 as u64)];
+            result = batch_bit_decomposition(&x,ctx, length);
 
+        } else {
+            let x = vec![Wrapping(4 as u64), Wrapping(6 as u64), Wrapping(5 as u64), Wrapping(0 as u64)];
+            result = batch_bit_decomposition(&x,ctx, length);
+        }
+        println!("{:?}",result);
+    }
     pub fn test_batch_comparison() {}
 
     pub fn test_comparison_bigint(ctx: &mut ComputingParty) {
@@ -295,15 +306,15 @@ pub mod protocol_test {
     }
 
     pub fn test_bit_decomposition(ctx: &mut ComputingParty) {
-        let bit_length = (ctx.dt_training.rfs_field as f64).log2().ceil() as usize;
+        let bit_length = (ctx.dt_training.prime as f64).log2().ceil() as usize;
         if ctx.party_id == 0 {
-            let input = 1;
+            let input = 4;
             let bit_decomposed = bit_decomposition(input, ctx, bit_length);
 //            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
 //            println!("{:?}", bit_decomposed_revealed);
             println!("{:?}", bit_decomposed);
         } else {
-            let input = 1;
+            let input = 5;
             let bit_decomposed = bit_decomposition(input, ctx, bit_length);
 //            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
 //            println!("{:?}", bit_decomposed_revealed);
@@ -359,14 +370,14 @@ pub mod protocol_test {
         if ctx.party_id == 0 {
             let x = vec![Wrapping(1), Wrapping(1)];
             let y = vec![Wrapping(0), Wrapping(0)];
-            let result = or_xor(&x, &y, ctx, 2, 2);
+            let result = or_xor(&x, &y, ctx, 2, ctx.dt_training.dataset_size_prime);
             println!("{:?}", result);
 //            let result_revealed = reveal_byte_vec_result(&result,ctx);
 //            println!("{}",result_revealed.to_string());
         } else {
             let x = vec![Wrapping(1), Wrapping(0)];
             let y = vec![Wrapping(0), Wrapping(0)];
-            let result = or_xor(&x, &y, ctx, 2, 2);
+            let result = or_xor(&x, &y, ctx, 2, ctx.dt_training.dataset_size_prime);
             println!("{:?}", result);
 //            let result_revealed = reveal_bigint_result(&result,ctx);
 //            println!("{}",result_revealed.to_string());
@@ -455,20 +466,33 @@ pub mod protocol_test {
     }
 
     pub fn test_batch_integer_equality(ctx: &mut ComputingParty) {
-        if ctx.party_id == 0 {
-            let x = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
-            let y = vec![Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)];
-            let result = batch_equality_integer(&x, &y, ctx, 2);
-            println!("{:?}", result);
+        let mut result = Vec::new();
+        let prime = ctx.dt_training.prime;
+//        let shares_received = send_u64_messages(ctx,ctx.dt_shares.equality_integer_shares.get(&prime).unwrap());
+//        let mut shares = Vec::new();
+//        for i in 0..shares_received.len(){
+//            shares.push((ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[i].0+shares_received[i].0).mod_floor(&prime));
+//        }
+//        println!("{:?}",shares);
+        for i in 0..2{
+            if ctx.party_id == 0 {
+                let x = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
+                let y = vec![Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(1 as u64)];
+                result = batch_equality_integer(&x, &y, ctx, prime);
 //            let result_revealed = reveal_int_result(&result, ctx);
 //            println!("{:?}", result_revealed);
-        } else {
-            let x = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
-            let y = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
-            let result = batch_equality_integer(&x, &y, ctx, 2);
-            println!("{:?}", result);
+            } else {
+                let x = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
+                let y = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
+                result = batch_equality_integer(&x, &y, ctx, prime);
 //            let result_revealed = reveal_int_result(&result, ctx);
 //            println!("{:?}", result_revealed);
+            }
+            let received = send_u64_messages(ctx,&result);
+            for i in 0..received.len(){
+                println!("{}", (received[i].0^result[i].0).mod_floor(&prime));
+            }
         }
+
     }
 }

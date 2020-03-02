@@ -9,7 +9,7 @@ ti_port0  = 4000
 ti_port1  = 8000
 
 #[random forest]
-tree_count = 10
+tree_count = 1
 tree_training_batch_size = 20
 thread_count = 40
 
@@ -23,8 +23,8 @@ binary_shares_per_tree = 1000
 ohe_add_shares = 1000
 ohe_binary_shares = 1000
 ohe_equality_shares = 1000
-big_int_prime = "649037107316853453566312041152512"
-prime = 32
+big_int_prime = "649037107316853453566312041152659"
+prime = 8
 bigint_bit_size = 109
 attr_value_cnt = 6
 class_value_cnt = 2

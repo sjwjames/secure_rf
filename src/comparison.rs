@@ -9,7 +9,7 @@ pub mod comparison {
     use std::collections::HashMap;
     use num::{abs, BigUint};
     use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint};
-    use crate::utils::utils::{big_uint_clone, get_current_binary_share};
+    use crate::utils::utils::{big_uint_clone, get_current_binary_share, mod_subtraction_u8};
     use std::num::Wrapping;
 
     pub fn compute_e_shares(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
@@ -31,8 +31,7 @@ pub mod comparison {
             let mut product_result = output_map.get(&i).unwrap();
             for j in 0..product_result.len() {
                 let global_index = i as usize * ctx.batch_size + j;
-                let local_diff = Wrapping(y_list[global_index]) - Wrapping(product_result[j]);
-                d_shares[global_index] = mod_floor(local_diff.0, BINARY_PRIME as u8);
+                d_shares[global_index] = mod_subtraction_u8(y_list[global_index],product_result[j],BINARY_PRIME as u8);
             }
         }
         ctx.thread_hierarchy.pop();
@@ -283,7 +282,7 @@ pub mod comparison {
         let mult_result = batch_multiplication_byte(&x_list_1d, &y_list_1d, ctx);
         for j in 0..list_len {
             for i in 0..bit_length {
-                d_shares[j][i] = mod_floor((Wrapping(y_list[j][i]) - Wrapping(mult_result[j * bit_length + i])).0, BINARY_PRIME as u8);
+                d_shares[j][i] = mod_subtraction_u8(y_list[j][i],mult_result[j * bit_length + i],BINARY_PRIME as u8);
             }
         }
 

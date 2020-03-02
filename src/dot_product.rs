@@ -25,7 +25,7 @@ pub mod dot_product {
                        pretruncate: bool) -> Wrapping<u64> {
         ctx.thread_hierarchy.push("dot_product".to_string());
         //println!("entering dot product");
-        let z_list = batch_multiplication_integer(x_list, y_list, ctx);
+        let z_list = batch_multiplication_integer(x_list, y_list, ctx,ctx.dt_training.dataset_size_prime);
 
         if !truncate {
             return z_list.iter().sum();
@@ -60,7 +60,7 @@ pub mod dot_product {
                 let to_index = min(i + ctx.batch_size, vector_length);
                 let x_list_copied = x_list[i..to_index].to_vec().clone();
                 let y_list_copied = y_list[i..to_index].to_vec().clone();
-                let multi_result = batch_multiplication_integer(&x_list_copied, &y_list_copied, ctx);
+                let multi_result = batch_multiplication_integer(&x_list_copied, &y_list_copied, ctx,ctx.dt_training.dataset_size_prime);
                 for item in multi_result {
                     dot_product = dot_product + item;
                 }
@@ -79,8 +79,9 @@ pub mod dot_product {
                 let y_list_copied = y_list[i..to_index].to_vec().clone();
                 let mut output_map = Arc::clone(&output_map);
                 ctx_copied.thread_hierarchy.push(format!("{}",batch_count));
+                let prime = ctx_copied.dt_training.dataset_size_prime;
                 thread_pool.execute(move || {
-                    let multi_result = batch_multiplication_integer(&x_list_copied, &y_list_copied, &mut ctx_copied);
+                    let multi_result = batch_multiplication_integer(&x_list_copied, &y_list_copied, &mut ctx_copied,prime);
                     let mut output_map = output_map.lock().unwrap();
                     (*output_map).insert(batch_count, multi_result);
                 });

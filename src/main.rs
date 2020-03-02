@@ -13,10 +13,10 @@ use std::str;
 use serde::{Serialize, Deserialize, Serializer};
 use num::integer::*;
 use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOptions, ConsumerMessage};
-use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue, Xbuffer, send_u64_messages, send_biguint_messages};
+use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue, Xbuffer, send_u64_messages, send_biguint_messages, mod_subtraction};
 use threadpool::ThreadPool;
 use random_forest_rust::multiplication::multiplication::multiplication_byte;
-use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication, test_batch_multiply_bigint, test_parallel_multiplication_big_integer, test_equality_big_integer, test_comparison, test_comparison_bigint, test_bit_decomposition, test_bit_decomposition_bigint, test_dot_product_bigint, test_or_xor, test_change_binary_to_decimal_field, test_argmax, test_or_xor_bigint, test_change_binary_to_bigint_field, test_dot_product_integer, test_batch_integer_equality};
+use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication, test_batch_multiply_bigint, test_parallel_multiplication_big_integer, test_equality_big_integer, test_comparison, test_comparison_bigint, test_bit_decomposition, test_bit_decomposition_bigint, test_dot_product_bigint, test_or_xor, test_change_binary_to_decimal_field, test_argmax, test_or_xor_bigint, test_change_binary_to_bigint_field, test_dot_product_integer, test_batch_integer_equality, test_batch_bit_decomposition};
 use rand::ThreadRng;
 use num::bigint::RandBigInt;
 use std::sync::{Arc, Mutex};
@@ -138,10 +138,11 @@ fn test_protocols() {
 //                test_equality_big_integer(&mut party_context);
 //                test_comparison(&mut party_context);
 //                test_bit_decomposition(&mut party_context);
+//                test_batch_bit_decomposition(&mut party_context);
 //                test_bit_decomposition_bigint(&mut party_context);
 //                test_comparison_bigint(&mut party_context);
 //                test_dot_product_bigint(&mut party_context);
-//                test_or_xor(&mut party_context);
+                test_or_xor(&mut party_context);
 //                test_or_xor_bigint(&mut party_context);
 //                test_change_binary_to_decimal_field(&mut party_context);
 //                test_change_binary_to_bigint_field(&mut party_context);
@@ -168,8 +169,9 @@ fn test_protocols() {
 
 fn main() {
 //    test_mq();
-    run();
-//    test_protocols();
+//    run();
+    test_protocols();
+
 }
 
 

@@ -9,7 +9,7 @@ pub mod random_forest {
     use std::collections::HashMap;
     use std::num::Wrapping;
     use crate::protocol::protocol::{matrix_multiplication_integer, batch_equality_integer};
-    use crate::utils::utils::get_additive_shares;
+    use crate::utils::utils::{get_additive_shares, send_u64_messages, send_u8_messages};
     use crate::bit_decomposition::bit_decomposition::{bit_decomposition, batch_bit_decomposition};
     use crate::comparison::comparison::{comparison, batch_comparison};
     use crate::constants::constants::BINARY_PRIME;
@@ -17,6 +17,8 @@ pub mod random_forest {
     use std::io::{BufReader, BufRead, Write};
     use crate::or_xor::or_xor::or_xor;
     use std::time::SystemTime;
+    use num::integer::*;
+
 
     pub fn random_feature_selection(attr_values: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<Vec<u8>> {
         let mut transformed_attr_values = Vec::new();
@@ -114,9 +116,11 @@ pub mod random_forest {
             }
         }
         let result = batch_equality_integer(&equality_x, &equality_y, ctx, prime);
+
         let bit_length = (prime as f64).log2().ceil() as usize;
 
         let mut bits_list = batch_bit_decomposition(&result, ctx, bit_length);
+        println!("bits_list:{:?}",bits_list[0..20].to_vec());
 //        let mut comparison_results = Vec::new();
         //        for item in result {
 //            let bits = bit_decomposition(item.0, ctx, bit_length);
@@ -131,8 +135,7 @@ pub mod random_forest {
             let comparison_result = comparison(&mut compared, &mut bits, ctx);
             comparison_results.push(comparison_result);
         }
-
-
+        println!("{:?}",comparison_results[0..20].to_vec());
 //        let mut compared = vec![vec![0u8; bit_length]; bits_list.len()];
 //        let comparison_results = batch_comparison(&mut compared, &mut bits_list, ctx, bit_length);
 
@@ -185,11 +188,17 @@ pub mod random_forest {
         let attr_value_count = ctx.dt_data.attr_value_count;
         let class_value_count = ctx.dt_data.class_value_count;
 
-        let class_val_prime = 2.0_f64.powf((ctx.dt_data.class_value_count as f64).log2().ceil()) as u64;
-        let ohe_prime = if ctx.dt_training.rfs_field > class_val_prime as u64 { ctx.dt_training.rfs_field } else { class_val_prime as u64 };
+//        let class_val_prime = 2.0_f64.powf((ctx.dt_data.class_value_count as f64).log2().ceil()) as u64;
         let discretized_x = ctx.dt_data.discretized_x.clone();
-        let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count, ohe_prime);
-        let mut class_values_bytes = ohe_conversion(&y, ctx, class_value_count, ohe_prime);
+        let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count, ctx.dt_training.prime);
+        let mut class_values_bytes = ohe_conversion(&y, ctx, class_value_count, ctx.dt_training.prime);
+
+        println!("{:?}", ctx.dt_shares.sequential_equality_integer_index);
+        println!("{:?}", ctx.dt_shares.sequential_additive_index);
+        println!("{}", ctx.dt_shares.sequential_equality_index);
+        println!("{}", ctx.dt_shares.sequential_additive_bigint_index);
+        println!("attr_values_bytes:{:?}", attr_values_bytes[0]);
+        println!("class_values_bytes:{:?}", class_values_bytes[0]);
 
 //        let mut result_vec = Vec::new();
         for current_tree_index in 0..remainder {
@@ -249,10 +258,18 @@ pub mod random_forest {
 
         thread_pool.join();
         ctx.thread_hierarchy.pop();
-        let runtime =now.elapsed().unwrap().as_millis();
+        let runtime = now.elapsed().unwrap().as_millis();
         println!("complete -- work time = {:5} (ms)", runtime);
-        let mut file = File::create(ctx.output_path.clone()+&format!("{}_", ctx.tree_count).to_string()+"runtime.txt").unwrap();
-        file.write_all(format!("{}",runtime).as_bytes());
+        let mut file = File::create(ctx.output_path.clone() + &format!("{}_", ctx.tree_count).to_string() + "runtime.txt").unwrap();
+        file.write_all(format!("{}", runtime).as_bytes());
+
+
+        println!("{}", ctx.dt_shares.sequential_binary_index);
+        println!("{:?}", ctx.dt_shares.sequential_equality_integer_index);
+        println!("{:?}", ctx.dt_shares.sequential_additive_index);
+        println!("{}", ctx.dt_shares.sequential_equality_index);
+        println!("{}", ctx.dt_shares.sequential_additive_bigint_index);
+
 //        println!("{:?}",result_vec);
 //        if ctx.asymmetric_bit==1{
 //            let mut result_to_write = Vec::new();

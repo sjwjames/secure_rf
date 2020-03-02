@@ -158,7 +158,7 @@ pub mod protocol {
             for j in 0..x[0].len() {
                 match operation {
                     LOCAL_ADDITION => row.push(Wrapping((x[i][j] + y[i][j]).0.mod_floor(&prime))),
-                    LOCAL_SUBTRACTION => row.push(Wrapping((x[i][j] - y[i][j]).0.mod_floor(&prime))),
+                    LOCAL_SUBTRACTION => row.push(mod_subtraction(x[i][j],y[i][j],prime)),
                     _ => {}
                 }
             }
@@ -239,10 +239,10 @@ pub mod protocol {
         let equality_shares = get_current_equality_integer_shares(ctx, range, prime);
         let mut list_sent = Vec::new();
         for i in 0..range {
-            let diff = Wrapping((x[i] - y[i]).0.mod_floor(&prime));
+            let diff = mod_subtraction(x[i],y[i],prime);
             xy_diff.push(diff);
-            let item0 = Wrapping((diff - additive_shares[i].0).0.mod_floor(&prime));
-            let item1 = Wrapping((equality_shares[i] - additive_shares[i].1).0.mod_floor(&prime));
+            let item0 = mod_subtraction(diff,additive_shares[i].0,prime);
+            let item1 = mod_subtraction(equality_shares[i],additive_shares[i].1,prime);
             diff_list[i][0] = item0;
             diff_list[i][1] = item1;
             list_sent.push(item0);

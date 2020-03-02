@@ -136,7 +136,7 @@ pub mod bit_decomposition {
             input_share1.append(&mut input_shares[j][1]);
 
             first_c_multiple.push(input_share0[0]);
-            first_c_multiplicand.push(input_share0[0]);
+            first_c_multiplicand.push(input_share1[0]);
             x_shares[j][0] = y_shares[j][0] as u8;
         }
         //Initialize c[1]
@@ -144,10 +144,9 @@ pub mod bit_decomposition {
         for i in 0..first_c_shares.len(){
             c_shares[i][0] = mod_floor(first_c_shares[i], BINARY_PRIME as u8);
         }
-        let mut i = 0;
         let mut batch_mul_result = batch_multiplication_byte(&input_share0, &input_share1, ctx);
         for j in 0..list_len{
-            for i in 0..bit_length{
+            for i in 1..bit_length{
                 d_shares[j][i]=mod_floor(batch_mul_result[j*bit_length+i] + ctx.asymmetric_bit,BINARY_PRIME as u8);
             }
         }
@@ -185,7 +184,7 @@ pub mod bit_decomposition {
         c_shares[0] = mod_floor(first_c_share, BINARY_PRIME as u8);
 
         //computeDShares in Java Lynx
-        let mut i = 0;
+        let mut i = 1;
 
         if ctx.raw_tcp_communication{
             let mut global_index = 0;

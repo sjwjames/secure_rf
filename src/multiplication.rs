@@ -34,23 +34,21 @@ pub mod multiplication {
 
         let mut diff_list_received = Vec::new();
         let mut diff_list_sent = Vec::new();
-        for item in &diff_list{
+        for item in &diff_list {
             diff_list_sent.push(big_uint_clone(&item.0));
             diff_list_sent.push(big_uint_clone(&item.1));
         }
 
-        if ctx.raw_tcp_communication{
-            let mut list_received = send_biguint_messages(ctx,&diff_list_sent);
-            for i in 0..diff_list.len(){
-                diff_list_received.push((big_uint_clone(&list_received[i*2]),big_uint_clone(&list_received[i*2+1])));
+        if ctx.raw_tcp_communication {
+            let mut list_received = send_biguint_messages(ctx, &diff_list_sent);
+            for i in 0..diff_list.len() {
+                diff_list_received.push((big_uint_clone(&list_received[i * 2]), big_uint_clone(&list_received[i * 2 + 1])));
             }
-
-        }else{
+        } else {
 //            let message_id = ctx.thread_hierarchy.join(":");
 //            push_message_to_queue(&ctx.remote_mq_address, &message_id, &diff_list_str);
 //            let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
 //            diff_list_received = deserialize_biguint_double_vec(&message_received[0]);
-
         }
 
 
@@ -141,7 +139,7 @@ pub mod multiplication {
         {
             let corr_rand = &mut ctx.dt_shares.additive_triples;
             for i in 0..tx_len {
-                let (u, v, w) = get_current_additive_share(ctx,ctx.dt_training.prime);
+                let (u, v, w) = get_current_additive_share(ctx, ctx.dt_training.prime);
                 //let (u, v, w) = if ctx.asymmetric_bit == 1 {CR_1} else {CR_0};
 
                 u_list[i] = Wrapping(u.0);
@@ -223,14 +221,14 @@ pub mod multiplication {
 
     pub fn multiplication_byte(x: u8, y: u8, ctx: &mut ComputingParty) -> u8 {
         ctx.thread_hierarchy.push("multiplication_byte".to_string());
-        let mut diff_list:Vec<u8> = Vec::new();
+        let mut diff_list: Vec<u8> = Vec::new();
         let ti_share_triple = get_current_binary_share(ctx).clone();
         diff_list.push(mod_floor((Wrapping(x) - Wrapping(ti_share_triple.0)).0, BINARY_PRIME as u8));
         diff_list.push(mod_floor((Wrapping(y) - Wrapping(ti_share_triple.1)).0, BINARY_PRIME as u8));
 
         let mut received_list: Vec<u8> = Vec::new();
         if ctx.raw_tcp_communication {
-            received_list = send_u8_messages(ctx,&diff_list);
+            received_list = send_u8_messages(ctx, &diff_list);
         } else {
 //            let mut message_id = ctx.thread_hierarchy.join(":");
 //            let message_content = serde_json::to_string(&diff_list).unwrap();
@@ -257,10 +255,10 @@ pub mod multiplication {
     pub fn batch_multiplication_byte(x_list: &Vec<u8>, y_list: &Vec<u8>, ctx: &mut ComputingParty) -> Vec<u8> {
         ctx.thread_hierarchy.push("batch_multiplication_byte".to_string());
         let batch_size = x_list.len();
-        let mut diff_list:Vec<Vec<u8>> = Vec::new();
+        let mut diff_list: Vec<Vec<u8>> = Vec::new();
         let mut output = Vec::new();
 
-        let mut ti_shares = get_binary_shares(ctx,batch_size);
+        let mut ti_shares = get_binary_shares(ctx, batch_size);
         for i in 0..batch_size {
             let mut new_row = Vec::new();
             let ti_share_triple = ti_shares[i];
@@ -271,15 +269,13 @@ pub mod multiplication {
 
         let mut diff_list_received: Vec<Vec<u8>> = Vec::new();
         if ctx.raw_tcp_communication {
-            diff_list_received=send_receive_u8_matrix(&diff_list,ctx);
-
+            diff_list_received = send_receive_u8_matrix(&diff_list, ctx);
         } else {
             let message_id = ctx.thread_hierarchy.join(":");
             let message_content = serde_json::to_string(&diff_list).unwrap();
             push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
             let message_received = receive_message_from_queue(&ctx.local_mq_address, &message_id, 1);
             diff_list_received = serde_json::from_str(&message_received[0]).unwrap();
-
         }
         let mut d_list = vec![0u8; batch_size];
         let mut e_list = vec![0u8; batch_size];
@@ -302,25 +298,25 @@ pub mod multiplication {
         output
     }
 
-    pub fn batch_multiplication_integer(x_list: &Vec<Wrapping<u64>>, y_list: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+    pub fn batch_multiplication_integer(x_list: &Vec<Wrapping<u64>>, y_list: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty, prime: u64) -> Vec<Wrapping<u64>> {
         ctx.thread_hierarchy.push("batch_multiplication_integer".to_string());
         let batch_size = x_list.len();
         let mut diff_list = Vec::new();
         let mut output = Vec::new();
 
-        let mut ti_shares = get_additive_shares(ctx,batch_size,ctx.dt_training.dataset_size_prime);
+        let mut ti_shares = get_additive_shares(ctx, batch_size, ctx.dt_training.dataset_size_prime);
         for i in 0..batch_size {
             let mut new_row = Vec::new();
             let ti_share_triple = ti_shares[i];
-            new_row.push(Wrapping(mod_floor((x_list[i] - ti_share_triple.0).0, ctx.dt_training.dataset_size_prime)));
-            new_row.push(Wrapping(mod_floor((y_list[i] - ti_share_triple.1).0, ctx.dt_training.dataset_size_prime)));
+            new_row.push(mod_subtraction(x_list[i], ti_share_triple.0, prime));
+            new_row.push(mod_subtraction(y_list[i], ti_share_triple.1, prime));
             diff_list.push(new_row);
         }
 
         let mut received_list: Vec<Vec<Wrapping<u64>>> = Vec::new();
-        if ctx.raw_tcp_communication{
-            received_list = send_receive_u64_matrix(&diff_list,ctx);
-        }else{
+        if ctx.raw_tcp_communication {
+            received_list = send_receive_u64_matrix(&diff_list, ctx);
+        } else {
             let message_id = ctx.thread_hierarchy.join(":");
             let message_content = serde_json::to_string(&diff_list).unwrap();
             push_message_to_queue(&ctx.remote_mq_address, &message_id, &message_content);
@@ -329,28 +325,26 @@ pub mod multiplication {
         }
 
 
-
         let mut d_list = vec![Wrapping(0u64); batch_size];
         let mut e_list = vec![Wrapping(0u64); batch_size];
 
         for i in 0..batch_size {
-            d_list[i] = Wrapping(mod_floor((d_list[i] + received_list[i][0]).0, ctx.dt_training.dataset_size_prime));
-            e_list[i] = Wrapping(mod_floor((e_list[i] + received_list[i][1]).0, ctx.dt_training.dataset_size_prime));
+            d_list[i] = Wrapping(mod_floor((d_list[i] + received_list[i][0]).0, prime));
+            e_list[i] = Wrapping(mod_floor((e_list[i] + received_list[i][1]).0, prime));
         }
 
         for i in 0..batch_size {
             let ti_share_triple = ti_shares[i];
-            let d = mod_floor((x_list[i] - ti_share_triple.0 + d_list[i]).0, ctx.dt_training.dataset_size_prime);
-            let e = mod_floor((y_list[i] - ti_share_triple.1 + e_list[i]).0, ctx.dt_training.dataset_size_prime);
+            let d = mod_floor((mod_subtraction(x_list[i],ti_share_triple.0,prime)  + d_list[i]).0, prime);
+            let e = mod_floor((mod_subtraction(y_list[i],ti_share_triple.1,prime)  + e_list[i]).0, prime);
             let mut result: u64 = (ti_share_triple.2 + (Wrapping(d) * ti_share_triple.1) + (ti_share_triple.0 * Wrapping(e))
                 + (Wrapping(d) * Wrapping(e) * Wrapping(ctx.asymmetric_bit as u64))).0;
-            result = mod_floor(result, ctx.dt_training.dataset_size_prime);
+            result = mod_floor(result, prime);
             output.push(Wrapping(result));
         }
         ctx.thread_hierarchy.pop();
         output
     }
-
 
 
     pub fn multiplication_bigint(x: &BigUint, y: &BigUint, ctx: &mut ComputingParty) -> BigUint {
@@ -361,9 +355,9 @@ pub mod multiplication {
         diff_list.push(big_uint_subtract(y, &share.1, &ctx.dt_training.big_int_prime));
 
         let mut diff_received = Vec::new();
-        if ctx.raw_tcp_communication{
-            diff_received = send_biguint_messages(ctx,&diff_list);
-        }else{
+        if ctx.raw_tcp_communication {
+            diff_received = send_biguint_messages(ctx, &diff_list);
+        } else {
             let mut diff_list_message = String::new();
             let message_id = ctx.thread_hierarchy.join(":");
             let message_content = serialize_biguint_vec(&diff_list);
@@ -411,7 +405,7 @@ pub mod multiplication {
             let mut i2 = to_index1;
             let mut new_products = Vec::new();
 
-            if ctx.raw_tcp_communication{
+            if ctx.raw_tcp_communication {
                 while i1 < to_index1 && i2 < to_index2 {
                     let temp_index1 = min(i1 + ctx.batch_size, to_index1);
                     let temp_index2 = min(i2 + ctx.batch_size, to_index2);
@@ -420,8 +414,7 @@ pub mod multiplication {
                     i1 = temp_index1;
                     i2 = temp_index2;
                 }
-
-            }else{
+            } else {
                 let mut batch_count = 0;
                 let mut output_map = Arc::new(Mutex::new(HashMap::new()));
                 while i1 < to_index1 && i2 < to_index2 {
@@ -447,7 +440,6 @@ pub mod multiplication {
                     new_products.append(&mut multi_result);
                 }
             }
-
 
 
             products.clear();
@@ -478,7 +470,7 @@ pub mod multiplication {
             let mut i2 = to_index1;
             let mut new_products = Vec::new();
 
-            if ctx.raw_tcp_communication{
+            if ctx.raw_tcp_communication {
                 while i1 < to_index1 && i2 < to_index2 {
                     let temp_index1 = min(i1 + ctx.batch_size, to_index1);
                     let temp_index2 = min(i2 + ctx.batch_size, to_index2);
@@ -487,7 +479,7 @@ pub mod multiplication {
                     i1 = temp_index1;
                     i2 = temp_index2;
                 }
-            }else{
+            } else {
                 let mut output_map = Arc::new(Mutex::new(HashMap::new()));
                 let mut batch_count = 0;
                 while i1 < to_index1 && i2 < to_index2 {
@@ -515,7 +507,6 @@ pub mod multiplication {
                     new_products.append(&mut multi_result);
                 }
             }
-
 
 
             products.clear();

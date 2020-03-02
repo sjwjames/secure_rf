@@ -23,7 +23,7 @@ pub mod ti {
     use std::str::FromStr;
     use threadpool::ThreadPool;
     use std::collections::HashMap;
-    use crate::utils::utils::{big_uint_subtract, send_u8_messages};
+    use crate::utils::utils::{big_uint_subtract, send_u8_messages, mod_subtraction, mod_subtraction_u8};
     use std::f64::consts::E;
     use std::fs::File;
 
@@ -407,17 +407,11 @@ pub mod ti {
         let mut add_amount = ctx.ohe_add_shares as usize;
         let mut eq_amount = ctx.ohe_equality_shares as usize;
         let mut binary_amount = ctx.ohe_binary_shares as usize;
-        let class_val_prime = 2.0_f64.powf((ctx.class_value_cnt as f64).log2().ceil()) as u64;
-
-        if class_val_prime == ctx.rfs_field {
-            add_amount = add_amount * 2;
-            eq_amount = eq_amount * 2;
-            binary_amount = binary_amount * 2;
-        }
+        let prime = ctx.prime;
         // OHE shares of attrs
         print!("preprocessing- generating additive shares...      ");
         let now = SystemTime::now();
-        let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, ctx.rfs_field, add_amount);
+        let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, prime, add_amount);
         println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
 
 
@@ -429,9 +423,16 @@ pub mod ti {
 
         print!("preprocessing- generating equality integer shares...           ");
         let now = SystemTime::now();
-        let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, ctx.rfs_field, eq_amount);
+        let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, prime, eq_amount);
         println!("complete -- work time = {:5} (ms)",
                  now.elapsed().unwrap().as_millis());
+
+//        println!("add_triples0:{:?}", add_triples0[0]);
+//        println!("add_triples1:{:?}", add_triples1[0]);
+//        println!("binary_triples0:{:?}", binary_triples0[0]);
+//        println!("binary_triples1:{:?}", binary_triples1[0]);
+//        println!("equality_share0:{}", equality_share0[0]);
+//        println!("equality_share1:{}", equality_share1[0]);
 
         let mut stream0 = streams[0].try_clone().unwrap();
         stream0.set_ttl(std::u32::MAX).expect("set_ttl call failed");
@@ -451,35 +452,35 @@ pub mod ti {
         thread_pool.join();
 
         // OHE shares of classes
-        if class_val_prime != ctx.rfs_field {
-            print!("preprocessing- generating additive shares...      ");
-            let now = SystemTime::now();
-            let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, class_val_prime, add_amount);
-            println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
-
-            print!("preprocessing- generating equality integer shares...           ");
-            let now = SystemTime::now();
-            let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, class_val_prime, eq_amount);
-            println!("complete -- work time = {:5} (ms)",
-                     now.elapsed().unwrap().as_millis());
-
-            let mut stream0 = streams[0].try_clone().unwrap();
-            stream0.set_ttl(std::u32::MAX).expect("set_ttl call failed");
-            stream0.set_write_timeout(None).expect("set_write_timeout call failed");
-            stream0.set_read_timeout(None).expect("set_read_timeout call failed");
-            thread_pool.execute(move || {
-                send_preprocessing_shares(add_triples0, vec![], equality_share0, &mut stream0);
-            });
-
-            let mut stream1 = streams[1].try_clone().unwrap();
-            stream1.set_ttl(std::u32::MAX).expect("set_ttl call failed");
-            stream1.set_write_timeout(None).expect("set_write_timeout call failed");
-            stream1.set_read_timeout(None).expect("set_read_timeout call failed");
-            thread_pool.execute(move || {
-                send_preprocessing_shares(add_triples1, vec![], equality_share1, &mut stream1);
-            });
-            thread_pool.join();
-        }
+//        if class_val_prime != ctx.rfs_field {
+//            print!("preprocessing- generating additive shares...      ");
+//            let now = SystemTime::now();
+//            let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, class_val_prime, add_amount);
+//            println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
+//
+//            print!("preprocessing- generating equality integer shares...           ");
+//            let now = SystemTime::now();
+//            let (equality_share0, equality_share1) = equality_integer_shares_helper(ctx, thread_pool, class_val_prime, eq_amount);
+//            println!("complete -- work time = {:5} (ms)",
+//                     now.elapsed().unwrap().as_millis());
+//
+//            let mut stream0 = streams[0].try_clone().unwrap();
+//            stream0.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+//            stream0.set_write_timeout(None).expect("set_write_timeout call failed");
+//            stream0.set_read_timeout(None).expect("set_read_timeout call failed");
+//            thread_pool.execute(move || {
+//                send_preprocessing_shares(add_triples0, vec![], equality_share0, &mut stream0);
+//            });
+//
+//            let mut stream1 = streams[1].try_clone().unwrap();
+//            stream1.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+//            stream1.set_write_timeout(None).expect("set_write_timeout call failed");
+//            stream1.set_read_timeout(None).expect("set_read_timeout call failed");
+//            thread_pool.execute(move || {
+//                send_preprocessing_shares(add_triples1, vec![], equality_share1, &mut stream1);
+//            });
+//            thread_pool.join();
+//        }
     }
 
     pub fn run_ti_module(ctx: &mut TI) {
@@ -907,7 +908,6 @@ pub mod ti {
             let mut share1_item = share1_map.get(&i).unwrap().clone();
             share1.push(share1_item);
         }
-
         (share0, share1)
     }
 
@@ -934,21 +934,23 @@ pub mod ti {
         let mut feature_selected_remain = ctx.feature_selected;
         let mut feature_bit_vec = vec![0u8; ctx.feature_cnt as usize];
         let mut rng = rand::thread_rng();
-        let mut vec_to_record = Vec::new();
-        while feature_selected_remain != 0 {
-            let index: usize = rng.gen_range(0, ctx.feature_cnt as usize);
-            if feature_bit_vec[index] == 0 {
-                vec_to_record.push(format!("{}", index));
-                feature_bit_vec[index] = 1;
-                feature_selected_remain -= 1;
-            }
+//        let mut vec_to_record = Vec::new();
+//        while feature_selected_remain != 0 {
+//            let index: usize = rng.gen_range(0, ctx.feature_cnt as usize);
+//            if feature_bit_vec[index] == 0 {
+//                vec_to_record.push(format!("{}", index));
+//                feature_bit_vec[index] = 1;
+//                feature_selected_remain -= 1;
+//            }
+//        }
+//
+//        vec_to_record.sort();
+//        let mut file = ctx.fs_selection_file.try_clone().unwrap();
+//        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
+
+        for item in [11, 13, 17, 23, 6].to_vec() {
+            feature_bit_vec[item] = 1;
         }
-
-        //hard-coded
-
-        vec_to_record.sort();
-        let mut file = ctx.fs_selection_file.try_clone().unwrap();
-        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
         let mut share0 = Vec::new();
         let mut share1 = Vec::new();
 
@@ -962,7 +964,7 @@ pub mod ti {
                     for k in 0..ctx.feature_cnt * ctx.attr_value_cnt {
                         let current_item = if k == (i as u64 * ctx.attr_value_cnt + j) { 1 } else { 0 };
                         let share0_item: u64 = rng.gen_range(0, 2);
-                        let share1_item: u64 = (Wrapping(current_item as u64) - Wrapping(share0_item)).0.mod_floor(&(BINARY_PRIME as u64));
+                        let share1_item: u64 = mod_subtraction(Wrapping(current_item as u64), Wrapping(share0_item), BINARY_PRIME as u64).0;
                         row0.push(Wrapping(share0_item));
                         row1.push(Wrapping(share1_item));
                     }
@@ -980,20 +982,24 @@ pub mod ti {
         let mut instance_selected_remain = ctx.instance_selected;
         let mut instance_selected_vec = vec![0u32; ctx.instance_cnt as usize];
         let mut rng = rand::thread_rng();
-        let mut vec_to_record = Vec::new();
-        while instance_selected_remain != 0 {
-            let index: usize = rng.gen_range(0, ctx.instance_cnt as usize);
-            instance_selected_vec[index] += 1;
-            vec_to_record.push(format!("{}", index));
-            instance_selected_remain -= 1;
+//        let mut vec_to_record = Vec::new();
+//        while instance_selected_remain != 0 {
+//            let index: usize = rng.gen_range(0, ctx.instance_cnt as usize);
+//            instance_selected_vec[index] += 1;
+//            vec_to_record.push(format!("{}", index));
+//            instance_selected_remain -= 1;
+//        }
+//
+//        vec_to_record.sort();
+//        let mut file = ctx.sampling_file.try_clone().unwrap();
+//        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
+
+        for item in [112, 124, 137, 150, 213, 217, 225, 240, 266, 28, 348, 363, 371, 398, 4, 404, 415, 444, 55, 64, 89].to_vec() {
+            instance_selected_vec[item] = 1;
         }
-        //temp
-        vec_to_record.sort();
-        let mut file = ctx.sampling_file.try_clone().unwrap();
-        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
         let mut share0 = vec![vec![Wrapping(0u64); ctx.instance_selected as usize]; ctx.instance_cnt as usize];
         let mut share1 = vec![vec![Wrapping(0u64); ctx.instance_selected as usize]; ctx.instance_cnt as usize];
-
+        let mut share = vec![vec![Wrapping(0u64); ctx.instance_selected as usize]; ctx.instance_cnt as usize];
         let mut count = 0;
         for i in 0..instance_selected_vec.len() {
             let item = instance_selected_vec[i];
@@ -1001,14 +1007,14 @@ pub mod ti {
                 for j in 0..ctx.instance_cnt {
                     let current_item = if j as usize == i { 1 } else { 0 };
                     let share0_item: u8 = rng.gen_range(0, BINARY_PRIME as u8);
-                    let share1_item: u8 = (Wrapping(current_item as u8) - Wrapping(share0_item)).0.mod_floor(&(BINARY_PRIME as u8));
+                    let share1_item: u8 = mod_subtraction_u8(current_item, share0_item, BINARY_PRIME as u8);
                     share0[j as usize][count] = Wrapping(share0_item as u64);
                     share1[j as usize][count] = Wrapping(share1_item as u64);
+                    share[j as usize][count] = Wrapping(current_item as u64);
                 }
                 count += 1;
             }
         }
-
         (share0, share1)
     }
 
@@ -1032,7 +1038,7 @@ pub mod ti {
                 let u_item = rng.gen_range(0, prime);
                 //hard_coded for two parties
                 let u_item0 = rng.gen_range(0, prime);
-                let u_item1 = (Wrapping(u_item) - Wrapping(u_item0)).0.mod_floor(&prime);
+                let u_item1 = mod_subtraction(Wrapping(u_item), Wrapping(u_item0), prime).0;
                 share0_row.push(Wrapping(u_item0));
                 share1_row.push(Wrapping(u_item1));
                 row.push(Wrapping(u_item));
@@ -1050,7 +1056,7 @@ pub mod ti {
                 let v_item = rng.gen_range(0, prime);
                 //hard_coded for two parties
                 let v_item0 = rng.gen_range(0, prime);
-                let v_item1 = (Wrapping(v_item) - Wrapping(v_item0)).0.mod_floor(&prime);
+                let v_item1 = mod_subtraction(Wrapping(v_item), Wrapping(v_item0), prime).0;
                 share0_row.push(Wrapping(v_item0));
                 share1_row.push(Wrapping(v_item1));
                 row.push(Wrapping(v_item));
@@ -1074,7 +1080,7 @@ pub mod ti {
                 w_item = Wrapping(w_item.0.mod_floor(&prime));
                 //hard_coded for two parties
                 let w_item0 = rng.gen_range(0, prime);
-                let w_item1 = (w_item - Wrapping(w_item0)).0.mod_floor(&prime);
+                let w_item1 = mod_subtraction(w_item, Wrapping(w_item0), prime).0;
                 share0_row.push(Wrapping(w_item0));
                 share1_row.push(Wrapping(w_item1));
                 row.push(w_item);
@@ -1208,9 +1214,9 @@ pub mod ti {
         let u0: u64 = rng.gen_range(0, prime);
         let v0: u64 = rng.gen_range(0, prime);
         let w0: u64 = rng.gen_range(0, prime);
-        let u1 = mod_floor((Wrapping(u) - Wrapping(u0)).0, prime);
-        let v1 = mod_floor((Wrapping(v) - Wrapping(v0)).0, prime);
-        let w1 = mod_floor((Wrapping(w) - Wrapping(w0)).0, prime);
+        let u1 = mod_subtraction(Wrapping(u), Wrapping(u0), prime).0;
+        let v1 = mod_subtraction(Wrapping(v), Wrapping(v0), prime).0;
+        let w1 = mod_subtraction(Wrapping(w), Wrapping(w0), prime).0;
 
         ((u0, v0, w0), (u1, v1, w1))
     }
@@ -1235,12 +1241,12 @@ pub mod ti {
     }
 
     fn new_equality_int_shares(rng: &mut rand::ThreadRng, prime: u64) -> (Wrapping<u64>, Wrapping<u64>) {
-        let mut r = rng.gen_range(1, prime);
+        let mut r = rng.gen_range(0, prime - 1) + 1;
         let mut rsum = 0;
         //hard-coded for two parties
         let r0 = rng.gen_range(0, prime);
         rsum = rsum + r0;
-        let r1 = (Wrapping(r) - Wrapping(rsum)).0.mod_floor(&prime);
+        let r1 = mod_subtraction(Wrapping(r), Wrapping(rsum), prime).0;
         (Wrapping(r0), Wrapping(r1))
     }
 
@@ -1268,9 +1274,9 @@ pub mod ti {
         vsum += v0;
         wsum += w0;
 
-        let u1 = mod_floor((Wrapping(u) - Wrapping(usum)).0, BINARY_PRIME as u8);
-        let v1 = mod_floor((Wrapping(v) - Wrapping(vsum)).0, BINARY_PRIME as u8);
-        let w1 = mod_floor((Wrapping(w) - Wrapping(wsum)).0, BINARY_PRIME as u8);
+        let u1 = mod_subtraction_u8(u, usum, BINARY_PRIME as u8);
+        let v1 = mod_subtraction_u8(v, vsum, BINARY_PRIME as u8);
+        let w1 = mod_subtraction_u8(w, wsum, BINARY_PRIME as u8);
 
         ((u0, v0, w0), (u1, v1, w1))
     }
