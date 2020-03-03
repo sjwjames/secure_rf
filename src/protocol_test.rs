@@ -7,10 +7,10 @@ pub mod protocol_test {
     use num::integer::*;
     use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
     use std::cmp::max;
-    use crate::protocol::protocol::{equality_big_integer, arg_max, batch_equality_integer};
+    use crate::protocol::protocol::{equality_big_integer, arg_max, batch_equality_integer, equality_integer_over_field, batch_equality, convert_integer_to_bits};
     use crate::comparison::comparison::{compare_bigint, comparison, compute_e_shares, compute_d_shares, compute_multi_e_parallel, compute_c_shares};
     use std::ops::BitAnd;
-    use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint, batch_bit_decomposition};
+    use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint, batch_bit_decomposition, bit_decomposition_opt, batch_log_decomp};
     use crate::dot_product::dot_product::{dot_product_bigint, dot_product_integer};
     use crate::or_xor::or_xor::{or_xor, or_xor_bigint};
     use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
@@ -81,7 +81,7 @@ pub mod protocol_test {
         let mut time = 0;
         for i in 0..5 {
             let mut now = SystemTime::now();
-            let result = batch_multiplication_integer(&x_vec, &y_vec, ctx,ctx.dt_training.dataset_size_prime);
+            let result = batch_multiplication_integer(&x_vec, &y_vec, ctx, ctx.dt_training.dataset_size_prime);
             time += now.elapsed().unwrap().as_millis();
 //            let result_revealed = reveal_int_vec_result(&result, ctx);
 //            assert!(result_pub.iter().zip(result_revealed.iter()).all(|(a, b)| a.0 == *b), "Arrays are not equal");
@@ -230,7 +230,7 @@ pub mod protocol_test {
 
     pub fn test_comparison(ctx: &mut ComputingParty) {
         let mut result = 0;
-        for i in 0..20{
+        for i in 0..20 {
             if ctx.party_id == 0 {
                 let x: Vec<u8> = vec![0, 0, 0, 0];
                 let y: Vec<u8> = vec![0, 0, 0, 0];
@@ -266,8 +266,8 @@ pub mod protocol_test {
 //            assert_eq!(c_share_revealed, [0, 0, 0, 0]);
                 result = comparison(&x, &y, ctx);
             }
-            let received = send_u8_messages(ctx,&[result].to_vec())[0];
-            println!("{}", received^result);
+            let received = send_u8_messages(ctx, &[result].to_vec())[0];
+            println!("{}", received ^ result);
         }
 
 //        let result_revealed = reveal_byte_result(result, ctx);
@@ -277,16 +277,28 @@ pub mod protocol_test {
     pub fn test_batch_bit_decomposition(ctx: &mut ComputingParty) {
         let length = 3;
         let mut result = Vec::new();
+        let size = (ctx.integer_precision + ctx.decimal_precision + 1) as usize;
+        let depth = (size as f64).log2().ceil() as usize;
         if ctx.party_id == 0 {
-            let x = vec![Wrapping(1 as u64), Wrapping(3 as u64), Wrapping(2 as u64), Wrapping(1 as u64)];
-            result = batch_bit_decomposition(&x,ctx, length);
-
+            let x = vec![Wrapping(1 as u64), Wrapping(4 as u64), Wrapping(2 as u64), Wrapping(1 as u64)];
+            result= bit_decomposition_opt(x[3]-x[2],ctx,size);
+//            result = batch_log_decomp(&x, size, depth, ctx);
         } else {
-            let x = vec![Wrapping(4 as u64), Wrapping(6 as u64), Wrapping(5 as u64), Wrapping(0 as u64)];
-            result = batch_bit_decomposition(&x,ctx, length);
+            let x = vec![Wrapping(4 as u64), Wrapping(5 as u64), Wrapping(5 as u64), Wrapping(0 as u64)];
+            result= bit_decomposition_opt(x[3],ctx,size);
+//            result = batch_log_decomp(&x, size, depth, ctx);
         }
         println!("{:?}",result);
+//        for item in result {
+//            let bits = convert_integer_to_bits(item, size);
+//            let result_shared = send_u8_messages(ctx, &bits);
+//            for i in 0..size {
+//                print!("{}", bits[i] ^ result_shared[i]);
+//            }
+//            println!("");
+//        }
     }
+
     pub fn test_batch_comparison() {}
 
     pub fn test_comparison_bigint(ctx: &mut ComputingParty) {
@@ -310,12 +322,14 @@ pub mod protocol_test {
         if ctx.party_id == 0 {
             let input = 4;
             let bit_decomposed = bit_decomposition(input, ctx, bit_length);
+//            let bit_decomposed = batch_log_decomp(input, ctx, bit_length);
 //            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
 //            println!("{:?}", bit_decomposed_revealed);
             println!("{:?}", bit_decomposed);
         } else {
-            let input = 5;
+            let input = 3;
             let bit_decomposed = bit_decomposition(input, ctx, bit_length);
+//            let bit_decomposed = batch_log_decomp(input, ctx, bit_length);
 //            let bit_decomposed_revealed = reveal_byte_vec_result(&bit_decomposed, ctx);
 //            println!("{:?}", bit_decomposed_revealed);
             println!("{:?}", bit_decomposed);
@@ -466,7 +480,7 @@ pub mod protocol_test {
     }
 
     pub fn test_batch_integer_equality(ctx: &mut ComputingParty) {
-        let mut result = Vec::new();
+//        let mut result = Vec::new();
         let prime = ctx.dt_training.prime;
 //        let shares_received = send_u64_messages(ctx,ctx.dt_shares.equality_integer_shares.get(&prime).unwrap());
 //        let mut shares = Vec::new();
@@ -474,25 +488,33 @@ pub mod protocol_test {
 //            shares.push((ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[i].0+shares_received[i].0).mod_floor(&prime));
 //        }
 //        println!("{:?}",shares);
-        for i in 0..2{
-            if ctx.party_id == 0 {
-                let x = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
-                let y = vec![Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(1 as u64)];
-                result = batch_equality_integer(&x, &y, ctx, prime);
+        let mut temp = Vec::new();
+        if ctx.party_id == 0 {
+            let x = vec![Wrapping(4 as u64), Wrapping(4 as u64), Wrapping(3 as u64), Wrapping(0 as u64)];
+            let y = vec![Wrapping(1 as u64), Wrapping(3 as u64), Wrapping(2 as u64), Wrapping(1 as u64)];
+//            for i in 0..x.len() {
+//                let temp = equality_integer_over_field(x[i].0, y[i].0, ctx, 3, 7);
+//                println!("temp:{}", temp);
+//            }
+            temp = batch_equality(&x, &y, ctx);
+//                result = batch_equality_integer(&x, &y, ctx, prime);
 //            let result_revealed = reveal_int_result(&result, ctx);
 //            println!("{:?}", result_revealed);
-            } else {
-                let x = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
-                let y = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
-                result = batch_equality_integer(&x, &y, ctx, prime);
+        } else {
+            let x = vec![Wrapping(3 as u64), Wrapping(3 as u64), Wrapping(1 as u64), Wrapping(0 as u64)];
+            let y = vec![Wrapping(0 as u64), Wrapping(4 as u64), Wrapping(2 as u64), Wrapping(0 as u64)];
+//
+//            for i in 0..x.len() {
+//                let temp = equality_integer_over_field(x[i].0, y[i].0, ctx, 3, 7);
+//                println!("temp:{}", temp);
+//            }
+            temp = batch_equality(&x, &y, ctx);
+//                result = batch_equality_integer(&x, &y, ctx, prime);
 //            let result_revealed = reveal_int_result(&result, ctx);
 //            println!("{:?}", result_revealed);
-            }
-            let received = send_u64_messages(ctx,&result);
-            for i in 0..received.len(){
-                println!("{}", (received[i].0^result[i].0).mod_floor(&prime));
-            }
         }
-
+        let result = send_u64_messages(ctx, &temp);
+        let result_shared:Vec<u64> = result.iter().zip(temp.iter()).map(|(a, b)| (a.0 ^ b.0)).collect();
+        println!("{:?}", result_shared);
     }
 }

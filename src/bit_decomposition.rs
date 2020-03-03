@@ -11,16 +11,17 @@ pub mod bit_decomposition {
     use std::cmp::min;
     use std::num::Wrapping;
     use std::ops::Div;
+    use crate::protocol::protocol::{batch_bitwise_and, convert_integer_to_bits};
 
-    pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty,bit_length:usize) -> Vec<u8> {
+    pub fn bit_decomposition(input: u64, ctx: &mut ComputingParty, bit_length: usize) -> Vec<u8> {
         ctx.thread_hierarchy.push("bit_decomposition".to_string());
         let mut input_shares = Vec::new();
 
         let binary_str = format!("{:b}", input);
-        let reversed_binary_vec:Vec<char> = binary_str.chars().rev().collect();
+        let reversed_binary_vec: Vec<char> = binary_str.chars().rev().collect();
         let mut temp: Vec<u8> = Vec::new();
         for item in reversed_binary_vec {
-            let item_parsed:u8 = format!("{}",item).parse().unwrap();
+            let item_parsed: u8 = format!("{}", item).parse().unwrap();
             temp.push(item_parsed);
         }
         let mut temp0 = vec![0u8; bit_length];
@@ -41,21 +42,21 @@ pub mod bit_decomposition {
         }
 
 
-        let x_shares = generate_bit_decomposition(bit_length,&input_shares,ctx);
+        let x_shares = generate_bit_decomposition(bit_length, &input_shares, ctx);
 
         // pop bit_decomposition
         ctx.thread_hierarchy.pop();
         x_shares
     }
 
-    pub fn batch_bit_decomposition(input_vec:&Vec<Wrapping<u64>>,ctx: &mut ComputingParty,bit_length:usize)->Vec<Vec<u8>>{
+    pub fn batch_bit_decomposition(input_vec: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty, bit_length: usize) -> Vec<Vec<u8>> {
         let mut input_share_list = Vec::new();
-        for input in input_vec{
+        for input in input_vec {
             let binary_str = format!("{:b}", input.0);
-            let reversed_binary_vec:Vec<char> = binary_str.chars().rev().collect();
+            let reversed_binary_vec: Vec<char> = binary_str.chars().rev().collect();
             let mut temp = Vec::new();
             for item in reversed_binary_vec {
-                let item_parsed:u8 = format!("{}",item).parse().unwrap();
+                let item_parsed: u8 = format!("{}", item).parse().unwrap();
                 temp.push(item_parsed);
             }
             let mut temp0 = vec![0u8; bit_length];
@@ -76,7 +77,7 @@ pub mod bit_decomposition {
             input_share_list.push(input_shares)
         }
 
-        let x_shares = generate_bit_decomposition_batch(bit_length,&mut input_share_list,ctx);
+        let x_shares = generate_bit_decomposition_batch(bit_length, &mut input_share_list, ctx);
 
         x_shares
     }
@@ -96,40 +97,40 @@ pub mod bit_decomposition {
         }
         let mut temp0 = vec![0u8; bit_length as usize];
         let diff = (abs((bit_length - temp.len()) as isize)) as usize;
-        for i in 0..diff{
+        for i in 0..diff {
             temp.push(0);
         }
 
         //todo add partyCount to ctx
-        for i in 0..2{
-            if i==ctx.party_id {
+        for i in 0..2 {
+            if i == ctx.party_id {
                 input_shares.push(temp.clone());
-            }else{
+            } else {
                 input_shares.push(temp0.clone());
             }
         }
 
-        let x_shares = generate_bit_decomposition(bit_length,&input_shares,ctx);
+        let x_shares = generate_bit_decomposition(bit_length, &input_shares, ctx);
         // pop bit_decomposition
         ctx.thread_hierarchy.pop();
         x_shares
     }
 
-    fn generate_bit_decomposition_batch(bit_length:usize,input_shares:&mut Vec<Vec<Vec<u8>>>,ctx:&mut ComputingParty)->Vec<Vec<u8>>{
+    fn generate_bit_decomposition_batch(bit_length: usize, input_shares: &mut Vec<Vec<Vec<u8>>>, ctx: &mut ComputingParty) -> Vec<Vec<u8>> {
         let list_len = input_shares.len();
-        let mut e_shares = vec![vec![0u8;bit_length as usize];list_len];
-        let mut d_shares = vec![vec![0u8;bit_length as usize];list_len];
-        let mut c_shares = vec![vec![0u8;bit_length as usize];list_len];
-        let mut x_shares = vec![vec![0u8;bit_length as usize];list_len];
-        let mut y_shares = vec![vec![0u8;bit_length as usize];list_len];
+        let mut e_shares = vec![vec![0u8; bit_length as usize]; list_len];
+        let mut d_shares = vec![vec![0u8; bit_length as usize]; list_len];
+        let mut c_shares = vec![vec![0u8; bit_length as usize]; list_len];
+        let mut x_shares = vec![vec![0u8; bit_length as usize]; list_len];
+        let mut y_shares = vec![vec![0u8; bit_length as usize]; list_len];
 
         let mut first_c_multiple = Vec::new();
         let mut first_c_multiplicand = Vec::new();
         let mut input_share0 = Vec::new();
         let mut input_share1 = Vec::new();
-        for j in 0..list_len{
-            for i in 0..bit_length{
-                let y = input_shares[j][0][i]+input_shares[j][1][i];
+        for j in 0..list_len {
+            for i in 0..bit_length {
+                let y = input_shares[j][0][i] + input_shares[j][1][i];
                 y_shares[j][i] = mod_floor(y, BINARY_PRIME as u8);
             }
             input_share0.append(&mut input_shares[j][0]);
@@ -141,18 +142,18 @@ pub mod bit_decomposition {
         }
         //Initialize c[1]
         let first_c_shares = batch_multiplication_byte(&first_c_multiple, &first_c_multiplicand, ctx);
-        for i in 0..first_c_shares.len(){
+        for i in 0..first_c_shares.len() {
             c_shares[i][0] = mod_floor(first_c_shares[i], BINARY_PRIME as u8);
         }
         let mut batch_mul_result = batch_multiplication_byte(&input_share0, &input_share1, ctx);
-        for j in 0..list_len{
-            for i in 1..bit_length{
-                d_shares[j][i]=mod_floor(batch_mul_result[j*bit_length+i] + ctx.asymmetric_bit,BINARY_PRIME as u8);
+        for j in 0..list_len {
+            for i in 1..bit_length {
+                d_shares[j][i] = mod_floor(batch_mul_result[j * bit_length + i] + ctx.asymmetric_bit, BINARY_PRIME as u8);
             }
         }
-        let mut e_shares = vec![vec![0u8; bit_length];list_len];
-        for j in 0..list_len{
-            for i in 1..bit_length{
+        let mut e_shares = vec![vec![0u8; bit_length]; list_len];
+        for j in 0..list_len {
+            for i in 1..bit_length {
                 let e_result = (Wrapping(multiplication_byte(y_shares[j][i], c_shares[j][i - 1], ctx)) + Wrapping(ctx.asymmetric_bit)).0;
                 e_shares[j][i] = mod_floor(e_result, BINARY_PRIME as u8);
                 let x_result = (Wrapping(y_shares[j][i]) + Wrapping(c_shares[j][i - 1])).0;
@@ -165,16 +166,16 @@ pub mod bit_decomposition {
         x_shares
     }
 
-    fn generate_bit_decomposition(bit_length:usize,input_shares:&Vec<Vec<u8>>,ctx:&mut ComputingParty)->Vec<u8>{
-        let mut e_shares = vec![0u8;bit_length as usize];
-        let mut d_shares = vec![0u8;bit_length as usize];
-        let mut c_shares = vec![0u8;bit_length as usize];
-        let mut x_shares = vec![0u8;bit_length as usize];
-        let mut y_shares = vec![0u8;bit_length as usize];
+    fn generate_bit_decomposition(bit_length: usize, input_shares: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
+        let mut e_shares = vec![0u8; bit_length as usize];
+        let mut d_shares = vec![0u8; bit_length as usize];
+        let mut c_shares = vec![0u8; bit_length as usize];
+        let mut x_shares = vec![0u8; bit_length as usize];
+        let mut y_shares = vec![0u8; bit_length as usize];
 
         //initY
-        for i in 0..bit_length{
-            let y = input_shares[0][i]+input_shares[1][i];
+        for i in 0..bit_length {
+            let y = input_shares[0][i] + input_shares[1][i];
             y_shares[i] = mod_floor(y, BINARY_PRIME as u8);
         }
         x_shares[0] = y_shares[0] as u8;
@@ -186,7 +187,7 @@ pub mod bit_decomposition {
         //computeDShares in Java Lynx
         let mut i = 1;
 
-        if ctx.raw_tcp_communication{
+        if ctx.raw_tcp_communication {
             let mut global_index = 0;
             while i < bit_length {
                 let to_index = min(i + ctx.batch_size, bit_length);
@@ -197,7 +198,7 @@ pub mod bit_decomposition {
                 }
                 i = to_index;
             }
-        }else{
+        } else {
             let mut output_map = Arc::new(Mutex::new(HashMap::new()));
             let mut batch_count = 0;
             let thread_pool = ThreadPool::new(ctx.thread_count);
@@ -245,5 +246,159 @@ pub mod bit_decomposition {
         // pop computeVariables
         ctx.thread_hierarchy.pop();
         x_shares
+    }
+
+    pub fn bit_decomposition_opt(input: Wrapping<u64>, ctx: &mut ComputingParty, bit_length: usize) -> Vec<u8> {
+        let mut input_shares = Vec::new();
+
+        let mut temp = convert_integer_to_bits(input.0, bit_length - 1);
+        let mut temp0 = vec![0u8; bit_length - 1];
+
+        // hard-coded for two-party
+
+        for i in 0..2 {
+            let mut temp = temp.clone();
+            let mut temp0 = temp0.clone();
+            if i == ctx.party_id {
+                input_shares.push(temp);
+            } else {
+                input_shares.push(temp0);
+            }
+        }
+
+        let mut g = batch_multiplication_byte(&input_shares[0], &input_shares[1], ctx);
+//        let mut g = vec![0u8;bit_length];
+
+        let mut result = vec![0u8; bit_length];
+        let mut c_list = Vec::new();
+        for k in 0..bit_length - 1 {
+            let mut c: u8 = 0;
+            for i in k..0 {
+                let mut temp_item = g[i];
+                for j in k..i {
+                    temp_item = multiplication_byte(temp_item, temp[j], ctx);
+                }
+                c = (c + temp_item).mod_floor(&(BINARY_PRIME as u8));
+            }
+            c_list.push(c);
+        }
+        result[0] = temp[0];
+        for i in 1..bit_length - 1 {
+            result[i] = (temp[i] + c_list[i - 1]).mod_floor(&(BINARY_PRIME as u8));
+        }
+        result[bit_length - 1] = temp[bit_length - 2];
+        result
+    }
+
+
+    pub fn batch_log_decomp(x_additive_list: &Vec<Wrapping<u64>>,
+                            size: usize,
+                            depth: usize,
+                            ctx: &mut ComputingParty) -> Vec<u64> {
+        let len = x_additive_list.len();
+
+        let dummy = vec![0u64; len];
+        let x_u64 = x_additive_list.iter().map(|x| x.0).collect();
+        let x_and = if ctx.asymmetric_bit == 0 {
+            batch_bitwise_and(&x_u64, &dummy, ctx, false)
+        } else {
+            batch_bitwise_and(&dummy, &x_u64, ctx, false)
+        };
+
+        let mut propogate = Vec::new();
+        let mut generate = Vec::new();
+
+        for (x, x_and) in x_u64.iter().zip(x_and.iter()) {
+            propogate.push(vec![*x]);
+            generate.push(vec![*x_and]);
+        }
+
+        let decomp_26_circuit: [Vec<[(usize, usize); 2]>; 5] =
+
+            [
+                vec![[(0, 0), (0, 1)], [(0, 2), (0, 3)], [(0, 4), (0, 5)], [(0, 6), (0, 7)], [(0, 8), (0, 9)], [(0, 10), (0, 11)], [(0, 12), (0, 13)], [(0, 14), (0, 15)], [(0, 16), (0, 17)], [(0, 18), (0, 19)], [(0, 20), (0, 21)], [(0, 22), (0, 23)], [(0, 24), (0, 25)]],
+                vec![[(1, 0), (0, 2)], [(1, 0), (1, 1)], [(1, 2), (0, 6)], [(1, 2), (1, 3)], [(1, 4), (0, 10)], [(1, 4), (1, 5)], [(1, 6), (0, 14)], [(1, 6), (1, 7)], [(1, 8), (0, 18)], [(1, 8), (1, 9)], [(1, 10), (0, 22)], [(1, 10), (1, 11)]],
+                vec![[(2, 1), (0, 4)], [(2, 1), (1, 2)], [(2, 1), (2, 2)], [(2, 1), (2, 3)], [(2, 5), (0, 12)], [(2, 5), (1, 6)], [(2, 5), (2, 6)], [(2, 5), (2, 7)], [(2, 9), (0, 20)], [(2, 9), (1, 10)], [(2, 9), (2, 10)], [(2, 9), (2, 11)]],
+                vec![[(3, 3), (0, 8)], [(3, 3), (1, 4)], [(3, 3), (2, 4)], [(3, 3), (2, 5)], [(3, 3), (3, 4)], [(3, 3), (3, 5)], [(3, 3), (3, 6)], [(3, 3), (3, 7)], [(3, 11), (0, 24)], [(3, 11), (1, 12)]],
+                vec![[(4, 7), (0, 16)], [(4, 7), (1, 8)], [(4, 7), (2, 8)], [(4, 7), (2, 9)], [(4, 7), (3, 8)], [(4, 7), (3, 9)], [(4, 7), (3, 10)], [(4, 7), (3, 11)], [(4, 7), (4, 8)], [(4, 7), (4, 9)]],
+            ];
+
+        for i in 0..depth {
+            let mut prop_layer = vec![0u64; len];
+            let mut gen_layer = vec![0u64; len];
+
+            let mut ops: Vec<(u64, u64, u64, u64)> = Vec::new();
+
+            for j in 0..len {
+                let mut p = 0u64;
+                let mut g = 0u64;
+                let mut p_next = 0u64;
+                let mut g_next = 0u64;
+
+
+                for (k, index_pair) in decomp_26_circuit[i].iter().enumerate() {
+                    let rop_row = index_pair[0].0;
+                    let rop_col = index_pair[0].1;
+                    let lop_row = index_pair[1].0;
+                    let lop_col = index_pair[1].1;
+
+                    p |= ((propogate[j][rop_row] >> rop_col as u64) & 1u64) << k as u64;
+                    g |= ((generate[j][rop_row] >> rop_col as u64) & 1u64) << k as u64;
+                    p_next |= ((propogate[j][lop_row] >> lop_col as u64) & 1u64) << k as u64;
+                    g_next |= ((generate[j][lop_row] >> lop_col as u64) & 1u64) << k as u64;
+                }
+
+                ops.push((p, g, p_next, g_next));
+            }
+
+            let mut l_op = vec![0u64; 2 * len];
+            let mut r_op = vec![0u64; 2 * len];
+            let mut g_next = vec![0u64; len];
+
+
+            // let ops: Vec<(u64, u64, u64, u64)> =
+            // 	handles.into_iter().map(|x| x.join().unwrap()).collect();
+
+            for i in (0..len).step_by(2) {
+                l_op[i] = ops[i].2;
+                l_op[i + 1] = ops[i].2;
+                r_op[i] = ops[i].0;
+                r_op[i + 1] = ops[i].1;
+
+                g_next[i / 2] = ops[i].3;
+            }
+
+            let layers = batch_bitwise_and(&l_op, &r_op, ctx, false);
+
+            let mut p_layer = vec![0u64; len];
+            let mut g_layer = vec![0u64; len];
+
+            p_layer.clone_from_slice(&layers[..len]);
+            g_layer.clone_from_slice(&layers[len..]);
+
+            g_layer = g_layer.iter().zip(g_next.iter()).map(|(&x, &y)| x ^ y).collect();
+
+            for i in 0..len {
+                propogate[i].push(p_layer[i]);
+                generate[i].push(g_layer[i]);
+            }
+        }
+
+        let mut carry: Vec<u64> = Vec::new();
+
+        for instance in 0..len {
+            carry.push(generate[instance][0] & 1);
+
+            for i in 1..depth + 1 {
+                let mask = (1 << i) - 1;
+
+                carry[instance] |= (generate[instance][i] & mask as u64) << (i - 1) as u64;
+            }
+
+            carry[instance] <<= 1;
+        }
+
+
+        x_u64.iter().zip(carry.iter()).map(|(&p, &c)| p ^ c).collect()
     }
 }

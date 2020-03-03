@@ -30,7 +30,7 @@ remote_mq_port = 5673
 #[LOGISTIC REGRESSION]
 
 decimal_precision = 10
-integer_precision = 15 
+integer_precision = 15
 learning_rate = 0.001
 
 #[RANDOM FOREST]

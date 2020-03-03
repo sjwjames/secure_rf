@@ -4,7 +4,7 @@ pub mod protocol {
     **/
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
-    use crate::constants::constants::{BATCH_SIZE, U8S_PER_TX, BUF_SIZE, U64S_PER_TX, BINARY_PRIME, LOCAL_ADDITION, LOCAL_SUBTRACTION};
+    use crate::constants::constants::{BATCH_SIZE, U8S_PER_TX, BUF_SIZE, U64S_PER_TX, BINARY_PRIME, LOCAL_ADDITION, LOCAL_SUBTRACTION, CR_BIN_1, CR_BIN_0};
     use std::io::{Read, Write, BufReader, BufRead};
     use threadpool::ThreadPool;
     use std::collections::HashMap;
@@ -19,6 +19,8 @@ pub mod protocol {
     use std::ops::{Add, Mul};
     use crate::multiplication::multiplication::{batch_multiplication_byte, parallel_multiplication, multi_thread_batch_mul_byte};
     use crate::comparison::comparison::comparison;
+    use crate::or_xor::or_xor::or_xor;
+    use crate::bit_decomposition::bit_decomposition::{batch_log_decomp, bit_decomposition_opt};
 
     pub fn arg_max(bit_shares: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
         println!("arg_max starts");
@@ -131,7 +133,7 @@ pub mod protocol {
 
         let mut diff_list_received = Vec::new();
         if ctx.raw_tcp_communication {
-            diff_list_received = send_biguint_messages(ctx,&diff_list);
+            diff_list_received = send_biguint_messages(ctx, &diff_list);
         } else {
             let mut diff_list_message = String::new();
             let message_id = ctx.thread_hierarchy.join(":");
@@ -158,7 +160,7 @@ pub mod protocol {
             for j in 0..x[0].len() {
                 match operation {
                     LOCAL_ADDITION => row.push(Wrapping((x[i][j] + y[i][j]).0.mod_floor(&prime))),
-                    LOCAL_SUBTRACTION => row.push(mod_subtraction(x[i][j],y[i][j],prime)),
+                    LOCAL_SUBTRACTION => row.push(mod_subtraction(x[i][j], y[i][j], prime)),
                     _ => {}
                 }
             }
@@ -188,7 +190,6 @@ pub mod protocol {
     }
 
 
-
     pub fn matrix_multiplication_integer(x: &Vec<Vec<Wrapping<u64>>>, y: &Vec<Vec<Wrapping<u64>>>, ctx: &ComputingParty, prime: u64, matrix_mul_shares: &(Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>, Vec<Vec<Wrapping<u64>>>)) -> Vec<Vec<Wrapping<u64>>> {
         let mut d_matrix = Vec::new();
         let mut e_matrix = Vec::new();
@@ -207,9 +208,9 @@ pub mod protocol {
 
         e_matrix = local_matrix_computation(y, &v_shares, prime, LOCAL_SUBTRACTION);
 
-        let mut d_matrix_received = send_receive_u64_matrix(&d_matrix,ctx);
+        let mut d_matrix_received = send_receive_u64_matrix(&d_matrix, ctx);
 
-        let mut e_matrix_received = send_receive_u64_matrix(&e_matrix,ctx);
+        let mut e_matrix_received = send_receive_u64_matrix(&e_matrix, ctx);
 
         let mut d = local_matrix_computation(&d_matrix, &d_matrix_received, prime, LOCAL_ADDITION);
         let mut e = local_matrix_computation(&e_matrix, &e_matrix_received, prime, LOCAL_ADDITION);
@@ -239,17 +240,17 @@ pub mod protocol {
         let equality_shares = get_current_equality_integer_shares(ctx, range, prime);
         let mut list_sent = Vec::new();
         for i in 0..range {
-            let diff = mod_subtraction(x[i],y[i],prime);
+            let diff = mod_subtraction(x[i], y[i], prime);
             xy_diff.push(diff);
-            let item0 = mod_subtraction(diff,additive_shares[i].0,prime);
-            let item1 = mod_subtraction(equality_shares[i],additive_shares[i].1,prime);
+            let item0 = mod_subtraction(diff, additive_shares[i].0, prime);
+            let item1 = mod_subtraction(equality_shares[i], additive_shares[i].1, prime);
             diff_list[i][0] = item0;
             diff_list[i][1] = item1;
             list_sent.push(item0);
             list_sent.push(item1);
         }
 
-        let received_list= send_u64_messages(ctx,&list_sent);
+        let received_list = send_u64_messages(ctx, &list_sent);
 //
 //        let mut o_stream = ctx.o_stream.try_clone()
 //            .expect("failed cloning tcp o_stream");
@@ -268,12 +269,247 @@ pub mod protocol {
 //        }
 
         for i in 0..range {
-            let d = Wrapping((diff_list[i][0] + received_list[i*2]).0.mod_floor(&prime));
-            let e = Wrapping((diff_list[i][1] + received_list[i*2+1]).0.mod_floor(&prime));
+            let d = Wrapping((diff_list[i][0] + received_list[i * 2]).0.mod_floor(&prime));
+            let e = Wrapping((diff_list[i][1] + received_list[i * 2 + 1]).0.mod_floor(&prime));
             let product = (additive_shares[i].2 + d * additive_shares[i].1 + additive_shares[i].0 * e + d * e * Wrapping(ctx.asymmetric_bit as u64)).0.mod_floor(&prime);
             result.push(Wrapping(product));
         }
 
         result
+    }
+
+    pub fn convert_integer_to_bits(x: u64, bit_length: usize) -> Vec<u8> {
+        let mut result = Vec::new();
+        let binary_str = format!("{:b}", x);
+        let reversed_binary_vec: Vec<char> = binary_str.chars().rev().collect();
+        for item in &reversed_binary_vec {
+            let item_u8: u8 = format!("{}", item).parse().unwrap();
+            result.push(item_u8);
+        }
+        if bit_length > reversed_binary_vec.len() {
+            let mut temp = vec![0u8; bit_length - reversed_binary_vec.len()];
+            result.append(&mut temp);
+        } else {
+            result = result[0..bit_length].to_vec();
+        }
+        result
+    }
+
+
+    pub fn equality_integer_over_field(x: u64, y: u64, ctx: &mut ComputingParty, bit_length: usize) -> u8 {
+        let x_bits = convert_integer_to_bits(x, bit_length);
+        let y_bits = convert_integer_to_bits(y, bit_length);
+        let mut c = 0;
+        let mut c_list = Vec::new();
+        for i in 0..bit_length {
+            c_list.push(Wrapping((x_bits[i] + y_bits[i]).mod_floor(&(BINARY_PRIME as u8)) as u64));
+//            c_list.push((x_bits[i] + y_bits[i]).mod_floor(&(BINARY_PRIME as u8)));
+        }
+
+        let mut current_length = bit_length;
+        let mut temp_list = c_list.clone();
+        while current_length > 1 {
+            if current_length % 2 == 0 {
+                temp_list = or_xor(&temp_list[0..current_length / 2].to_vec(), &temp_list[current_length / 2..current_length].to_vec(), ctx, 1, 2);
+//                temp_list = batch_multiplication_byte(&temp_list[0..current_length / 2].to_vec(), &temp_list[current_length / 2..current_length].to_vec(), ctx);
+            } else {
+                let mut mid = temp_list[current_length / 2];
+                temp_list = or_xor(&temp_list[0..current_length / 2].to_vec(), &temp_list[current_length / 2 + 1..current_length].to_vec(), ctx, 1, 2);
+//                temp_list = batch_multiplication_byte(&temp_list[0..current_length / 2].to_vec(), &temp_list[current_length / 2 + 1..current_length].to_vec(), ctx);
+
+                temp_list.push(mid);
+            }
+            current_length = temp_list.len();
+        }
+
+        (temp_list[0].0 as u8 + ctx.asymmetric_bit).mod_floor(&(BINARY_PRIME as u8))
+//        for i in 0..c_list.len() {
+//            c =
+//        }
+//        (c + ctx.asymmetric_bit).mod_floor(&(BINARY_PRIME as u8))
+    }
+
+
+    pub fn batch_bitwise_and(x_list: &Vec<u64>,
+                             y_list: &Vec<u64>,
+                             ctx: &mut ComputingParty,
+                             invert_output: bool) -> Vec<u64> {
+        let len = (*x_list).len();
+        let mut z_list: Vec<u64> = vec![0u64; len];
+
+        let mut remainder = len;
+        let mut index = 0;
+        while remainder > BATCH_SIZE {
+            let mut x_sublist = [0u64; BATCH_SIZE];
+            let mut y_sublist = [0u64; BATCH_SIZE];
+
+            x_sublist.clone_from_slice(&(x_list[BATCH_SIZE * index..BATCH_SIZE * (index + 1)]));
+            y_sublist.clone_from_slice(&(y_list[BATCH_SIZE * index..BATCH_SIZE * (index + 1)]));
+
+            let z_sublist = batch_bitwise_and_submodule(x_sublist, y_sublist, BATCH_SIZE, ctx);
+
+            z_list[BATCH_SIZE * index..BATCH_SIZE * (index + 1)].clone_from_slice(&z_sublist);
+
+            remainder -= BATCH_SIZE;
+            index += 1;
+        }
+
+        let mut x_sublist = [0u64; BATCH_SIZE];
+        let mut y_sublist = [0u64; BATCH_SIZE];
+
+        x_sublist[0..remainder].clone_from_slice(&(x_list[BATCH_SIZE * index..]));
+        y_sublist[0..remainder].clone_from_slice(&(y_list[BATCH_SIZE * index..]));
+
+        let z_sublist = batch_bitwise_and_submodule(x_sublist, y_sublist, remainder, ctx);
+
+        z_list[BATCH_SIZE * index..].clone_from_slice(&(z_sublist[..remainder]));
+
+        if invert_output {
+            let inversion_mask = (-Wrapping((*ctx).asymmetric_bit as u64)).0;
+            for i in 0..len {
+                z_list[i] ^= inversion_mask;
+            }
+        }
+
+        z_list
+    }
+
+    pub fn batch_bitwise_and_submodule(x_list: [u64; BATCH_SIZE],
+                                       y_list: [u64; BATCH_SIZE],
+                                       tx_len: usize,
+                                       ctx: &mut ComputingParty) -> [u64; BATCH_SIZE] {
+        let asymmetric_bit = ctx.asymmetric_bit as u64;
+        let inversion_mask: u64 = (-Wrapping(asymmetric_bit)).0;
+
+        let mut in_stream = ctx.in_stream.try_clone()
+            .expect("failed cloning tcp in_stream");
+
+        let mut o_stream = ctx.o_stream.try_clone()
+            .expect("failed cloning tcp o_stream");
+
+        let mut u_list = [0u64; BATCH_SIZE];
+        let mut v_list = [0u64; BATCH_SIZE];
+        let mut w_list = [0u64; BATCH_SIZE];
+        let mut d_list = [0u64; BATCH_SIZE];
+        let mut e_list = [0u64; BATCH_SIZE];
+        let mut z_list = [0u64; BATCH_SIZE];
+
+        {
+            for i in 0..tx_len {
+
+                //let (u, v, w) = corr_rand_xor.pop().unwrap();
+                let (u, v, w) = if asymmetric_bit == 1 { CR_BIN_1 } else { CR_BIN_0 };
+
+                u_list[i] = u;
+                v_list[i] = v;
+                w_list[i] = w;
+
+                d_list[i] = x_list[i] ^ u;
+                e_list[i] = y_list[i] ^ v;
+            }
+        }
+
+        let mut tx_buf = Xbuffer { u8_buf: [0u8; BUF_SIZE] };
+        let mut rx_buf = Xbuffer { u8_buf: [0u8; BUF_SIZE] };
+
+        for i in (0..2 * tx_len).step_by(2) {
+            let d = d_list[i / 2];
+            let e = e_list[i / 2];
+
+            unsafe {
+                tx_buf.u64_buf[i] = d;
+                tx_buf.u64_buf[i + 1] = e;
+            }
+        }
+
+        if ctx.asymmetric_bit == 1 {
+            let mut bytes_written = 0;
+            while bytes_written < BUF_SIZE {
+                let current_bytes = unsafe {
+                    o_stream.write(&tx_buf.u8_buf[bytes_written..]).unwrap()
+                };
+                bytes_written += current_bytes;
+            }
+
+            let mut bytes_read = 0;
+            while bytes_read < BUF_SIZE {
+                let current_bytes = unsafe {
+                    match in_stream.read(&mut rx_buf.u8_buf[bytes_read..]) {
+                        Ok(size) => size,
+                        Err(_) => panic!("couldn't read"),
+                    }
+                };
+                bytes_read += current_bytes;
+            }
+        } else {
+            let mut bytes_read = 0;
+            while bytes_read < BUF_SIZE {
+                let current_bytes = unsafe {
+                    match in_stream.read(&mut rx_buf.u8_buf[bytes_read..]) {
+                        Ok(size) => size,
+                        Err(_) => panic!("couldn't read"),
+                    }
+                };
+                bytes_read += current_bytes;
+            }
+
+            let mut bytes_written = 0;
+            while bytes_written < BUF_SIZE {
+                let current_bytes = unsafe {
+                    o_stream.write(&tx_buf.u8_buf[bytes_written..]).unwrap()
+                };
+                bytes_written += current_bytes;
+            }
+        }
+
+        for i in (0..2 * tx_len).step_by(2) {
+            let d = d_list[i / 2] ^ unsafe { rx_buf.u64_buf[i] };
+            let e = e_list[i / 2] ^ unsafe { rx_buf.u64_buf[i + 1] };
+
+            let u = u_list[i / 2];
+            let v = v_list[i / 2];
+            let w = w_list[i / 2];
+
+            z_list[i / 2] = w ^ (d & v) ^ (u & e) ^ (d & e & inversion_mask);
+        }
+
+        z_list
+    }
+
+    pub fn batch_equality(x_list: &Vec<Wrapping<u64>>,
+                          y_list: &Vec<Wrapping<u64>>,
+                          ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+        let len = x_list.len();
+        let mut op1: Vec<Wrapping<u64>> = x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (x - y)).collect();
+
+        op1.append(&mut x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (y - x)).collect());
+        let size = (ctx.integer_precision + ctx.decimal_precision + 1) as usize;
+        let depth = ((size - 1) as f64).log2().ceil() as usize;
+        let mut diff_dc = Vec::new();
+        for item in &op1 {
+            let bits = bit_decomposition_opt(*item, ctx, size);
+            diff_dc.push(Wrapping(bits[size - 1] as u64));
+        }
+//        let received = send_u64_messages(ctx,&diff_dc);
+        let mut x_y = diff_dc[0..len].to_vec();
+        let mut y_x = diff_dc[len..len*2].to_vec();
+        let dummy0 = vec![Wrapping(0u64);len];
+        if ctx.asymmetric_bit==1{
+            x_y = or_xor(&x_y,&dummy0,ctx,1,BINARY_PRIME as u64);
+            y_x = or_xor(&y_x,&dummy0,ctx,1,BINARY_PRIME as u64);
+
+        }else{
+            x_y = or_xor(&dummy0,&x_y,ctx,1,BINARY_PRIME as u64);
+            y_x = or_xor(&dummy0,&y_x,ctx,1,BINARY_PRIME as u64);
+        }
+
+        let temp = or_xor(&x_y,&y_x,ctx,2,BINARY_PRIME as u64);
+        let dummy = vec![Wrapping(ctx.asymmetric_bit as u64);len];
+        let result = or_xor(&temp,&dummy,ctx,2,2);
+        result
+//        (0..len).map(|i| Wrapping((diff_dc[i][size - 1] ^ diff_dc[i + len][size - 1] ^ ctx.asymmetric_bit) as u64)).collect()
+//        let diff_dc = batch_log_decomp(&op1, size, depth, ctx);
+//
+//        (0..len).map(|i| Wrapping(((diff_dc[i] ^ diff_dc[i + len]) >> 63) ^ ctx.asymmetric_bit as u64)).collect()
     }
 }

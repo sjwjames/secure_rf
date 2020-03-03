@@ -32,6 +32,7 @@ pub mod computing_party {
         /* options */
         pub debug_output: bool,
         pub decimal_precision: u32,
+        pub integer_precision:u32,
         pub raw_tcp_communication: bool,
         /* network */
         pub party_id: u8,
@@ -134,7 +135,7 @@ pub mod computing_party {
                 message_manager: Arc::new(Mutex::new(MessageManager {
                     map: HashMap::new()
                 })),
-
+                integer_precision: self.integer_precision
             }
         }
     }
@@ -694,6 +695,7 @@ pub mod computing_party {
             debug_output,
             raw_tcp_communication,
             decimal_precision,
+            integer_precision,
             party_id,
             ti_ip,
             ti_port0,
