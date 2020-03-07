@@ -2,7 +2,7 @@ pub mod protocol_test {
     use crate::computing_party::computing_party::ComputingParty;
     use std::num::Wrapping;
     use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte, batch_multiplication_integer, multiplication_bigint, multi_thread_batch_mul_byte, parallel_multiplication, batch_multiply_bigint, parallel_multiplication_big_integer};
-    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result, reveal_int_result, send_u8_messages, send_u64_messages};
+    use crate::utils::utils::{reveal_byte_result, reveal_byte_vec_result, reveal_int_vec_result, reveal_bigint_result, reveal_bigint_vec_result, reveal_int_result, send_u8_messages, send_u64_messages, truncate_local, u64_to_byte_array};
     use rand::{random, Rng};
     use num::integer::*;
     use num::{BigUint, FromPrimitive, ToPrimitive, Zero, One};
@@ -15,6 +15,7 @@ pub mod protocol_test {
     use crate::or_xor::or_xor::{or_xor, or_xor_bigint};
     use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
     use std::time::SystemTime;
+    use crate::discretize::discretize::{reveal, discretize, binary_vector_to_ring, xor_share_to_additive};
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -278,17 +279,22 @@ pub mod protocol_test {
         let length = 3;
         let mut result = Vec::new();
         let size = (ctx.integer_precision + ctx.decimal_precision + 1) as usize;
-        let depth = (size as f64).log2().ceil() as usize;
+        let depth = ((size - 1) as f64).log2().ceil() as usize;
         if ctx.party_id == 0 {
-            let x = vec![Wrapping(1 as u64), Wrapping(4 as u64), Wrapping(2 as u64), Wrapping(1 as u64)];
-            result= bit_decomposition_opt(x[3]-x[2],ctx,size);
+            let x = vec![Wrapping(18446744073709551615 as u64), Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)];
+//            let x = vec![Wrapping(7 as u64)];
+
+            result = bit_decomposition(18446744073709551615u64, ctx, 64);
+//            result= bit_decomposition_opt(x[0],ctx,4);
 //            result = batch_log_decomp(&x, size, depth, ctx);
         } else {
-            let x = vec![Wrapping(4 as u64), Wrapping(5 as u64), Wrapping(5 as u64), Wrapping(0 as u64)];
-            result= bit_decomposition_opt(x[3],ctx,size);
+            let x = vec![Wrapping(18446744073709551614 as u64), Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(0 as u64)];
+////            let x = vec![Wrapping(7 as u64)];
+            result = bit_decomposition(18446744073709551614u64, ctx, 65);
+//            result= bit_decomposition_opt(x[0],ctx,4);
 //            result = batch_log_decomp(&x, size, depth, ctx);
         }
-        println!("{:?}",result);
+        println!("result:{:?}", result);
 //        for item in result {
 //            let bits = convert_integer_to_bits(item, size);
 //            let result_shared = send_u8_messages(ctx, &bits);
@@ -471,7 +477,7 @@ pub mod protocol_test {
 //            println!("{:?}", result_revealed);
         } else {
             let x = vec![Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(2 as u64), Wrapping(0 as u64)];
-            let y = vec![Wrapping(3 as u64), Wrapping(0 as u64), Wrapping(3 as u64), Wrapping(3 as u64)];
+            let y = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)];
             let result = dot_product_integer(&x, &y, ctx);
             println!("{:?}", result);
 //            let result_revealed = reveal_int_result(&result, ctx);
@@ -489,32 +495,144 @@ pub mod protocol_test {
 //        }
 //        println!("{:?}",shares);
         let mut temp = Vec::new();
-        if ctx.party_id == 0 {
-            let x = vec![Wrapping(4 as u64), Wrapping(4 as u64), Wrapping(3 as u64), Wrapping(0 as u64)];
-            let y = vec![Wrapping(1 as u64), Wrapping(3 as u64), Wrapping(2 as u64), Wrapping(1 as u64)];
-//            for i in 0..x.len() {
-//                let temp = equality_integer_over_field(x[i].0, y[i].0, ctx, 3, 7);
-//                println!("temp:{}", temp);
-//            }
-            temp = batch_equality(&x, &y, ctx);
-//                result = batch_equality_integer(&x, &y, ctx, prime);
-//            let result_revealed = reveal_int_result(&result, ctx);
-//            println!("{:?}", result_revealed);
-        } else {
-            let x = vec![Wrapping(3 as u64), Wrapping(3 as u64), Wrapping(1 as u64), Wrapping(0 as u64)];
-            let y = vec![Wrapping(0 as u64), Wrapping(4 as u64), Wrapping(2 as u64), Wrapping(0 as u64)];
-//
-//            for i in 0..x.len() {
-//                let temp = equality_integer_over_field(x[i].0, y[i].0, ctx, 3, 7);
-//                println!("temp:{}", temp);
-//            }
-            temp = batch_equality(&x, &y, ctx);
-//                result = batch_equality_integer(&x, &y, ctx, prime);
-//            let result_revealed = reveal_int_result(&result, ctx);
-//            println!("{:?}", result_revealed);
+        let mut x = Vec::new();
+        let mut y = Vec::new();
+        for i in 0..1 {
+            if ctx.asymmetric_bit == 1 {
+                x.push(Wrapping(1u64));
+                y.push(Wrapping(1u64));
+            } else {
+                x.push(Wrapping(0u64));
+                y.push(Wrapping(1u64));
+            }
         }
-        let result = send_u64_messages(ctx, &temp);
-        let result_shared:Vec<u64> = result.iter().zip(temp.iter()).map(|(a, b)| (a.0 ^ b.0)).collect();
-        println!("{:?}", result_shared);
+
+        println!("{:?}", x);
+        println!("{:?}", y);
+        temp = batch_equality(&x, &y, ctx);
+//        if ctx.party_id == 0 {
+//            let x = vec![Wrapping(5 as u64), Wrapping(2 as u64), Wrapping(2 as u64), Wrapping(7 as u64)];
+//            let y = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(4 as u64)];
+////            for i in 0..x.len() {
+////                let temp = equality_integer_over_field(x[i].0, y[i].0, ctx, 3, 7);
+////                println!("temp:{}", temp);
+////            }
+//            temp = batch_equality(&x, &y, ctx,4);
+////                result = batch_equality_integer(&x, &y, ctx, prime);
+////            let result_revealed = reveal_int_result(&result, ctx);
+////            println!("{:?}", result_revealed);
+//        } else {
+//            let x = vec![Wrapping(7 as u64), Wrapping(6 as u64), Wrapping(2 as u64), Wrapping(1 as u64)];
+//            let y = vec![Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(4 as u64)];
+////
+////            for i in 0..x.len() {
+////                let temp = equality_integer_over_field(x[i].0, y[i].0, ctx, 3, 7);
+////                println!("temp:{}", temp);
+////            }
+//            temp = batch_equality(&x, &y, ctx,4);
+////                result = batch_equality_integer(&x, &y, ctx, prime);
+////            let result_revealed = reveal_int_result(&result, ctx);
+////            println!("{:?}", result_revealed);
+//        }
+//        let result = send_u64_messages(ctx, &temp);
+//        let result_shared:Vec<u64> = result.iter().zip(temp.iter()).map(|(a, b)| (a.0 ^ b.0)).collect();
+        println!("{:?}", temp);
+    }
+
+    pub fn test_discretization(ctx: &mut ComputingParty) {
+        let n = 11;
+
+        let mut values = vec![Wrapping(0u64); n];
+
+        if ctx.asymmetric_bit == 1 {
+            values = vec![
+                Wrapping(18446744073709550336u64),
+                Wrapping(18446744073709550592u64),
+                Wrapping(18446744073709550848u64),
+                Wrapping(18446744073709551104u64),
+                Wrapping(18446744073709551360u64),
+                Wrapping(768u64),
+                Wrapping(1024u64),
+                Wrapping(1280u64),
+                Wrapping(0u64),
+                Wrapping(256u64),
+                Wrapping(512u64),
+            ];
+        }
+
+        let revealed = reveal(&values, ctx, ctx.decimal_precision, true, true);
+
+        println!("TEST DISCRETIZE\nlist to discretize:      {:5?}", &revealed);
+        let result = discretize(&values, 8, ctx);
+        println!("discretization result:{:?}", reveal(&result, ctx, ctx.decimal_precision, true, true));
+
+        let x = [result].to_vec();
+        let category = 8 as usize;
+        let rows = x.len();
+        let cols = x[0].len();
+        let mut equality_x = Vec::new();
+        let mut equality_y = Vec::new();
+        let decimal_mult = (2.0f64.powf(ctx.decimal_precision as f64) as u64);
+        for j in 0..cols {
+            for k in 0..category {
+                let mut x_row = Vec::new();
+                let mut y_row = Vec::new();
+
+                for i in 0..rows {
+                    x_row.push(x[i][j]);
+                    if ctx.asymmetric_bit == 1 {
+                        y_row.push(k as u64);
+                    } else {
+                        y_row.push(0u64);
+                    }
+                }
+                equality_x.append(&mut x_row);
+                equality_y.append(&mut y_row);
+            }
+        }
+        println!("equality_x:{:?}", equality_x);
+        println!("equality_y:{:?}", equality_y);
+
+        let equality_y = binary_vector_to_ring(&equality_y,ctx);
+        println!("equality_y:{:?}", equality_y);
+
+        let eq_result = batch_equality(&equality_x, &equality_y, ctx);
+        let eq_result = eq_result.iter().map(|a|Wrapping(*a)).collect();
+        println!("eq_result:{:?}", eq_result);
+        let eq_received = send_u64_messages(ctx, &eq_result);
+        let eq_result_revealed: Vec<u64> = eq_result.iter().zip(eq_received).map(|(a, b)| a.0 ^ b.0).collect();
+        println!("eq_result_revealed:{:?}", eq_result_revealed);
+
+//        let b =
+        let mut a = Vec::new();
+        let mut b = Vec::new();
+//
+        for i in 9..14 {
+            if ctx.asymmetric_bit == 1 {
+                a.push(i as u64);
+            } else {
+                a.push(0 as u64);
+            }
+        }
+        for i in [13,12,11,10,9].to_vec() {
+            if ctx.asymmetric_bit == 1 {
+                b.push(i as u64);
+            } else {
+                b.push(0 as u64);
+            }
+        }
+        let a = binary_vector_to_ring(&a,ctx);
+        let b = binary_vector_to_ring(&b,ctx);
+//
+        let d = batch_equality(&a,&b,ctx);
+        println!("d:{:?}",d);
+//        let b_received = send_u64_messages(ctx, &b);
+//        let prime = (2.0f64.powf(64.0) as u64);
+//
+//        let c:Vec<u64>= b.iter().zip(b_received.iter()).map(|(a,b)|(a+b).0-prime).collect();
+//        println!("c:{:?}", c);
+//        let a_received = send_u64_messages(ctx, &a);
+//        let a_combined:Vec<u64> = a.iter().zip(a_received).map(|(a,b)|(a+b).0.mod_floor(&prime)).collect();
+//        println!("a_combined:{:?}",a_combined);
     }
 }

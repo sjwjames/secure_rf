@@ -26,16 +26,8 @@ pub mod or_xor {
 
         if ctx.raw_tcp_communication {
             let mut global_index = 0;
-            while i < bit_length {
-                let to_index = min(i + ctx.batch_size, bit_length);
-                let mut batch_mul_result = batch_multiplication_integer(&x_list[i..to_index].to_vec(), &y_list[i..to_index].to_vec(), ctx, prime);
-                for item in batch_mul_result.iter() {
-                    let result = mod_subtraction( Wrapping(x_list[global_index].0) + Wrapping(y_list[global_index].0),(Wrapping(constant_multiplier) * Wrapping(item.0)),prime);
-                    output.push(Wrapping(mod_floor(result.0, prime)));
-                    global_index += 1;
-                }
-                i = to_index;
-            }
+            let mut batch_mul_result = batch_multiplication_integer(&x_list, &y_list, ctx, prime);
+            output = x_list.iter().zip(y_list).zip(batch_mul_result).map(|((a,b),c)|(mod_subtraction( a+b,(Wrapping(constant_multiplier) * c),prime))).collect();
         } else {
             let thread_pool = ThreadPool::new((bit_length / ctx.batch_size) + 1);
             let mut output_map = Arc::new(Mutex::new(HashMap::new()));

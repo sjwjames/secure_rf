@@ -4,7 +4,7 @@ pub mod bit_decomposition {
     use num::integer::*;
     use crate::constants::constants::BINARY_PRIME;
     use crate::multiplication::multiplication::{multiplication_byte, batch_multiplication_byte};
-    use crate::utils::utils::{increment_current_share_index, big_uint_clone};
+    use crate::utils::utils::{increment_current_share_index, big_uint_clone, send_u8_messages};
     use std::sync::{Arc, Mutex};
     use threadpool::ThreadPool;
     use std::collections::HashMap;
@@ -251,9 +251,8 @@ pub mod bit_decomposition {
     pub fn bit_decomposition_opt(input: Wrapping<u64>, ctx: &mut ComputingParty, bit_length: usize) -> Vec<u8> {
         let mut input_shares = Vec::new();
 
-        let mut temp = convert_integer_to_bits(input.0, bit_length - 1);
-        let mut temp0 = vec![0u8; bit_length - 1];
-
+        let mut temp = convert_integer_to_bits(input.0, bit_length);
+        let mut temp0 = vec![0u8; bit_length];
         // hard-coded for two-party
 
         for i in 0..2 {
@@ -266,12 +265,12 @@ pub mod bit_decomposition {
             }
         }
 
-        let mut g = batch_multiplication_byte(&input_shares[0], &input_shares[1], ctx);
+        let mut g = batch_multiplication_byte(&input_shares[0][0..bit_length-1].to_vec(), &input_shares[1][0..bit_length-1].to_vec(), ctx);
 //        let mut g = vec![0u8;bit_length];
 
         let mut result = vec![0u8; bit_length];
         let mut c_list = Vec::new();
-        for k in 0..bit_length - 1 {
+        for k in 0..bit_length-1 {
             let mut c: u8 = 0;
             for i in k..0 {
                 let mut temp_item = g[i];
@@ -286,7 +285,7 @@ pub mod bit_decomposition {
         for i in 1..bit_length - 1 {
             result[i] = (temp[i] + c_list[i - 1]).mod_floor(&(BINARY_PRIME as u8));
         }
-        result[bit_length - 1] = temp[bit_length - 2];
+        result[bit_length - 1] = temp[bit_length - 1];
         result
     }
 

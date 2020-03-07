@@ -408,10 +408,12 @@ pub mod ti {
         let mut eq_amount = ctx.ohe_equality_shares as usize;
         let mut binary_amount = ctx.ohe_binary_shares as usize;
         let prime = ctx.prime;
+//        let u64_prime = (2.0f64.powf(64.0) as u64);
+
         // OHE shares of attrs
         print!("preprocessing- generating additive shares...      ");
         let now = SystemTime::now();
-        let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, prime, add_amount);
+        let (add_triples0, add_triples1) = additive_share_helper(ctx, thread_pool, BINARY_PRIME as u64, add_amount);
         println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
 
 
@@ -934,7 +936,7 @@ pub mod ti {
         let mut feature_selected_remain = ctx.feature_selected;
         let mut feature_bit_vec = vec![0u8; ctx.feature_cnt as usize];
         let mut rng = rand::thread_rng();
-//        let mut vec_to_record = Vec::new();
+        let mut vec_to_record = Vec::new();
 //        while feature_selected_remain != 0 {
 //            let index: usize = rng.gen_range(0, ctx.feature_cnt as usize);
 //            if feature_bit_vec[index] == 0 {
@@ -947,10 +949,15 @@ pub mod ti {
 //        vec_to_record.sort();
 //        let mut file = ctx.fs_selection_file.try_clone().unwrap();
 //        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
-
+//
         for item in [11, 13, 17, 23, 6].to_vec() {
             feature_bit_vec[item] = 1;
+            vec_to_record.push(format!("{}", item));
         }
+        vec_to_record.sort();
+        let mut file = ctx.fs_selection_file.try_clone().unwrap();
+        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
+
         let mut share0 = Vec::new();
         let mut share1 = Vec::new();
 
@@ -982,7 +989,7 @@ pub mod ti {
         let mut instance_selected_remain = ctx.instance_selected;
         let mut instance_selected_vec = vec![0u32; ctx.instance_cnt as usize];
         let mut rng = rand::thread_rng();
-//        let mut vec_to_record = Vec::new();
+        let mut vec_to_record = Vec::new();
 //        while instance_selected_remain != 0 {
 //            let index: usize = rng.gen_range(0, ctx.instance_cnt as usize);
 //            instance_selected_vec[index] += 1;
@@ -996,7 +1003,11 @@ pub mod ti {
 
         for item in [112, 124, 137, 150, 213, 217, 225, 240, 266, 28, 348, 363, 371, 398, 4, 404, 415, 444, 55, 64, 89].to_vec() {
             instance_selected_vec[item] = 1;
+            vec_to_record.push(format!("{}", item));
         }
+        vec_to_record.sort();
+        let mut file = ctx.sampling_file.try_clone().unwrap();
+        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
         let mut share0 = vec![vec![Wrapping(0u64); ctx.instance_selected as usize]; ctx.instance_cnt as usize];
         let mut share1 = vec![vec![Wrapping(0u64); ctx.instance_selected as usize]; ctx.instance_cnt as usize];
         let mut share = vec![vec![Wrapping(0u64); ctx.instance_selected as usize]; ctx.instance_cnt as usize];

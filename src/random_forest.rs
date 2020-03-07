@@ -8,8 +8,8 @@ pub mod random_forest {
     use crate::message::message::MessageManager;
     use std::collections::HashMap;
     use std::num::Wrapping;
-    use crate::protocol::protocol::{matrix_multiplication_integer, batch_equality_integer};
-    use crate::utils::utils::{get_additive_shares, send_u64_messages, send_u8_messages};
+    use crate::protocol::protocol::{matrix_multiplication_integer, batch_equality_integer, batch_equality};
+    use crate::utils::utils::{get_additive_shares, send_u64_messages, send_u8_messages, truncate_local};
     use crate::bit_decomposition::bit_decomposition::{bit_decomposition, batch_bit_decomposition};
     use crate::comparison::comparison::{comparison, batch_comparison};
     use crate::constants::constants::BINARY_PRIME;
@@ -18,6 +18,7 @@ pub mod random_forest {
     use crate::or_xor::or_xor::or_xor;
     use std::time::SystemTime;
     use num::integer::*;
+    use crate::discretize::discretize::binary_vector_to_ring;
 
 
     pub fn random_feature_selection(attr_values: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<Vec<u8>> {
@@ -93,7 +94,7 @@ pub mod random_forest {
 //        }
     }
 
-    pub fn ohe_conversion(x: &Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty, category: usize, prime: u64) -> Vec<Vec<u8>> {
+    pub fn ohe_conversion(x: &Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty, category: usize, bit_length: usize) -> Vec<Vec<u8>> {
         let rows = x.len();
         let cols = x[0].len();
         let mut equality_x = Vec::new();
@@ -104,40 +105,32 @@ pub mod random_forest {
                 let mut y_row = Vec::new();
 
                 for i in 0..rows {
-                    x_row.push(x[i][j]);
+//                    x_row.push(truncate_local(Wrapping((x[i][j].0 as f64 * 2f64.powf(ctx.decimal_precision as f64)) as u64),ctx.decimal_precision,ctx.asymmetric_bit));
+//                    if ctx.asymmetric_bit == 1 {
+//                        y_row.push(truncate_local(Wrapping((k as f64 * 2f64.powf(ctx.decimal_precision as f64)) as u64),ctx.decimal_precision,ctx.asymmetric_bit));
+//                    } else {
+//                        y_row.push(Wrapping(0));
+//                    }
+
+                    x_row.push(x[i][j].0);
                     if ctx.asymmetric_bit == 1 {
-                        y_row.push(Wrapping(k as u64));
+                        y_row.push(k as u64);
                     } else {
-                        y_row.push(Wrapping(0));
+                        y_row.push(0u64);
                     }
                 }
                 equality_x.append(&mut x_row);
                 equality_y.append(&mut y_row);
             }
         }
-        let result = batch_equality_integer(&equality_x, &equality_y, ctx, prime);
 
-        let bit_length = (prime as f64).log2().ceil() as usize;
+        let equality_x = binary_vector_to_ring(&equality_x,ctx);
+        let equality_y = binary_vector_to_ring(&equality_y,ctx);
 
-        let mut bits_list = batch_bit_decomposition(&result, ctx, bit_length);
-        println!("bits_list:{:?}",bits_list[0..20].to_vec());
-//        let mut comparison_results = Vec::new();
-        //        for item in result {
-//            let bits = bit_decomposition(item.0, ctx, bit_length);
-//            let mut compared = vec![0; bits.len()];
-//            let comparison_result = comparison(&compared, &bits, ctx);
-//            comparison_results.push(comparison_result);
-//        }
-
-        let mut comparison_results = Vec::new();
-        for mut bits in bits_list {
-            let mut compared = vec![0u8; bit_length];
-            let comparison_result = comparison(&mut compared, &mut bits, ctx);
-            comparison_results.push(comparison_result);
-        }
-        println!("{:?}",comparison_results[0..20].to_vec());
-//        let mut compared = vec![vec![0u8; bit_length]; bits_list.len()];
-//        let comparison_results = batch_comparison(&mut compared, &mut bits_list, ctx, bit_length);
+        let eq_result = batch_equality(&equality_x, &equality_y, ctx);
+//        let eq_received = send_u64_messages(ctx,&eq_result);
+//        let eq_result_revealed:Vec<u64> = eq_result.iter().zip(eq_received).map(|(a,b)|a.0^b.0).collect();
+//        println!("eq_result_revealed:{:?}",eq_result_revealed);
 
         let mut count = 0;
         let mut result = Vec::new();
@@ -145,7 +138,7 @@ pub mod random_forest {
             for k in 0..category {
                 let mut row = Vec::new();
                 for i in 0..rows {
-                    row.push(comparison_results[count]);
+                    row.push(eq_result[count] as u8);
                     count += 1;
                 }
                 result.push(row);
@@ -188,15 +181,16 @@ pub mod random_forest {
         let attr_value_count = ctx.dt_data.attr_value_count;
         let class_value_count = ctx.dt_data.class_value_count;
 
-//        let class_val_prime = 2.0_f64.powf((ctx.dt_data.class_value_count as f64).log2().ceil()) as u64;
-        let discretized_x = ctx.dt_data.discretized_x.clone();
-        let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count, ctx.dt_training.prime);
-        let mut class_values_bytes = ohe_conversion(&y, ctx, class_value_count, ctx.dt_training.prime);
+        let attr_val_bit_length = ((attr_value_count as f64).log2().ceil() + 1.0) as usize;
+        let class_val_bit_length = ((class_value_count as f64).log2().ceil()+ 1.0) as usize;
 
-        println!("{:?}", ctx.dt_shares.sequential_equality_integer_index);
-        println!("{:?}", ctx.dt_shares.sequential_additive_index);
-        println!("{}", ctx.dt_shares.sequential_equality_index);
-        println!("{}", ctx.dt_shares.sequential_additive_bigint_index);
+        let discretized_x = ctx.dt_data.discretized_x.clone();
+        let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count, attr_val_bit_length);
+        let mut class_values_bytes = ohe_conversion(&y, ctx, class_value_count, 4);
+//        println!("{:?}", ctx.dt_shares.sequential_equality_integer_index);
+//        println!("{:?}", ctx.dt_shares.sequential_additive_index);
+//        println!("{}", ctx.dt_shares.sequential_equality_index);
+//        println!("{}", ctx.dt_shares.sequential_additive_bigint_index);
         println!("attr_values_bytes:{:?}", attr_values_bytes[0]);
         println!("class_values_bytes:{:?}", class_values_bytes[0]);
 

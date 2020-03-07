@@ -644,4 +644,29 @@ pub mod utils {
     pub fn mod_subtraction_u8(x: u8, y: u8, prime: u8) -> u8 {
         (x as i8 - y as i8).mod_floor(&(prime as i8)) as u8
     }
+
+    pub fn u64_to_byte_array(x: u64) -> [u8 ; 8] {
+
+        [ ((x >> 56) & 0xff) as u8,
+            ((x >> 48) & 0xff) as u8,
+            ((x >> 40) & 0xff) as u8,
+            ((x >> 32) & 0xff) as u8,
+            ((x >> 24) & 0xff) as u8,
+            ((x >> 16) & 0xff) as u8,
+            ((x >>  8) & 0xff) as u8,
+            (x & 0xff) as u8 ]
+    }
+
+    pub fn byte_array_to_u64(buf: [u8; 8]) -> u64 {
+
+
+        ((buf[0] as u64) << 56) +
+            ((buf[1] as u64) << 48 )+
+            ((buf[2] as u64) << 40) +
+            ((buf[3] as u64) << 32) +
+            ((buf[4] as u64) << 24) +
+            ((buf[5] as u64) << 16) +
+            ((buf[6] as u64) <<  8) +
+            (buf[7] as u64)
+    }
 }

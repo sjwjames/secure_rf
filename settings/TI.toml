@@ -15,7 +15,7 @@ thread_count = 40
 
 
 #[breast Cancer]
-batch_size = 110
+batch_size = 84
 add_shares_per_tree = 1000
 add_shares_bigint_per_tree = 1000
 equality_shares_per_tree = 1000
@@ -23,10 +23,10 @@ binary_shares_per_tree = 1000
 ohe_add_shares = 1000
 ohe_binary_shares = 1000
 ohe_equality_shares = 1000
-big_int_prime = "649037107316853453566312041152659"
-prime = 8
-bigint_bit_size = 109
-attr_value_cnt = 6
+big_int_prime = "9671406556917033397649483"
+prime = 32
+bigint_bit_size = 83
+attr_value_cnt = 4
 class_value_cnt = 2
 feature_selected = 5
 instance_selected = 21

@@ -6,7 +6,7 @@ pub mod computing_party {
     use std::fs::File;
     use std::string::ToString;
     use std::io::{Write, Read, BufReader, BufRead};
-    use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX};
+    use crate::constants::constants::{TI_BATCH_SIZE, U64S_PER_TX, U8S_PER_TX, BINARY_PRIME};
     use crate::decision_tree::decision_tree::{DecisionTreeData, DecisionTreeTraining, DecisionTreeShares, DecisionTreeTIShareMessage, DecisionTreeResult};
     use num::bigint::{BigUint, BigInt, ToBigUint, ToBigInt};
     use std::str::FromStr;
@@ -836,11 +836,11 @@ pub mod computing_party {
         let mut binary_shares = receive_u8_triple_shares(&mut stream, ctx.ohe_binary_shares);
         let mut equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares);
 
-        ctx.dt_shares.additive_triples.insert(prime, additive_shares);
+        ctx.dt_shares.additive_triples.insert(BINARY_PRIME as u64, additive_shares);
         ctx.dt_shares.equality_integer_shares.insert(prime, equality_shares);
         ctx.dt_shares.binary_triples.append(&mut binary_shares);
         ctx.dt_shares.sequential_additive_index = HashMap::new();
-        ctx.dt_shares.sequential_additive_index.insert(prime, 0);
+        ctx.dt_shares.sequential_additive_index.insert(BINARY_PRIME as u64, 0);
         ctx.dt_shares.sequential_equality_integer_index = HashMap::new();
         ctx.dt_shares.sequential_equality_integer_index.insert(prime, 0);
         ctx.dt_shares.sequential_binary_index = 0;

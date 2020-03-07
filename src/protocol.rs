@@ -20,7 +20,11 @@ pub mod protocol {
     use crate::multiplication::multiplication::{batch_multiplication_byte, parallel_multiplication, multi_thread_batch_mul_byte};
     use crate::comparison::comparison::comparison;
     use crate::or_xor::or_xor::or_xor;
-    use crate::bit_decomposition::bit_decomposition::{batch_log_decomp, bit_decomposition_opt};
+    use crate::bit_decomposition::bit_decomposition::{batch_log_decomp, bit_decomposition_opt, bit_decomposition};
+    use crate::discretize::discretize::{xor_share_to_additive, reveal_submodule};
+    use crate::constants::constants;
+
+    const BATCH_SIZE_REVEAL: usize = constants::REVEAL_BATCH_SIZE;
 
     pub fn arg_max(bit_shares: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<u8> {
         println!("arg_max starts");
@@ -476,40 +480,142 @@ pub mod protocol {
         z_list
     }
 
-    pub fn batch_equality(x_list: &Vec<Wrapping<u64>>,
-                          y_list: &Vec<Wrapping<u64>>,
-                          ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+
+    // returns x == y ? 1 : 0 for all values in x_list, y_list
+    pub fn batch_equality(x_list : &Vec<Wrapping<u64>>,
+                          y_list : &Vec<Wrapping<u64>>,
+                          ctx    : &mut ComputingParty) -> Vec<u64> {
+
+
         let len = x_list.len();
         let mut op1: Vec<Wrapping<u64>> = x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (x - y)).collect();
+        op1.append( &mut x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (y - x)).collect() );
 
-        op1.append(&mut x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (y - x)).collect());
-        let size = (ctx.integer_precision + ctx.decimal_precision + 1) as usize;
-        let depth = ((size - 1) as f64).log2().ceil() as usize;
-        let mut diff_dc = Vec::new();
-        for item in &op1 {
-            let bits = bit_decomposition_opt(*item, ctx, size);
-            diff_dc.push(Wrapping(bits[size - 1] as u64));
+        let diff_dc  = batch_bit_extract(
+            &op1,
+            (ctx.integer_precision + ctx.decimal_precision + 1) as usize,
+            ctx
+        );
+
+        (0..len).map(|i| (diff_dc[i] ^ diff_dc[i+len]) ^ (ctx.asymmetric_bit as u64))
+            .collect()
+
+    }
+
+    pub fn batch_bit_extract(x_additive_list : &Vec<Wrapping<u64>>,
+                             bit_pos         : usize,
+                             ctx             : &mut ComputingParty) -> Vec<u64> {
+
+        assert!(0 <= bit_pos && bit_pos < 64);
+        let len = x_additive_list.len();
+
+        if bit_pos == 0 {
+            return x_additive_list.iter().map(|x| 1 & x.0).collect();
         }
-//        let received = send_u64_messages(ctx,&diff_dc);
-        let mut x_y = diff_dc[0..len].to_vec();
-        let mut y_x = diff_dc[len..len*2].to_vec();
-        let dummy0 = vec![Wrapping(0u64);len];
-        if ctx.asymmetric_bit==1{
-            x_y = or_xor(&x_y,&dummy0,ctx,1,BINARY_PRIME as u64);
-            y_x = or_xor(&y_x,&dummy0,ctx,1,BINARY_PRIME as u64);
 
-        }else{
-            x_y = or_xor(&dummy0,&x_y,ctx,1,BINARY_PRIME as u64);
-            y_x = or_xor(&dummy0,&y_x,ctx,1,BINARY_PRIME as u64);
+        let propogate: Vec<u64> = x_additive_list.iter().map(|x| x.0).collect();
+        let mut p_layer = propogate.clone();
+        let mut g_layer = if ctx.asymmetric_bit == 0 {
+            batch_bitwise_and(&propogate, &vec![0u64; len], ctx, false)
+        } else {
+            batch_bitwise_and(&vec![0u64; len], &propogate, ctx, false)
+        };
+
+        let mut matrices = bit_pos;
+        while matrices > 1 {
+
+            let pairs = matrices / 2;
+            let remainder = matrices % 2;
+
+            let mut p      = vec![0u64 ; len];
+            let mut p_next = vec![0u64 ; len];
+            let mut g      = vec![0u64 ; len];
+            let mut g_next = vec![0u64 ; len];
+
+            for j in 0..len {
+                for i in 0..pairs {
+                    p[j] |= ((p_layer[j] >> (2 * i) as u64) & 1) << i as u64;
+                    g[j] |= ((g_layer[j] >> (2 * i) as u64) & 1) << i as u64;
+                    p_next[j] |= ((p_layer[j] >> (2 * i + 1) as u64) & 1) << i as u64;
+                    g_next[j] |= ((g_layer[j] >> (2 * i + 1) as u64) & 1) << i as u64;
+                }
+            }
+
+            let mut l_ops = p_next.clone();
+            l_ops.append(&mut p_next);
+
+            let mut r_ops = p.clone();
+            r_ops.append(&mut g);
+
+            let matmul = batch_bitwise_and(&l_ops, &r_ops, ctx, false);
+
+            // let l_ops = utility::compactify_bit_vector( &l_ops, pairs as usize );
+            // let r_ops = utility::compactify_bit_vector( &r_ops, pairs as usize );
+            // let matmul = batch_bitwise_and(&l_ops, &r_ops, ctx, false);
+            // let matmul = utility::decompactify_bit_vector(&matmul, pairs as usize, 2*len);
+
+            let mut p_layer_next = vec![0u64 ; len];
+            let mut g_layer_next = vec![0u64 ; len];
+
+            for j in 0..len {
+                for i in 0..pairs {
+                    p_layer_next[j] |= ((matmul[j] >> i as u64) & 1) << i as u64;
+                    g_layer_next[j] |= (((g_next[j] >> i as u64) ^ (matmul[j + len] >> i as u64)) & 1) << i as u64;
+                }
+
+                if remainder == 1 {
+                    p_layer_next[j] |= ((p_layer[j] >> (matrices - 1) as u64) & 1) << pairs as u64;
+                    g_layer_next[j] |= ((g_layer[j] >> (matrices - 1) as u64) & 1) << pairs as u64;
+                }
+            }
+
+            p_layer = p_layer_next;
+            g_layer = g_layer_next;
+            matrices = pairs + remainder;
         }
 
-        let temp = or_xor(&x_y,&y_x,ctx,2,BINARY_PRIME as u64);
-        let dummy = vec![Wrapping(ctx.asymmetric_bit as u64);len];
-        let result = or_xor(&temp,&dummy,ctx,2,2);
-        result
-//        (0..len).map(|i| Wrapping((diff_dc[i][size - 1] ^ diff_dc[i + len][size - 1] ^ ctx.asymmetric_bit) as u64)).collect()
-//        let diff_dc = batch_log_decomp(&op1, size, depth, ctx);
-//
-//        (0..len).map(|i| Wrapping(((diff_dc[i] ^ diff_dc[i + len]) >> 63) ^ ctx.asymmetric_bit as u64)).collect()
+        g_layer.iter().zip(&propogate).map(|(&g, &p)| 1 & (g ^ (p >> bit_pos)) ).collect()
+
+    }
+
+    pub fn reveal_xor(x_list : &Vec<u64>,
+                      ctx    : &mut ComputingParty) -> Vec<Wrapping<u64>> {
+
+
+        let x_additive = xor_share_to_additive( x_list, ctx, 64 );
+
+        reveal_wrapping(&x_additive, ctx)
+    }
+
+    // recombine a list of secret shares with option to map from ring 2^64 to real.
+    pub fn reveal_wrapping(x_list : &Vec<Wrapping<u64>>,
+                           ctx    : &mut ComputingParty) -> Vec<Wrapping<u64>> {
+
+        let len = (*x_list).len();
+        let mut x_combined = vec![ Wrapping(0u64) ; len];
+        let mut remainder = len.clone();
+        let mut index = 0;
+
+        while remainder > BATCH_SIZE_REVEAL {
+
+            let mut x_sublist = [ Wrapping(0) ; BATCH_SIZE_REVEAL];
+            x_sublist.clone_from_slice(&(x_list[BATCH_SIZE_REVEAL*index..BATCH_SIZE_REVEAL*(index+1)]));
+
+            let x_combined_sublist = reveal_submodule(x_sublist, BATCH_SIZE_REVEAL, ctx,false);
+
+            x_combined[BATCH_SIZE_REVEAL*index..BATCH_SIZE_REVEAL*(index+1)].clone_from_slice(&x_combined_sublist);
+
+            remainder -= BATCH_SIZE_REVEAL;
+            index += 1;
+        }
+
+        let mut x_sublist = [ Wrapping(0) ; BATCH_SIZE_REVEAL];
+        x_sublist[0..remainder].clone_from_slice(&(x_list[BATCH_SIZE_REVEAL*index..]));
+
+        let x_combined_sublist = reveal_submodule(x_sublist, BATCH_SIZE_REVEAL, ctx,false);
+
+        x_combined[BATCH_SIZE_REVEAL*index..].clone_from_slice(&(x_combined_sublist[..remainder]));
+
+        x_combined
     }
 }

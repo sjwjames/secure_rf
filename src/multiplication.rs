@@ -1,7 +1,7 @@
 pub mod multiplication {
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
-    use crate::constants::constants::{BATCH_SIZE, U8S_PER_TX, BUF_SIZE, U64S_PER_TX, BINARY_PRIME};
+    use crate::constants::constants::{BATCH_SIZE, U8S_PER_TX, BUF_SIZE, U64S_PER_TX, BINARY_PRIME, CR_1, CR_0};
     use std::io::{Read, Write, BufReader, BufRead};
     use threadpool::ThreadPool;
     use std::collections::HashMap;
@@ -139,8 +139,8 @@ pub mod multiplication {
         {
             let corr_rand = &mut ctx.dt_shares.additive_triples;
             for i in 0..tx_len {
-                let (u, v, w) = get_current_additive_share(ctx, ctx.dt_training.prime);
-                //let (u, v, w) = if ctx.asymmetric_bit == 1 {CR_1} else {CR_0};
+//                let (u, v, w) = get_current_additive_share(ctx, ctx.dt_training.prime);
+                let (u, v, w) = if ctx.asymmetric_bit == 1 {CR_1} else {CR_0};
 
                 u_list[i] = Wrapping(u.0);
                 v_list[i] = Wrapping(v.0);
@@ -304,7 +304,7 @@ pub mod multiplication {
         let mut diff_list = Vec::new();
         let mut output = Vec::new();
 
-        let mut ti_shares = get_additive_shares(ctx, batch_size, ctx.dt_training.dataset_size_prime);
+        let mut ti_shares = get_additive_shares(ctx, batch_size, prime);
         for i in 0..batch_size {
             let mut new_row = Vec::new();
             let ti_share_triple = ti_shares[i];
