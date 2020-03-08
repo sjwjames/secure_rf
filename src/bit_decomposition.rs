@@ -17,18 +17,9 @@ pub mod bit_decomposition {
         ctx.thread_hierarchy.push("bit_decomposition".to_string());
         let mut input_shares = Vec::new();
 
-        let binary_str = format!("{:b}", input);
-        let reversed_binary_vec: Vec<char> = binary_str.chars().rev().collect();
-        let mut temp: Vec<u8> = Vec::new();
-        for item in reversed_binary_vec {
-            let item_parsed: u8 = format!("{}", item).parse().unwrap();
-            temp.push(item_parsed);
-        }
         let mut temp0 = vec![0u8; bit_length];
-        let diff = abs(bit_length as isize - temp.len() as isize);
-        for i in 0..diff {
-            temp.push(0);
-        }
+        let mut temp = convert_integer_to_bits(input, bit_length);
+
         // hard-coded for two-party
 
         for i in 0..2 {
@@ -188,16 +179,20 @@ pub mod bit_decomposition {
         let mut i = 1;
 
         if ctx.raw_tcp_communication {
-            let mut global_index = 0;
-            while i < bit_length {
-                let to_index = min(i + ctx.batch_size, bit_length);
-                let mut batch_mul_result = batch_multiplication_byte(&input_shares[0][i..to_index].to_vec(), &input_shares[1][i..to_index].to_vec(), ctx);
-                for item in batch_mul_result.iter() {
-                    d_shares[global_index] = mod_floor(item + ctx.asymmetric_bit, BINARY_PRIME as u8);
-                    global_index += 1;
-                }
-                i = to_index;
+            let batch_mul_result = batch_multiplication_byte(&input_shares[0][1..bit_length].to_vec(), &input_shares[1][1..bit_length].to_vec(), ctx);
+            for i in 0..bit_length - 1 {
+                d_shares[i + 1] = mod_floor(batch_mul_result[i] + ctx.asymmetric_bit, BINARY_PRIME as u8);
             }
+//            let mut global_index = 0;
+//            while i < bit_length {
+//                let to_index = min(i + ctx.batch_size, bit_length);
+//                let mut batch_mul_result = batch_multiplication_byte(&input_shares[0][i..to_index].to_vec(), &input_shares[1][i..to_index].to_vec(), ctx);
+//                for item in batch_mul_result.iter() {
+//                    d_shares[global_index] = mod_floor(item + ctx.asymmetric_bit, BINARY_PRIME as u8);
+//                    global_index += 1;
+//                }
+//                i = to_index;
+//            }
         } else {
             let mut output_map = Arc::new(Mutex::new(HashMap::new()));
             let mut batch_count = 0;
@@ -265,12 +260,12 @@ pub mod bit_decomposition {
             }
         }
 
-        let mut g = batch_multiplication_byte(&input_shares[0][0..bit_length-1].to_vec(), &input_shares[1][0..bit_length-1].to_vec(), ctx);
+        let mut g = batch_multiplication_byte(&input_shares[0][0..bit_length - 1].to_vec(), &input_shares[1][0..bit_length - 1].to_vec(), ctx);
 //        let mut g = vec![0u8;bit_length];
 
         let mut result = vec![0u8; bit_length];
         let mut c_list = Vec::new();
-        for k in 0..bit_length-1 {
+        for k in 0..bit_length - 1 {
             let mut c: u8 = 0;
             for i in k..0 {
                 let mut temp_item = g[i];
@@ -399,5 +394,84 @@ pub mod bit_decomposition {
 
 
         x_u64.iter().zip(carry.iter()).map(|(&p, &c)| p ^ c).collect()
+    }
+
+    pub fn batch_log_decomp_new(x_additive_list: &Vec<Wrapping<u64>>,
+                                ctx: &mut ComputingParty) -> Vec<u64> {
+        let len = x_additive_list.len();
+        let propogate: Vec<u64> = x_additive_list.iter().map(|x| x.0).collect();
+        let mut p_layer = propogate.clone();
+        let mut g_layer = if ctx.asymmetric_bit == 0 {
+            batch_bitwise_and(&propogate, &vec![0u64; len], ctx, false)
+        } else {
+            batch_bitwise_and(&vec![0u64; len], &propogate, ctx, false)
+        };
+
+        let mut matrices = (ctx.integer_precision + ctx.decimal_precision + 1) as usize;
+        while matrices > 1 {
+            let pairs = matrices / 2;
+            let remainder = matrices % 2;
+
+            let mut p = vec![0u64; len];
+            let mut p_next = vec![0u64; len];
+            let mut g = vec![0u64; len];
+            let mut g_next = vec![0u64; len];
+
+            for j in 0..len {
+                for i in 0..pairs {
+                    p[j] |= ((p_layer[j] >> (2 * i) as u64) & 1) << i as u64;
+                    g[j] |= ((g_layer[j] >> (2 * i) as u64) & 1) << i as u64;
+                    p_next[j] |= ((p_layer[j] >> (2 * i + 1) as u64) & 1) << i as u64;
+                    g_next[j] |= ((g_layer[j] >> (2 * i + 1) as u64) & 1) << i as u64;
+                }
+            }
+
+            let mut l_ops = p_next.clone();
+            l_ops.append(&mut p_next);
+
+            let mut r_ops = p.clone();
+            r_ops.append(&mut g);
+
+            let matmul = batch_bitwise_and(&l_ops, &r_ops, ctx, false);
+
+            // let l_ops = utility::compactify_bit_vector( &l_ops, pairs as usize );
+            // let r_ops = utility::compactify_bit_vector( &r_ops, pairs as usize );
+            // let matmul = batch_bitwise_and(&l_ops, &r_ops, ctx, false);
+            // let matmul = utility::decompactify_bit_vector(&matmul, pairs as usize, 2*len);
+
+            let mut p_layer_next = vec![0u64; len];
+            let mut g_layer_next = vec![0u64; len];
+
+            for j in 0..len {
+                for i in 0..pairs {
+                    p_layer_next[j] |= ((matmul[j] >> i as u64) & 1) << i as u64;
+                    g_layer_next[j] |= (((g_next[j] >> i as u64) ^ (matmul[j + len] >> i as u64)) & 1) << i as u64;
+                }
+
+                if remainder == 1 {
+                    p_layer_next[j] |= ((p_layer[j] >> (matrices - 1) as u64) & 1) << pairs as u64;
+                    g_layer_next[j] |= ((g_layer[j] >> (matrices - 1) as u64) & 1) << pairs as u64;
+                }
+            }
+
+            p_layer = p_layer_next;
+            g_layer = g_layer_next;
+            matrices = pairs + remainder;
+        }
+        let mut result_temp = Vec::new();
+        let pos = 64 as usize;
+        for i in 0..g_layer.len() {
+            let g = g_layer[i];
+            let p = propogate[i];
+            let mut bits = x_additive_list[i].0 & 1;
+            for i in 1..pos {
+                let bit = 1 & (g ^ (p >> i as u64));
+                if bit == 1 {
+                    bits += 2.0f64.powf(pos as f64) as u64;
+                }
+            }
+            result_temp.push(bits);
+        }
+        result_temp
     }
 }

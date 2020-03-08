@@ -18,7 +18,7 @@ pub mod random_forest {
     use crate::or_xor::or_xor::or_xor;
     use std::time::SystemTime;
     use num::integer::*;
-    use crate::discretize::discretize::binary_vector_to_ring;
+    use crate::discretize::discretize::{binary_vector_to_ring, discretize};
 
 
     pub fn random_feature_selection(attr_values: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<Vec<u8>> {
@@ -69,9 +69,28 @@ pub mod random_forest {
         result_u8
     }
 
-    pub fn discretize_data(x: Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty) {
-        //temporarily
-        ctx.dt_data.discretized_x = x;
+    pub fn discretize_data(x: &mut Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty) {
+        let mut x_temp = Vec::new();
+        let x_rows = x.len();
+        let x_cols = x[0].len();
+        for j in 0..x_cols {
+            let mut col = Vec::new();
+            for i in 0..x_rows{
+                col.push(x[i][j]);
+            }
+            let discretized = discretize(&col, ctx.dt_data.attr_value_count, ctx);
+            x_temp.push(discretized);
+        }
+        println!("x_temp:{:?}",x_temp);
+        for i in 0..x_rows {
+            let mut row = Vec::new();
+            for j in 0..x_cols {
+                row.push(x_temp[j][i]);
+            }
+            ctx.dt_data.discretized_x.push(row);
+        }
+        println!("x:{:?}",ctx.dt_data.discretized_x[0]);
+
 
 //        if ctx.asymmetric_bit == 1 {
 //            ctx.dt_data.discretized_x = {
@@ -94,7 +113,7 @@ pub mod random_forest {
 //        }
     }
 
-    pub fn ohe_conversion(x: &Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty, category: usize, bit_length: usize) -> Vec<Vec<u8>> {
+    pub fn ohe_conversion(x: &Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty, category: usize) -> Vec<Vec<u8>> {
         let rows = x.len();
         let cols = x[0].len();
         let mut equality_x = Vec::new();
@@ -112,7 +131,7 @@ pub mod random_forest {
 //                        y_row.push(Wrapping(0));
 //                    }
 
-                    x_row.push(x[i][j].0);
+                    x_row.push(x[i][j]);
                     if ctx.asymmetric_bit == 1 {
                         y_row.push(k as u64);
                     } else {
@@ -124,8 +143,8 @@ pub mod random_forest {
             }
         }
 
-        let equality_x = binary_vector_to_ring(&equality_x,ctx);
-        let equality_y = binary_vector_to_ring(&equality_y,ctx);
+        let equality_y = binary_vector_to_ring(&equality_y, ctx);
+        let equality_y:Vec<Wrapping<u64>> = equality_y.iter().map(|a| Wrapping(a.0 << ctx.decimal_precision as u64)).collect();
 
         let eq_result = batch_equality(&equality_x, &equality_y, ctx);
 //        let eq_received = send_u64_messages(ctx,&eq_result);
@@ -159,40 +178,48 @@ pub mod random_forest {
         let mut current_p1_port = ctx.party1_port + 1;
         let mut x = load_dt_raw_data(&ctx.x_input_path);
         let mut y = load_dt_raw_data(&ctx.y_input_path);
-//        if ctx.asymmetric_bit == 1 {
-//            y = [
-//                [Wrapping(1)].to_vec(),
-//                [Wrapping(0)].to_vec(),
-//                [Wrapping(0)].to_vec(),
-//                [Wrapping(1)].to_vec()
-//            ].to_vec();
-//        } else {
-//            y = [
-//                [Wrapping(0)].to_vec(),
-//                [Wrapping(0)].to_vec(),
-//                [Wrapping(0)].to_vec(),
-//                [Wrapping(0)].to_vec()
-//            ].to_vec();
-//        }
 
-        discretize_data(x, ctx);
+        discretize_data(&mut x, ctx);
         receive_preprocessing_shares(ctx);
 
         let attr_value_count = ctx.dt_data.attr_value_count;
         let class_value_count = ctx.dt_data.class_value_count;
 
         let attr_val_bit_length = ((attr_value_count as f64).log2().ceil() + 1.0) as usize;
-        let class_val_bit_length = ((class_value_count as f64).log2().ceil()+ 1.0) as usize;
+        let class_val_bit_length = ((class_value_count as f64).log2().ceil() + 1.0) as usize;
 
         let discretized_x = ctx.dt_data.discretized_x.clone();
-        let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count, attr_val_bit_length);
-        let mut class_values_bytes = ohe_conversion(&y, ctx, class_value_count, 4);
+        let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count);
+        let mut y_temp = Vec::new();
+        for mut row in &y {
+            y_temp.append(&mut row.iter().map(|a| a.0).collect());
+        }
+        let y_temp = binary_vector_to_ring(&y_temp, ctx);
+        let mut y_converted = Vec::new();
+        for i in 0..y.len() {
+            let mut row = Vec::new();
+            for j in 0..y[0].len() {
+                row.push(y_temp[i * y[0].len() + j]);
+            }
+            y_converted.push(row);
+        }
+//        let mut y_temp = Vec::new();
+//        for i in 0..y.len(){
+//            y_temp.push(y[i][0]);
+//        }
+//        let mut y_converted = discretize(&y_temp,ctx.dt_data.class_value_count,ctx);
+//        let mut y_temp = Vec::new();
+//        for item in y_converted{
+//            y_temp.push([item].to_vec());
+//        }
+        let y_converted = y_converted.iter().map(|a|[Wrapping(a[0].0<<ctx.decimal_precision as u64)].to_vec()).collect();
+        let mut class_values_bytes = ohe_conversion(&y_converted, ctx, class_value_count);
 //        println!("{:?}", ctx.dt_shares.sequential_equality_integer_index);
 //        println!("{:?}", ctx.dt_shares.sequential_additive_index);
 //        println!("{}", ctx.dt_shares.sequential_equality_index);
 //        println!("{}", ctx.dt_shares.sequential_additive_bigint_index);
-        println!("attr_values_bytes:{:?}", attr_values_bytes[0]);
-        println!("class_values_bytes:{:?}", class_values_bytes[0]);
+//        println!("attr_values_bytes:{:?}", attr_values_bytes[attr_value_count-1]);
+//        println!("class_values_bytes:{:?}", class_values_bytes[0]);
 
 //        let mut result_vec = Vec::new();
         for current_tree_index in 0..remainder {

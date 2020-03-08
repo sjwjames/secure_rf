@@ -138,7 +138,7 @@ fn test_protocols() {
 //                test_equality_big_integer(&mut party_context);
 //                test_comparison(&mut party_context);
 //                test_bit_decomposition(&mut party_context);
-//                test_batch_bit_decomposition(&mut party_context);
+                test_batch_bit_decomposition(&mut party_context);
 //                test_bit_decomposition_bigint(&mut party_context);
 //                test_comparison_bigint(&mut party_context);
 //                test_dot_product_bigint(&mut party_context);
@@ -149,7 +149,7 @@ fn test_protocols() {
 //                test_argmax(&mut party_context);
 //                test_dot_product_integer(&mut party_context);
 //                test_batch_integer_equality(&mut party_context);
-                test_discretization(&mut party_context);
+//                test_discretization(&mut party_context);
 //                let mut b = Vec::new();
 //                for i in 1..1000 {
 //                    b.push(BigUint::from_i32(i).unwrap());
@@ -170,8 +170,8 @@ fn test_protocols() {
 
 fn main() {
 //    test_mq();
-//    run();
-    test_protocols();
+    run();
+//    test_protocols();
 }
 
 

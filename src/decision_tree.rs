@@ -5,7 +5,7 @@ pub mod decision_tree {
     use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint, reveal_bigint_result, reveal_byte_vec_result, send_u8_messages, send_biguint_messages};
+    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint, reveal_bigint_result, reveal_byte_vec_result, send_u8_messages, send_biguint_messages, send_receive_u64_matrix};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
@@ -614,6 +614,9 @@ pub mod decision_tree {
         let mut argmax_result = Vec::new();
         if ctx.raw_tcp_communication {
             let mut class_value_transaction = ctx.dt_data.class_values.clone();
+//            let received = send_receive_u64_matrix(&class_value_transaction,ctx);
+//            let combined:Vec<Vec<u64>> = received.iter().zip(class_value_transaction.iter()).map(|(a,b)|a.iter().zip(b.iter()).map(|(c,d)|(c.0+d.0).mod_floor(&(ctx.dt_training.dataset_size_prime as u64))).collect()).collect();
+//            println!("combined:{:?}",combined);
             for i in 0..ctx.dt_data.class_value_count {
                 let dp_result = dot_product_integer(&subset_decimal, &class_value_transaction[i], ctx);
                 s.push(dp_result.0);
@@ -623,6 +626,7 @@ pub mod decision_tree {
                 let bd_result = bit_decomposition(s[i], ctx, ctx.dt_training.dataset_size_bit_length as usize);
                 bit_shares.push(bd_result);
             }
+            println!("bit_shares:{:?}",bit_shares);
             argmax_result = arg_max(&bit_shares, ctx);
         } else {
             let thread_pool = ThreadPool::new(ctx.thread_count);

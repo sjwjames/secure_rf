@@ -574,7 +574,7 @@ pub mod protocol {
             matrices = pairs + remainder;
         }
 
-        g_layer.iter().zip(&propogate).map(|(&g, &p)| 1 & (g ^ (p >> bit_pos)) ).collect()
+        g_layer.iter().zip(&propogate).map(|(&g, &p)| 1 & (g ^ (p >> bit_pos as u64)) ).collect()
 
     }
 

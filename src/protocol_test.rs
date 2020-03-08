@@ -10,7 +10,7 @@ pub mod protocol_test {
     use crate::protocol::protocol::{equality_big_integer, arg_max, batch_equality_integer, equality_integer_over_field, batch_equality, convert_integer_to_bits};
     use crate::comparison::comparison::{compare_bigint, comparison, compute_e_shares, compute_d_shares, compute_multi_e_parallel, compute_c_shares};
     use std::ops::BitAnd;
-    use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint, batch_bit_decomposition, bit_decomposition_opt, batch_log_decomp};
+    use crate::bit_decomposition::bit_decomposition::{bit_decomposition, bit_decomposition_bigint, batch_bit_decomposition, bit_decomposition_opt, batch_log_decomp, batch_log_decomp_new};
     use crate::dot_product::dot_product::{dot_product_bigint, dot_product_integer};
     use crate::or_xor::or_xor::{or_xor, or_xor_bigint};
     use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
@@ -45,7 +45,7 @@ pub mod protocol_test {
             y_vec = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].to_vec();
         } else {
             x_vec = [1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0].to_vec();
-            y_vec = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].to_vec();
+            y_vec = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1].to_vec();
         }
 //        println!("x_pub_vec {:?}", x_pub_vec);
 //        println!("y_pub_vec {:?}", y_pub_vec);
@@ -284,25 +284,29 @@ pub mod protocol_test {
             let x = vec![Wrapping(18446744073709551615 as u64), Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)];
 //            let x = vec![Wrapping(7 as u64)];
 
-            result = bit_decomposition(18446744073709551615u64, ctx, 64);
+//            result = bit_decomposition(29, ctx, 5);
+            result = batch_log_decomp_new(&x, ctx);
+
 //            result= bit_decomposition_opt(x[0],ctx,4);
 //            result = batch_log_decomp(&x, size, depth, ctx);
         } else {
             let x = vec![Wrapping(18446744073709551614 as u64), Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(0 as u64)];
 ////            let x = vec![Wrapping(7 as u64)];
-            result = bit_decomposition(18446744073709551614u64, ctx, 65);
+//            result = bit_decomposition(17, ctx, 5);
+            result = batch_log_decomp_new(&x, ctx);
+
 //            result= bit_decomposition_opt(x[0],ctx,4);
 //            result = batch_log_decomp(&x, size, depth, ctx);
         }
-        println!("result:{:?}", result);
-//        for item in result {
-//            let bits = convert_integer_to_bits(item, size);
-//            let result_shared = send_u8_messages(ctx, &bits);
-//            for i in 0..size {
-//                print!("{}", bits[i] ^ result_shared[i]);
-//            }
-//            println!("");
-//        }
+//        println!("result:{:?}", result);
+        for item in result {
+            let bits = convert_integer_to_bits(item, size);
+            let result_shared = send_u8_messages(ctx, &bits);
+            for i in 0..size {
+                print!("{}", bits[i] ^ result_shared[i]);
+            }
+            println!("");
+        }
     }
 
     pub fn test_batch_comparison() {}
@@ -499,11 +503,11 @@ pub mod protocol_test {
         let mut y = Vec::new();
         for i in 0..1 {
             if ctx.asymmetric_bit == 1 {
-                x.push(Wrapping(1u64));
-                y.push(Wrapping(1u64));
+                x.push(Wrapping(15595373502427150336u64));
+                y.push(Wrapping(9475888053360961536u64));
             } else {
-                x.push(Wrapping(0u64));
-                y.push(Wrapping(1u64));
+                x.push(Wrapping(2851370571282402304u64));
+                y.push(Wrapping(8970856020348591104u64));
             }
         }
 
@@ -542,32 +546,29 @@ pub mod protocol_test {
     pub fn test_discretization(ctx: &mut ComputingParty) {
         let n = 11;
 
-        let mut values = vec![Wrapping(0u64); n];
+        let mut values = vec![
+            Wrapping(6558502252784700000u64),
+            Wrapping(8546166971241300000u64),
+            Wrapping(16178756104899400000u64)
+
+        ];
 
         if ctx.asymmetric_bit == 1 {
             values = vec![
-                Wrapping(18446744073709550336u64),
-                Wrapping(18446744073709550592u64),
-                Wrapping(18446744073709550848u64),
-                Wrapping(18446744073709551104u64),
-                Wrapping(18446744073709551360u64),
-                Wrapping(768u64),
-                Wrapping(1024u64),
-                Wrapping(1280u64),
-                Wrapping(0u64),
-                Wrapping(256u64),
-                Wrapping(512u64),
+                Wrapping(11888241820924800000u64),
+                Wrapping(9900577102468270000u64),
+                Wrapping(2267987968810130000u64)
             ];
         }
 
         let revealed = reveal(&values, ctx, ctx.decimal_precision, true, true);
 
         println!("TEST DISCRETIZE\nlist to discretize:      {:5?}", &revealed);
-        let result = discretize(&values, 8, ctx);
+        let result = discretize(&values, 3, ctx);
         println!("discretization result:{:?}", reveal(&result, ctx, ctx.decimal_precision, true, true));
 
         let x = [result].to_vec();
-        let category = 8 as usize;
+        let category = 3 as usize;
         let rows = x.len();
         let cols = x[0].len();
         let mut equality_x = Vec::new();
@@ -593,11 +594,12 @@ pub mod protocol_test {
         println!("equality_x:{:?}", equality_x);
         println!("equality_y:{:?}", equality_y);
 
-        let equality_y = binary_vector_to_ring(&equality_y,ctx);
+        let equality_y = binary_vector_to_ring(&equality_y, ctx);
+        let equality_y = equality_y.iter().map(|a| Wrapping(a.0 << ctx.decimal_precision as u64)).collect();
         println!("equality_y:{:?}", equality_y);
 
         let eq_result = batch_equality(&equality_x, &equality_y, ctx);
-        let eq_result = eq_result.iter().map(|a|Wrapping(*a)).collect();
+        let eq_result = eq_result.iter().map(|a| Wrapping(*a)).collect();
         println!("eq_result:{:?}", eq_result);
         let eq_received = send_u64_messages(ctx, &eq_result);
         let eq_result_revealed: Vec<u64> = eq_result.iter().zip(eq_received).map(|(a, b)| a.0 ^ b.0).collect();
@@ -614,18 +616,18 @@ pub mod protocol_test {
                 a.push(0 as u64);
             }
         }
-        for i in [13,12,11,10,9].to_vec() {
+        for i in [13, 12, 11, 10, 9].to_vec() {
             if ctx.asymmetric_bit == 1 {
                 b.push(i as u64);
             } else {
                 b.push(0 as u64);
             }
         }
-        let a = binary_vector_to_ring(&a,ctx);
-        let b = binary_vector_to_ring(&b,ctx);
+        let a = binary_vector_to_ring(&a, ctx);
+        let b = binary_vector_to_ring(&b, ctx);
 //
-        let d = batch_equality(&a,&b,ctx);
-        println!("d:{:?}",d);
+        let d = batch_equality(&a, &b, ctx);
+        println!("d:{:?}", d);
 //        let b_received = send_u64_messages(ctx, &b);
 //        let prime = (2.0f64.powf(64.0) as u64);
 //
