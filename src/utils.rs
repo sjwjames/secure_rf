@@ -192,9 +192,9 @@ pub mod utils {
 
     pub fn get_current_equality_integer_shares(ctx: &mut ComputingParty, range: usize, prime: u64) -> Vec<Wrapping<u64>> {
         let current_index = ctx.dt_shares.sequential_equality_integer_index.get(&prime).unwrap();
-        let shares = ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[*current_index..(current_index + range)].to_vec();
-//        let share = ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[0];
-//        let shares = vec![share; range];
+//        let shares = ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[*current_index..(current_index + range)].to_vec();
+        let share = ctx.dt_shares.equality_integer_shares.get(&prime).unwrap()[0];
+        let shares = vec![share; range];
         ctx.dt_shares.sequential_equality_integer_index.insert(prime, current_index + range);
         return shares;
     }

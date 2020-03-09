@@ -9,13 +9,52 @@ ti_port0  = 4000
 ti_port1  = 8000
 
 #[random forest]
-tree_count = 1
+tree_count = 100
 tree_training_batch_size = 20
 thread_count = 40
 
 
 #[breast Cancer]
-batch_size = 84
+#batch_size = 128
+#add_shares_per_tree = 1000
+#add_shares_bigint_per_tree = 1000
+#equality_shares_per_tree = 1000
+#binary_shares_per_tree = 1000
+#ohe_add_shares = 1000
+#ohe_binary_shares = 1000
+#ohe_equality_shares = 1000
+#big_int_prime = "170141183460469231731687303715884105757"
+#prime = 512
+#bigint_bit_size = 127
+#attr_value_cnt = 4
+#class_value_cnt = 2
+#feature_selected = 5
+#instance_selected = 455
+#instance_cnt = 455
+#feature_cnt = 30
+#output_path = "breast_cancer_results/fold1/"
+
+#batch_size = 84
+#add_shares_per_tree = 1000
+#add_shares_bigint_per_tree = 1000
+#equality_shares_per_tree = 1000
+#binary_shares_per_tree = 1000
+#ohe_add_shares = 1000
+#ohe_binary_shares = 1000
+#ohe_equality_shares = 1000
+#big_int_prime = "9671406556917033397649483"
+#prime = 32
+#bigint_bit_size = 83
+#attr_value_cnt = 4
+#class_value_cnt = 2
+#feature_selected = 5
+#instance_selected = 21
+#instance_cnt = 456
+#feature_cnt = 30
+#output_path = "breast_cancer_results/fold5/"
+
+#[ECG Heartbeat]
+batch_size = 106
 add_shares_per_tree = 1000
 add_shares_bigint_per_tree = 1000
 equality_shares_per_tree = 1000
@@ -23,18 +62,16 @@ binary_shares_per_tree = 1000
 ohe_add_shares = 1000
 ohe_binary_shares = 1000
 ohe_equality_shares = 1000
-big_int_prime = "9671406556917033397649483"
-prime = 32
-bigint_bit_size = 83
+big_int_prime = "40564819207303340847894502572071"
+prime = 128
+bigint_bit_size = 105
 attr_value_cnt = 4
 class_value_cnt = 2
-feature_selected = 5
-instance_selected = 21
-instance_cnt = 455
-feature_cnt = 30
-output_path = "breast_cancer_results/fold1/"
-
-
+feature_selected = 14
+instance_selected = 121
+instance_cnt = 11641
+feature_cnt = 188
+output_path = "ECG/fold2/"
 
 #[random data]
 #batch_size = 34

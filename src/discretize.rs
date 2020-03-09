@@ -98,9 +98,9 @@ pub mod discretize {
             // println!("r_ops: {:5?}", reveal(&r_operands, ctx, ctx.decimal_precision, true));
 
             let l_geq_r = batch_compare(&l_operands, &r_operands, ctx);
-            let l_geq_r: Vec<u64> = reveal(&l_operands, ctx, ctx.decimal_precision, true, true)
+            let l_geq_r: Vec<u64> = reveal(&l_operands, ctx, ctx.decimal_precision, true, ctx.debug_output)
                 .iter()
-                .zip(&reveal(&r_operands, ctx, ctx.decimal_precision, true, true))
+                .zip(&reveal(&r_operands, ctx, ctx.decimal_precision, true, ctx.debug_output))
                 .map(|(&l, &r)| if (l >= r) && ctx.asymmetric_bit == 1 { 1u64 } else { 0u64 })
                 .collect();
 
@@ -200,8 +200,8 @@ pub mod discretize {
         }
 
         let l_geq_r = batch_compare(&l_operands, &r_operands, ctx);
-        let l_geq_r: Vec<u64> = reveal(&l_operands, ctx, ctx.decimal_precision, true, true).iter()
-            .zip(&reveal(&r_operands, ctx, ctx.decimal_precision, true, true))
+        let l_geq_r: Vec<u64> = reveal(&l_operands, ctx, ctx.decimal_precision, true, ctx.debug_output).iter()
+            .zip(&reveal(&r_operands, ctx, ctx.decimal_precision, true, ctx.debug_output))
             .map(|(&l, &r)| if (l >= r) && ctx.asymmetric_bit == 1 { 1u64 } else { 0u64 })
             .collect();
         let l_geq_r: Vec<Wrapping<u64>> = xor_share_to_additive(&l_geq_r, ctx, 1)

@@ -81,7 +81,6 @@ pub mod random_forest {
             let discretized = discretize(&col, ctx.dt_data.attr_value_count, ctx);
             x_temp.push(discretized);
         }
-        println!("x_temp:{:?}",x_temp);
         for i in 0..x_rows {
             let mut row = Vec::new();
             for j in 0..x_cols {
@@ -89,7 +88,6 @@ pub mod random_forest {
             }
             ctx.dt_data.discretized_x.push(row);
         }
-        println!("x:{:?}",ctx.dt_data.discretized_x[0]);
 
 
 //        if ctx.asymmetric_bit == 1 {
@@ -169,6 +167,7 @@ pub mod random_forest {
 
     pub fn train(ctx: &mut ComputingParty) {
         ctx.thread_hierarchy.push("RF".to_string());
+        let total_now = SystemTime::now();
         let now = SystemTime::now();
 
         let thread_pool = ThreadPool::with_name(format!("{}", "RF"), ctx.thread_count);
@@ -180,6 +179,9 @@ pub mod random_forest {
         let mut y = load_dt_raw_data(&ctx.y_input_path);
 
         discretize_data(&mut x, ctx);
+        let runtime = now.elapsed().unwrap().as_millis();
+        println!("loading & discretization completes -- work time = {:5} (ms)", runtime);
+
         receive_preprocessing_shares(ctx);
 
         let attr_value_count = ctx.dt_data.attr_value_count;
@@ -189,7 +191,11 @@ pub mod random_forest {
         let class_val_bit_length = ((class_value_count as f64).log2().ceil() + 1.0) as usize;
 
         let discretized_x = ctx.dt_data.discretized_x.clone();
+        let now = SystemTime::now();
         let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count);
+        let runtime = now.elapsed().unwrap().as_millis();
+        println!("OHE of attributes completes -- work time = {:5} (ms)", runtime);
+
         let mut y_temp = Vec::new();
         for mut row in &y {
             y_temp.append(&mut row.iter().map(|a| a.0).collect());
@@ -212,8 +218,13 @@ pub mod random_forest {
 //        for item in y_converted{
 //            y_temp.push([item].to_vec());
 //        }
+        let now = SystemTime::now();
+
         let y_converted = y_converted.iter().map(|a|[Wrapping(a[0].0<<ctx.decimal_precision as u64)].to_vec()).collect();
         let mut class_values_bytes = ohe_conversion(&y_converted, ctx, class_value_count);
+        let runtime = now.elapsed().unwrap().as_millis();
+        println!("OHE of classes completes -- work time = {:5} (ms)", runtime);
+
 //        println!("{:?}", ctx.dt_shares.sequential_equality_integer_index);
 //        println!("{:?}", ctx.dt_shares.sequential_additive_index);
 //        println!("{}", ctx.dt_shares.sequential_equality_index);
@@ -256,10 +267,18 @@ pub mod random_forest {
             dt_ctx.dt_shares = dt_shares;
             let mut attr_values_bytes_copied = attr_values_bytes.clone();
             let mut class_values_bytes_copied = class_values_bytes.clone();
+            let now = SystemTime::now();
             let mut rfs_x = random_feature_selection(&attr_values_bytes_copied, &mut dt_ctx);
+            let runtime = now.elapsed().unwrap().as_millis();
+            println!("RF completes -- work time = {:5} (ms)", runtime);
+
             rfs_x.append(&mut class_values_bytes_copied);
 
+            let now = SystemTime::now();
             let sampling_result = sample_with_replacement(&mut dt_ctx, &rfs_x);
+            let runtime = now.elapsed().unwrap().as_millis();
+            println!("RF completes -- work time = {:5} (ms)", runtime);
+
             dt_ctx.party0_port = current_p0_port;
             dt_ctx.party1_port = current_p1_port;
 
@@ -269,17 +288,22 @@ pub mod random_forest {
             dt_ctx.o_stream = o_stream;
             produce_dt_data(sampling_result, &mut dt_ctx);
             let max_depth = (&dt_ctx.dt_training).max_depth;
+            let now = SystemTime::now();
             let dt_training = decision_tree::train(&mut dt_ctx, max_depth);
+            let runtime = now.elapsed().unwrap().as_millis();
+            println!("One tree completes -- work time = {:5} (ms)", runtime);
             if ctx.asymmetric_bit == 1 {
                 dt_ctx.result_file.write_all("\n".as_bytes());
             }
 //            current_p0_port += 1;
 //            current_p1_port += 1;
+
+
         }
 
         thread_pool.join();
         ctx.thread_hierarchy.pop();
-        let runtime = now.elapsed().unwrap().as_millis();
+        let runtime = total_now.elapsed().unwrap().as_millis();
         println!("complete -- work time = {:5} (ms)", runtime);
         let mut file = File::create(ctx.output_path.clone() + &format!("{}_", ctx.tree_count).to_string() + "runtime.txt").unwrap();
         file.write_all(format!("{}", runtime).as_bytes());
