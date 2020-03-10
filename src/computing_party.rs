@@ -13,7 +13,7 @@ pub mod computing_party {
     use std::sync::{Arc, Mutex};
     use crate::message::message::{MessageManager, MQMetaMaps};
     use std::collections::HashMap;
-    use std::thread;
+    use std::{thread, fs};
     use amiquip::{Connection, Channel, Exchange};
     use threadpool::ThreadPool;
     use std::f64::consts::E;
@@ -45,7 +45,7 @@ pub mod computing_party {
         pub party1_port: u16,
         pub in_stream: TcpStream,
         pub o_stream: TcpStream,
-        pub ti_stream: TcpStream,
+//        pub ti_stream: TcpStream,
 
         /* mq */
         pub local_mq_ip: String,
@@ -70,7 +70,7 @@ pub mod computing_party {
         pub dt_training: DecisionTreeTraining,
         pub dt_shares: DecisionTreeShares,
         pub dt_results: DecisionTreeResult,
-        pub result_file: File,
+//        pub result_file: File,
 
         /* random forest */
         pub thread_count: usize,
@@ -103,7 +103,7 @@ pub mod computing_party {
                 party1_port: self.party1_port,
                 in_stream: self.in_stream.try_clone().expect("failed to clone in_stream"),
                 o_stream: self.o_stream.try_clone().expect("failed to clone o_stream"),
-                ti_stream: self.ti_stream.try_clone().expect("failed to clone ti_stream"),
+//                ti_stream: self.ti_stream.try_clone().expect("failed to clone ti_stream"),
                 local_mq_ip: self.local_mq_ip.clone(),
                 local_mq_port: self.local_mq_port,
                 remote_mq_ip: self.remote_mq_ip.clone(),
@@ -120,7 +120,7 @@ pub mod computing_party {
                 dt_shares: self.dt_shares.clone(),
                 dt_results: self.dt_results.clone(),
 
-                result_file: self.result_file.try_clone().unwrap(),
+//                result_file: self.result_file.try_clone().unwrap(),
                 thread_count: self.thread_count,
                 tree_count: self.tree_count,
                 batch_size: self.batch_size,
@@ -640,11 +640,11 @@ pub mod computing_party {
         };
 
         // TI connection
-        let ti_socket: SocketAddr = ti_addr
-            .parse()
-            .expect("unable to parse ti socket address");
-
-        let ti_stream = try_connect(&ti_socket, &t_pfx);
+//        let ti_socket: SocketAddr = ti_addr
+//            .parse()
+//            .expect("unable to parse ti socket address");
+//
+//        let ti_stream = try_connect(&ti_socket, &t_pfx);
 
         println!("{} successfully connected to ti server on port {}",
                  &t_pfx, &external_addr);
@@ -657,9 +657,9 @@ pub mod computing_party {
         in_stream.set_write_timeout(None).expect("set_write_timeout call failed");
         in_stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
-        ti_stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
-        ti_stream.set_write_timeout(None).expect("set_write_timeout call failed");
-        ti_stream.set_read_timeout(None).expect("set_read_timeout call failed");
+//        ti_stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+//        ti_stream.set_write_timeout(None).expect("set_write_timeout call failed");
+//        ti_stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
 
 //        let dt_data = produce_dt_data(one_hot_encoding_matrix, class_value_count, attr_value_count, attribute_count, instance_count, party_id);
@@ -690,7 +690,7 @@ pub mod computing_party {
         let local_mq_address = format!("amqp://guest:guest@{}:{}", local_mq_ip.clone(), local_mq_port);
         let remote_mq_address = format!("amqp://guest:guest@{}:{}", remote_mq_ip.clone(), remote_mq_port);
 
-        let mut result_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "trees.txt").unwrap();
+//        let mut result_file = File::create(None).unwrap();
         ComputingParty {
             debug_output,
             raw_tcp_communication,
@@ -706,7 +706,7 @@ pub mod computing_party {
             party1_port,
             asymmetric_bit,
             output_path,
-            ti_stream,
+//            ti_stream,
             local_mq_ip,
             local_mq_port,
             remote_mq_ip,
@@ -721,7 +721,7 @@ pub mod computing_party {
             tree_training_batch_size,
             instance_selected,
             dt_training,
-            result_file,
+//            result_file,
             x_input_path,
             y_input_path,
             dt_shares: DecisionTreeShares {
@@ -829,21 +829,21 @@ pub mod computing_party {
     }
 
     pub fn receive_preprocessing_shares(ctx: &mut ComputingParty) {
-        let mut stream = ctx.ti_stream.try_clone().unwrap();
-        let prime = ctx.dt_training.prime;
-
-        let mut additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares);
-        let mut binary_shares = receive_u8_triple_shares(&mut stream, ctx.ohe_binary_shares);
-        let mut equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares);
-
-        ctx.dt_shares.additive_triples.insert(BINARY_PRIME as u64, additive_shares);
-        ctx.dt_shares.equality_integer_shares.insert(prime, equality_shares);
-        ctx.dt_shares.binary_triples.append(&mut binary_shares);
-        ctx.dt_shares.sequential_additive_index = HashMap::new();
-        ctx.dt_shares.sequential_additive_index.insert(BINARY_PRIME as u64, 0);
-        ctx.dt_shares.sequential_equality_integer_index = HashMap::new();
-        ctx.dt_shares.sequential_equality_integer_index.insert(prime, 0);
-        ctx.dt_shares.sequential_binary_index = 0;
+//        let mut stream = ctx.ti_stream.try_clone().unwrap();
+//        let prime = ctx.dt_training.prime;
+//
+//        let mut additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares);
+//        let mut binary_shares = receive_u8_triple_shares(&mut stream, ctx.ohe_binary_shares);
+//        let mut equality_shares = receive_u64_shares(&mut stream, ctx.ohe_equality_shares);
+//
+//        ctx.dt_shares.additive_triples.insert(BINARY_PRIME as u64, additive_shares);
+//        ctx.dt_shares.equality_integer_shares.insert(prime, equality_shares);
+//        ctx.dt_shares.binary_triples.append(&mut binary_shares);
+//        ctx.dt_shares.sequential_additive_index = HashMap::new();
+//        ctx.dt_shares.sequential_additive_index.insert(BINARY_PRIME as u64, 0);
+//        ctx.dt_shares.sequential_equality_integer_index = HashMap::new();
+//        ctx.dt_shares.sequential_equality_integer_index.insert(prime, 0);
+//        ctx.dt_shares.sequential_binary_index = 0;
 //        let class_val_prime = 2.0_f64.powf((ctx.dt_data.class_value_count as f64).log2().ceil()) as u64;
 //        if prime==class_val_prime{
 //            let mut additive_shares = receive_u64_triple_shares(&mut stream, ctx.ohe_add_shares*2);
@@ -879,6 +879,102 @@ pub mod computing_party {
 //            ctx.dt_shares.additive_triples.insert(class_val_prime, y_additive_shares);
 //            ctx.dt_shares.equality_integer_shares.insert(class_val_prime, y_equality_shares);
 //        }
+    }
+
+    pub fn read_shares(ctx: &mut ComputingParty,tree_count:usize) -> DecisionTreeShares{
+        let path = format!("{}_{}shares_tree_{}_{}.txt", &ctx.output_path,ctx.tree_count, tree_count, ctx.party_id);
+        let file = File::open(path).unwrap();
+        let reader = BufReader::new(file);
+        let mut ti_shares_message:DecisionTreeTIShareMessage = serde_json::from_reader(reader).unwrap();
+        //mock data
+//        let ti_shares_message: DecisionTreeTIShareMessage = serde_json::from_str(&share_message).unwrap();
+
+        let additive_triples: HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>> = serde_json::from_str(&ti_shares_message.additive_triples).unwrap();
+
+        let mut additive_bigint_triples = Vec::new();
+        let additive_bigint_triple_str_vec: Vec<&str> = ti_shares_message.additive_bigint_triples.split(";").collect();
+        for item in additive_bigint_triple_str_vec {
+            let str_vec: Vec<&str> = item.split("&").collect();
+
+            additive_bigint_triples.push(
+                (
+                    BigUint::from_str(&str_vec[0]).unwrap(),
+                    BigUint::from_str(&str_vec[1]).unwrap(),
+                    BigUint::from_str(&str_vec[2]).unwrap()
+                )
+            );
+        }
+
+        let mut binary_triples = Vec::new();
+        let binary_triples_vec: Vec<&str> = ti_shares_message.binary_triples.split(";").collect();
+        for item in binary_triples_vec {
+            binary_triples.push(serde_json::from_str(item).unwrap());
+        }
+
+        let mut equality_shares = Vec::new();
+        let equality_share_vec: Vec<&str> = ti_shares_message.equality_shares.split(";").collect();
+        for item in equality_share_vec {
+            equality_shares.push(
+                BigUint::from_str(item).unwrap()
+            );
+        }
+
+        let mut rfs_shares = Vec::new();
+        let rfs_share_vec: Vec<&str> = ti_shares_message.rfs_shares.split(";").collect();
+        for item in rfs_share_vec {
+            rfs_shares.push(serde_json::from_str(item).unwrap());
+        }
+
+        let mut bagging_shares = Vec::new();
+        let bagging_vec: Vec<&str> = ti_shares_message.bagging_shares.split(";").collect();
+        for item in bagging_vec {
+            bagging_shares.push(serde_json::from_str(item).unwrap());
+        }
+
+        let mut matrix_mul_shares = (Vec::new(), Vec::new(), Vec::new());
+        let matrix_mul_shares_str_vec: Vec<&str> = ti_shares_message.matrix_mul_shares.split("&").collect();
+        matrix_mul_shares.0 = serde_json::from_str(&matrix_mul_shares_str_vec[0]).unwrap();
+        matrix_mul_shares.1 = serde_json::from_str(&matrix_mul_shares_str_vec[1]).unwrap();
+        matrix_mul_shares.2 = serde_json::from_str(&matrix_mul_shares_str_vec[2]).unwrap();
+
+        let mut equality_integer_shares = serde_json::from_str(&ti_shares_message.equality_integer_shares).unwrap();
+
+        let mut bagging_matrix_mul_shares = (Vec::new(), Vec::new(), Vec::new());
+        let bagging_matrix_mul_shares_str_vec: Vec<&str> = ti_shares_message.bagging_matrix_mul_shares.split("&").collect();
+        bagging_matrix_mul_shares.0 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[0]).unwrap();
+        bagging_matrix_mul_shares.1 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[1]).unwrap();
+        bagging_matrix_mul_shares.2 = serde_json::from_str(&bagging_matrix_mul_shares_str_vec[2]).unwrap();
+
+        let mut sequential_equality_integer_index = HashMap::new();
+        sequential_equality_integer_index.insert(ctx.dt_training.rfs_field, 0);
+        sequential_equality_integer_index.insert(ctx.dt_training.bagging_field, 0);
+
+        let mut sequential_additive_index = HashMap::new();
+        sequential_additive_index.insert(ctx.dt_training.dataset_size_prime, 0);
+        sequential_additive_index.insert(ctx.dt_training.rfs_field, 0);
+        sequential_additive_index.insert(ctx.dt_training.bagging_field, 0);
+
+        DecisionTreeShares {
+            additive_triples,
+            additive_bigint_triples,
+            rfs_shares,
+            bagging_shares,
+            binary_triples,
+            equality_shares,
+            equality_integer_shares,
+            current_additive_index: Arc::new(Mutex::new(0 as usize)),
+            current_additive_bigint_index: Arc::new(Mutex::new(0 as usize)),
+            current_equality_index: Arc::new(Mutex::new(0 as usize)),
+            current_binary_index: Arc::new(Mutex::new(0 as usize)),
+            sequential_additive_index,
+            sequential_additive_bigint_index: 0,
+            sequential_equality_index: 0,
+            sequential_binary_index: 0,
+            sequential_equality_integer_index,
+            sequential_ohe_additive_index: 0,
+            matrix_mul_shares,
+            bagging_matrix_mul_shares,
+        }
     }
 
     pub fn ti_receive(mut stream: TcpStream, ctx: &mut ComputingParty) -> DecisionTreeShares {

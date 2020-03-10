@@ -490,207 +490,243 @@ pub mod ti {
         let prefix = "main:      ";
         let s0_pfx = "server 0:  ";
         let s1_pfx = "server 1:  ";
+//
+//        let socket0: SocketAddr = format!("{}:{}", &ctx.ti_ip, ctx.ti_port0)
+//            .parse()
+//            .expect("unable to parse internal socket address");
+//
+//        let socket1: SocketAddr = format!("{}:{}", &ctx.ti_ip, ctx.ti_port1)
+//            .parse()
+//            .expect("unable to parse external socket address");
+//
+//        let listener0 = TcpListener::bind(&socket0)
+//            .expect("unable to establish Tcp Listener");
+//
+//        let listener1 = TcpListener::bind(&socket1)
+//            .expect("unable to establish Tcp Listener");
+//
+//        println!("{} listening on port {}", &s0_pfx, listener0.local_addr().unwrap());
+//        println!("{} listening on port {}", &s1_pfx, listener1.local_addr().unwrap());
+//
+//        let in_stream0 = match listener0.accept() {
+//            Ok((stream, _addr)) => stream,
+//            Err(_) => panic!("server 0: failed to accept connection"),
+//        };
+//
+//        let in_stream1 = match listener1.accept() {
+//            Ok((stream, _addr)) => stream,
+//            Err(_) => panic!("server 1: failed to accept connection"),
+//        };
+//        println!("{} accepted connection from {}", &s0_pfx, in_stream0.peer_addr().unwrap());
+//        println!("{} accepted connection from {}", &s1_pfx, in_stream1.peer_addr().unwrap());
 
-        let socket0: SocketAddr = format!("{}:{}", &ctx.ti_ip, ctx.ti_port0)
-            .parse()
-            .expect("unable to parse internal socket address");
 
-        let socket1: SocketAddr = format!("{}:{}", &ctx.ti_ip, ctx.ti_port1)
-            .parse()
-            .expect("unable to parse external socket address");
-
-        let listener0 = TcpListener::bind(&socket0)
-            .expect("unable to establish Tcp Listener");
-
-        let listener1 = TcpListener::bind(&socket1)
-            .expect("unable to establish Tcp Listener");
-
-        println!("{} listening on port {}", &s0_pfx, listener0.local_addr().unwrap());
-        println!("{} listening on port {}", &s1_pfx, listener1.local_addr().unwrap());
-
-        let in_stream0 = match listener0.accept() {
-            Ok((stream, _addr)) => stream,
-            Err(_) => panic!("server 0: failed to accept connection"),
-        };
-
-        let in_stream1 = match listener1.accept() {
-            Ok((stream, _addr)) => stream,
-            Err(_) => panic!("server 1: failed to accept connection"),
-        };
-        println!("{} accepted connection from {}", &s0_pfx, in_stream0.peer_addr().unwrap());
-        println!("{} accepted connection from {}", &s1_pfx, in_stream1.peer_addr().unwrap());
-
-        let mut trees_remaining = ctx.tree_count as isize;
-        let mut batch_count = 0;
         let thread_pool = ThreadPool::new(ctx.thread_count);
 
         //preprocess shares, discretization and OHE
-        generate_preprocessing_shares(ctx, &thread_pool, [&in_stream0, &in_stream1].to_vec());
+//        generate_preprocessing_shares(ctx, &thread_pool, [&in_stream0, &in_stream1].to_vec());
 
-        while trees_remaining > 0 {
-            let current_batch_size = if trees_remaining >= ctx.tree_training_batch_size as isize { ctx.tree_training_batch_size } else { trees_remaining as usize };
-            println!("current batch:{}", batch_count);
-
-
-//                println!("{} [{}] sending correlated randomness...   ", &s0_pfx, i);
-//                let shares0 = (add_triples0, xor_triples0);
-//                let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
-//                let sender_thread0 = thread::spawn(move || {
-//                    match get_confirmation(stream.try_clone()
-//                        .expect("server 0: failed to clone stream")) {
-//                        Ok(_) => return send_shares(0, stream.try_clone()
-//                            .expect("server 0: failed to clone stream"),
-//                                                    shares0),
-//                        Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
-//                    };
-//                });
-//
-//                println!("{} [{}] sending correlated randomness...   ", &s1_pfx, i);
-//                let shares1 = (add_triples1, xor_triples1);
-//                let stream = in_stream1.try_clone().expect("server 1: failed to clone stream");
-//                let sender_thread1 = thread::spawn(move || {
-//                    match get_confirmation(stream.try_clone()
-//                        .expect("server 1: failed to clone stream")) {
-//                        Ok(_) => return send_shares(1, stream.try_clone()
-//                            .expect("server 1: failed to clone stream"),
-//                                                    shares1),
-//                        Err(e) => return Err(e),//::("server 1: failed to recv confirmation"),
-//                    };
-//                });
-//
-            for i in 0..current_batch_size {
-                print!("{} [{}] generating additive shares...      ", &prefix, i);
-                let now = SystemTime::now();
-                let (add_triples0, add_triples1) = generate_additive_shares(&ctx, &thread_pool);
-                println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
+        for i in 0..ctx.tree_count {
+            print!("{} [{}] generating additive shares...      ", &prefix, i);
+            let now = SystemTime::now();
+            let (add_triples0, add_triples1) = generate_additive_shares(&ctx, &thread_pool);
+            println!("complete -- work time = {:5} (ms)", now.elapsed().unwrap().as_millis());
 
 
-                print!("{} [{}] generating binary shares...           ", &prefix, i);
-                let now = SystemTime::now();
-                let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, &thread_pool, ctx.binary_shares_per_tree);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
+            print!("{} [{}] generating binary shares...           ", &prefix, i);
+            let now = SystemTime::now();
+            let (binary_triples0, binary_triples1) = generate_binary_shares(&ctx, &thread_pool, ctx.binary_shares_per_tree);
+            println!("complete -- work time = {:5} (ms)",
+                     now.elapsed().unwrap().as_millis());
 
-                print!("{} [{}] generating equality bigint shares...           ", &prefix, i);
-                let now = SystemTime::now();
-                let (equality_bigint_share0, equality_bigint_share1) = generate_equality_bigint_shares(&ctx, &thread_pool);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-                print!("{} [{}] generating additive bigint shares...           ", &prefix, i);
-                let now = SystemTime::now();
-                let (additive_bigint_share0, additive_bigint_share1) = generate_additive_bigint_shares(&ctx, &thread_pool);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-
-
-                let now = SystemTime::now();
-                let (rfs_share0, rfs_share1) = generate_rfs_share(&ctx);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-
-                let now = SystemTime::now();
-                let (bagging_share0, bagging_share1) = generate_bagging_share(&ctx);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-
-                let now = SystemTime::now();
-                let (matrix_mul_share0, matrix_mul_share1) = generate_matrix_shares(&ctx, (ctx.attr_value_cnt * ctx.feature_selected) as usize, (ctx.attr_value_cnt * ctx.feature_cnt) as usize, ctx.instance_cnt as usize, BINARY_PRIME as u64);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-
-                print!("{} [{}] generating equality integer shares...           ", &prefix, i);
-                let now = SystemTime::now();
-                let (equality_share0, equality_share1) = generate_equality_integer_shares(&ctx, &thread_pool);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-
-                let now = SystemTime::now();
-                let (bagging_matrix_mul_share0, bagging_matrix_mul_share1) = generate_matrix_shares(&ctx, (ctx.feature_selected * ctx.attr_value_cnt + ctx.class_value_cnt) as usize, ctx.instance_cnt as usize, ctx.instance_selected as usize, BINARY_PRIME as u64);
-                println!("complete -- work time = {:5} (ms)",
-                         now.elapsed().unwrap().as_millis());
-
-                let mut share0 = DecisionTreeShares {
-                    additive_triples: add_triples0,
-                    additive_bigint_triples: additive_bigint_share0,
-                    rfs_shares: rfs_share0,
-                    bagging_shares: bagging_share0,
-                    binary_triples: binary_triples0,
-                    equality_shares: equality_bigint_share0,
-                    equality_integer_shares: equality_share0,
-                    current_additive_index: Arc::new(Mutex::new(0)),
-                    current_additive_bigint_index: Arc::new(Mutex::new(0)),
-                    current_equality_index: Arc::new(Mutex::new(0)),
-                    current_binary_index: Arc::new(Mutex::new(0)),
-                    sequential_additive_index: Default::default(),
-                    sequential_additive_bigint_index: 0,
-                    sequential_equality_index: 0,
-                    sequential_binary_index: 0,
-                    sequential_equality_integer_index: Default::default(),
-                    sequential_ohe_additive_index: 0,
-                    matrix_mul_shares: matrix_mul_share0,
-                    bagging_matrix_mul_shares: bagging_matrix_mul_share0,
-                };
-
-                let mut share1 = DecisionTreeShares {
-                    additive_triples: add_triples1,
-                    additive_bigint_triples: additive_bigint_share1,
-                    rfs_shares: rfs_share1,
-                    bagging_shares: bagging_share1,
-                    binary_triples: binary_triples1,
-                    equality_shares: equality_bigint_share1,
-                    equality_integer_shares: equality_share1,
-                    current_additive_index: Arc::new(Mutex::new(0)),
-                    current_additive_bigint_index: Arc::new(Mutex::new(0)),
-                    current_equality_index: Arc::new(Mutex::new(0)),
-                    current_binary_index: Arc::new(Mutex::new(0)),
-                    sequential_additive_index: Default::default(),
-                    sequential_additive_bigint_index: 0,
-                    sequential_equality_index: 0,
-                    sequential_binary_index: 0,
-                    sequential_equality_integer_index: Default::default(),
-                    sequential_ohe_additive_index: 0,
-                    matrix_mul_shares: matrix_mul_share1,
-                    bagging_matrix_mul_shares: bagging_matrix_mul_share1,
-                };
-                let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
-                let sender_thread0 = thread::spawn(move || {
-                    match get_confirmation(stream.try_clone()
-                        .expect("server 0: failed to clone stream")) {
-                        Ok(_) => return send_dt_shares(stream.try_clone()
-                                                           .expect("server 0: failed to clone stream"),
-                                                       share0),
-                        Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
-                    };
-                });
-
-                let stream = in_stream1.try_clone().expect("server 0: failed to clone stream");
-                let sender_thread1 = thread::spawn(move || {
-                    match get_confirmation(stream.try_clone()
-                        .expect("server 0: failed to clone stream")) {
-                        Ok(_) => return send_dt_shares(stream.try_clone()
-                                                           .expect("server 0: failed to clone stream"),
-                                                       share1),
-                        Err(e) => return Err(e),// panic!("server 0: failed to recv confirmation"),
-                    };
-                });
-
-                match sender_thread0.join() {
-                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-                                      &s0_pfx, i, now.elapsed().unwrap().as_millis()),
-                    Err(_) => panic!("main: failed to join sender 0"),
-                };//.expect("main: failed to rejoin server 0");
-
-                match sender_thread1.join() {
-                    Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
-                                      &s1_pfx, i, now.elapsed().unwrap().as_millis()),
-                    Err(_) => panic!("main: failed to join sender 1"),
-                };//.expect("main: failed to rejoin server 0");
-            }
+            print!("{} [{}] generating equality bigint shares...           ", &prefix, i);
+            let now = SystemTime::now();
+            let (equality_bigint_share0, equality_bigint_share1) = generate_equality_bigint_shares(&ctx, &thread_pool);
+            println!("complete -- work time = {:5} (ms)",
+                     now.elapsed().unwrap().as_millis());
+            print!("{} [{}] generating additive bigint shares...           ", &prefix, i);
+            let now = SystemTime::now();
+            let (additive_bigint_share0, additive_bigint_share1) = generate_additive_bigint_shares(&ctx, &thread_pool);
+            println!("complete -- work time = {:5} (ms)",
+                     now.elapsed().unwrap().as_millis());
 
 
-            trees_remaining -= ctx.tree_training_batch_size as isize;
-            batch_count += 1;
+            let now = SystemTime::now();
+            let (rfs_share0, rfs_share1) = generate_rfs_share(&ctx);
+            println!("complete -- work time = {:5} (ms)",
+                     now.elapsed().unwrap().as_millis());
+
+            let now = SystemTime::now();
+            let (bagging_share0, bagging_share1) = generate_bagging_share(&ctx);
+            println!("complete -- work time = {:5} (ms)",
+                     now.elapsed().unwrap().as_millis());
+
+            let now = SystemTime::now();
+            let (matrix_mul_share0, matrix_mul_share1) = generate_matrix_shares(&ctx, (ctx.attr_value_cnt * ctx.feature_selected) as usize, (ctx.attr_value_cnt * ctx.feature_cnt) as usize, ctx.instance_cnt as usize, BINARY_PRIME as u64);
+            println!("complete -- work time = {:5} (ms)",
+                     now.elapsed().unwrap().as_millis());
+
+            print!("{} [{}] generating equality integer shares...           ", &prefix, i);
+            let now = SystemTime::now();
+            let (equality_share0, equality_share1) = generate_equality_integer_shares(&ctx, &thread_pool);
+            println!("complete -- work time = {:5} (ms)",
+                     now.elapsed().unwrap().as_millis());
+
+            let now = SystemTime::now();
+            let (bagging_matrix_mul_share0, bagging_matrix_mul_share1) = generate_matrix_shares(&ctx, (ctx.feature_selected * ctx.attr_value_cnt + ctx.class_value_cnt) as usize, ctx.instance_cnt as usize, ctx.instance_selected as usize, BINARY_PRIME as u64);
+            println!("complete -- work time = {:5} (ms)",
+                     now.elapsed().unwrap().as_millis());
+
+            let mut share0 = DecisionTreeShares {
+                additive_triples: add_triples0,
+                additive_bigint_triples: additive_bigint_share0,
+                rfs_shares: rfs_share0,
+                bagging_shares: bagging_share0,
+                binary_triples: binary_triples0,
+                equality_shares: equality_bigint_share0,
+                equality_integer_shares: equality_share0,
+                current_additive_index: Arc::new(Mutex::new(0)),
+                current_additive_bigint_index: Arc::new(Mutex::new(0)),
+                current_equality_index: Arc::new(Mutex::new(0)),
+                current_binary_index: Arc::new(Mutex::new(0)),
+                sequential_additive_index: Default::default(),
+                sequential_additive_bigint_index: 0,
+                sequential_equality_index: 0,
+                sequential_binary_index: 0,
+                sequential_equality_integer_index: Default::default(),
+                sequential_ohe_additive_index: 0,
+                matrix_mul_shares: matrix_mul_share0,
+                bagging_matrix_mul_shares: bagging_matrix_mul_share0,
+            };
+
+            let mut share1 = DecisionTreeShares {
+                additive_triples: add_triples1,
+                additive_bigint_triples: additive_bigint_share1,
+                rfs_shares: rfs_share1,
+                bagging_shares: bagging_share1,
+                binary_triples: binary_triples1,
+                equality_shares: equality_bigint_share1,
+                equality_integer_shares: equality_share1,
+                current_additive_index: Arc::new(Mutex::new(0)),
+                current_additive_bigint_index: Arc::new(Mutex::new(0)),
+                current_equality_index: Arc::new(Mutex::new(0)),
+                current_binary_index: Arc::new(Mutex::new(0)),
+                sequential_additive_index: Default::default(),
+                sequential_additive_bigint_index: 0,
+                sequential_equality_index: 0,
+                sequential_binary_index: 0,
+                sequential_equality_integer_index: Default::default(),
+                sequential_ohe_additive_index: 0,
+                matrix_mul_shares: matrix_mul_share1,
+                bagging_matrix_mul_shares: bagging_matrix_mul_share1,
+            };
+//            let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
+            let mut file0 = File::create(format!("{}_{}shares_tree_{}_0.txt", &ctx.output_path, ctx.tree_count, i).as_str()).unwrap();
+            let mut file1 = File::create(format!("{}_{}shares_tree_{}_1.txt", &ctx.output_path, ctx.tree_count, i).as_str()).unwrap();
+
+            let sender_thread0 = thread::spawn(move || {
+                write_shares_to_file(share0, &mut file0);
+            });
+
+//            let stream = in_stream1.try_clone().expect("server 0: failed to clone stream");
+            let sender_thread1 = thread::spawn(move || {
+                write_shares_to_file(share1, &mut file1)
+            });
+
+            match sender_thread0.join() {
+                Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
+                                  &s0_pfx, i, now.elapsed().unwrap().as_millis()),
+                Err(_) => panic!("main: failed to join sender 0"),
+            };//.expect("main: failed to rejoin server 0");
+
+            match sender_thread1.join() {
+                Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
+                                  &s1_pfx, i, now.elapsed().unwrap().as_millis()),
+                Err(_) => panic!("main: failed to join sender 1"),
+            };//.expect("main: failed to rejoin server 0");
         }
+    }
+
+    fn write_shares_to_file(mut shares: DecisionTreeShares, file: &mut File) {
+        //////////////////////// SEND ADDITIVES ////////////////////////
+
+        let mut additive_shares = shares.additive_triples;
+
+        //////////////////////// SEND ADDITIVES ////////////////////////
+
+        let mut binary_triples = shares.binary_triples;
+        let mut binary_share_str_vec = Vec::new();
+        for item in binary_triples.iter() {
+            binary_share_str_vec.push(serde_json::to_string(&item).unwrap());
+        }
+
+
+        //////////////////////// ADDITIVE BIGINT ////////////////////////
+        let mut additive_bigint_triples = shares.additive_bigint_triples;
+        let mut additive_bigint_str_vec = Vec::new();
+        for item in additive_bigint_triples.iter() {
+            let mut tuples = Vec::new();
+//            tuples.push(serde_json::to_string(&(item.0.to_bytes_le())).unwrap());
+//            tuples.push(serde_json::to_string(&(item.1.to_bytes_le())).unwrap());
+//            tuples.push(serde_json::to_string(&(item.2.to_bytes_le())).unwrap());
+
+            tuples.push(item.0.to_string());
+            tuples.push(item.1.to_string());
+            tuples.push(item.2.to_string());
+
+            additive_bigint_str_vec.push(tuples.join("&"));
+        }
+
+        //////////////////////// EQUALITY BIGINT ////////////////////////
+        let mut equality_bigint_triples = shares.equality_shares;
+        let mut equality_bigint_str_vec = Vec::new();
+        for item in equality_bigint_triples.iter() {
+            equality_bigint_str_vec.push(item.to_string());
+        }
+
+        //////////////////////// RFS Shares ////////////////////////
+        let mut rfs_shares = shares.rfs_shares;
+        let mut rfs_shares_str_vec = Vec::new();
+        for item in rfs_shares.iter() {
+            rfs_shares_str_vec.push(serde_json::to_string(&item).unwrap());
+        }
+
+        //////////////////////// Bagging Shares ////////////////////////
+        let mut bagging_shares = shares.bagging_shares;
+        let mut bagging_shares_str_vec = Vec::new();
+        for item in bagging_shares.iter() {
+            bagging_shares_str_vec.push(serde_json::to_string(&item).unwrap());
+        }
+
+        //////////////////////// Matrix Multiplication Shares ////////////////////////
+        let mut matrix_mul_share = shares.matrix_mul_shares;
+        let mut matrix_mul_share_str_vec = Vec::new();
+        matrix_mul_share_str_vec.push(serde_json::to_string(&matrix_mul_share.0).unwrap());
+        matrix_mul_share_str_vec.push(serde_json::to_string(&matrix_mul_share.1).unwrap());
+        matrix_mul_share_str_vec.push(serde_json::to_string(&matrix_mul_share.2).unwrap());
+
+        //////////////////////// EQUALITY INTEGER ////////////////////////
+        let mut equality_integer_shares = shares.equality_integer_shares;
+
+
+        let mut bagging_matrix_mul_share = shares.bagging_matrix_mul_shares;
+        let mut bagging_matrix_mul_share_str_vec = Vec::new();
+        bagging_matrix_mul_share_str_vec.push(serde_json::to_string(&bagging_matrix_mul_share.0).unwrap());
+        bagging_matrix_mul_share_str_vec.push(serde_json::to_string(&bagging_matrix_mul_share.1).unwrap());
+        bagging_matrix_mul_share_str_vec.push(serde_json::to_string(&bagging_matrix_mul_share.2).unwrap());
+
+        let dt_share_message = DecisionTreeTIShareMessage {
+            additive_triples: serde_json::to_string(&additive_shares).unwrap(),
+            additive_bigint_triples: additive_bigint_str_vec.join(";"),
+            binary_triples: binary_share_str_vec.join(";"),
+            equality_shares: equality_bigint_str_vec.join(";"),
+            rfs_shares: rfs_shares_str_vec.join(";"),
+            bagging_shares: bagging_shares_str_vec.join(";"),
+            matrix_mul_shares: matrix_mul_share_str_vec.join("&"),
+            bagging_matrix_mul_shares: bagging_matrix_mul_share_str_vec.join("&"),
+            equality_integer_shares: serde_json::to_string(&equality_integer_shares).unwrap(),
+        };
+        file.write_all(serde_json::to_string(&dt_share_message).unwrap().as_bytes());
     }
 
     fn send_dt_shares(mut stream: TcpStream, mut shares: DecisionTreeShares) -> io::Result<()> {

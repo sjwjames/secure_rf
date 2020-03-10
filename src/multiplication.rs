@@ -27,9 +27,10 @@ pub mod multiplication {
         let mut result = vec![BigUint::zero(); x_list.len()];
         let mut diff_list = Vec::new();
         let prime = big_uint_clone(&ctx.dt_training.big_int_prime);
+        let shares = get_bigint_shares(ctx,x_list.len());
         for i in 0..x_list.len() {
-            diff_list.push((big_uint_subtract(&x_list[i], &ctx.dt_shares.additive_bigint_triples[i].0, &prime),
-                            big_uint_subtract(&y_list[i], &ctx.dt_shares.additive_bigint_triples[i].1, &prime)));
+            diff_list.push((big_uint_subtract(&x_list[i], &shares[i].0, &prime),
+                            big_uint_subtract(&y_list[i], &shares[i].1, &prime)));
         }
 
         let mut diff_list_received = Vec::new();
@@ -61,7 +62,7 @@ pub mod multiplication {
             e_list.push(diff_list_received[i].1.mod_floor(&prime));
         }
 
-        let big_int_shares = &ctx.dt_shares.additive_bigint_triples;
+        let big_int_shares = get_bigint_shares(ctx,batch_size);
         let big_asymmetric_bit = if ctx.asymmetric_bit == 1 { BigUint::one() } else { BigUint::zero() };
         for i in 0..batch_size {
             let u = &big_int_shares[i].0;

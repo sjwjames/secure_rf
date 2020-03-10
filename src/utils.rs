@@ -249,6 +249,17 @@ pub mod utils {
         return shares;
     }
 
+
+    pub fn get_bigint_shares(ctx: &mut ComputingParty, range: usize) -> Vec<(BigUint, BigUint, BigUint)> {
+        let current_index = ctx.dt_shares.sequential_additive_bigint_index;
+//        let shares = ctx.dt_shares.additive_triples.get(&prime).unwrap()[*current_index..current_index + range].to_vec();
+        let share = big_uint_triple_clone(&ctx.dt_shares.additive_bigint_triples[0]);
+        let shares = vec![share; range];
+        ctx.dt_shares.sequential_additive_bigint_index+=range;
+        return shares;
+    }
+
+
     pub fn receive_message_from_queue(address: &String, routing_key: &String, message_count: usize) -> Vec<String> {
 //        thread::sleep(Duration::from_millis(10));
         let mut connection = Connection::insecure_open(address).unwrap();

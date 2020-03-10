@@ -45,23 +45,22 @@ ohe_binary_shares = 1000
 ohe_equality_shares = 1000
 
 #[BREAST CANCER]
-#instance_selected = 455
-#feature_selected = 5
-#batch_size = 128
-#tree_training_batch_size = 20
-#attr_value_count = 4
-#class_value_count = 2
-#attribute_count = 30
-#instance_count = 455
-#asymmetric_bit = 0
-#prime = 512
-#big_int_prime = "170141183460469231731687303715884105757"
-#dataset_size_prime = 32
-#big_int_ti_index = 0
-#bit_length = 127
-#x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainX_shared_fold1_0.csv"
-#y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainy_shared_fold1_0.csv"
-#output_path = "breast_cancer_results/fold1/"
+instance_selected = 21
+feature_selected = 5
+batch_size = 84
+tree_training_batch_size = 20
+attr_value_count = 4
+class_value_count = 2
+attribute_count = 30
+instance_count = 455
+prime = 32
+big_int_prime = "9671406556917033397649483"
+dataset_size_prime = 32
+big_int_ti_index = 0
+bit_length = 83
+x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainX_shared_fold1_0.csv"
+y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainy_shared_fold1_0.csv"
+output_path = "breast_cancer_results/fold1/"
 
 
 #instance_selected = 21
@@ -85,22 +84,22 @@ ohe_equality_shares = 1000
 
 
 #[ECG Heartbeat]
-instance_selected = 121
-feature_selected = 14
-batch_size = 106
-tree_training_batch_size = 20
-attr_value_count = 4
-class_value_count = 2
-attribute_count = 188
-instance_count = 11641
-prime = 128
-big_int_prime = "40564819207303340847894502572071"
-dataset_size_prime = 32
-big_int_ti_index = 0
-bit_length = 105
-x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/pt_data/shared/trainX_shared_fold2_0.csv"
-y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/pt_data/shared/trainy_shared_fold2_0.csv"
-output_path = "ECG/fold2/"
+#instance_selected = 121
+#feature_selected = 14
+#batch_size = 106
+#tree_training_batch_size = 20
+#attr_value_count = 4
+#class_value_count = 2
+#attribute_count = 188
+#instance_count = 11641
+#prime = 128
+#big_int_prime = "40564819207303340847894502572071"
+#dataset_size_prime = 32
+#big_int_ti_index = 0
+#bit_length = 105
+#x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/pt_data/shared/trainX_shared_fold2_0.csv"
+#y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/pt_data/shared/trainy_shared_fold2_0.csv"
+#output_path = "ECG/fold2/"
 
 #[RANDOM DATA]
 #instance_selected = 3

@@ -1,5 +1,5 @@
 pub mod random_forest {
-    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, produce_dt_data, load_dt_raw_data, receive_preprocessing_shares};
+    use crate::computing_party::computing_party::{ComputingParty, get_formatted_address, try_setup_socket, initialize_party_context, ti_receive, produce_dt_data, load_dt_raw_data, receive_preprocessing_shares, read_shares};
     use crate::decision_tree::decision_tree;
     use std::sync::{Arc, Mutex};
     use threadpool::ThreadPool;
@@ -182,7 +182,7 @@ pub mod random_forest {
         let runtime = now.elapsed().unwrap().as_millis();
         println!("loading & discretization completes -- work time = {:5} (ms)", runtime);
 
-        receive_preprocessing_shares(ctx);
+//        receive_preprocessing_shares(ctx);
 
         let attr_value_count = ctx.dt_data.attr_value_count;
         let class_value_count = ctx.dt_data.class_value_count;
@@ -242,63 +242,54 @@ pub mod random_forest {
 //            let mut class_values_bytes_copied = class_values_bytes.clone();
 
 //            thread_pool.execute(move||{
-//                let mut rfs_x = random_feature_selection(&attr_values_bytes_copied, &mut dt_ctx);
-//                rfs_x.append(&mut class_values_bytes_copied);
-//
-//                let sampling_result = sample_with_replacement(&mut dt_ctx, &rfs_x);
-//                dt_ctx.party0_port = current_p0_port;
-//                dt_ctx.party1_port = current_p1_port;
-//
-//                let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);
-//                let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr, &dt_ctx.message_manager);
-//                dt_ctx.in_stream = in_stream;
-//                dt_ctx.o_stream = o_stream;
-//                produce_dt_data(sampling_result, &mut dt_ctx);
-//                let max_depth = (&dt_ctx.dt_training).max_depth;
-//                let dt_training = decision_tree::train(&mut dt_ctx, max_depth);
-//                result_vec.push(dt_ctx.dt_results.result_list);
-//                current_p0_port += 1;
-//                current_p1_port += 1;
+
 //            });
 
-            let dt_shares = ti_receive(
-                ctx.ti_stream.try_clone().expect("failed to clone ti recvr"), ctx);
+
+//            let dt_shares = ti_receive(
+//                ctx.ti_stream.try_clone().expect("failed to clone ti recvr"), ctx);
             let mut dt_ctx = ctx.clone();
-            dt_ctx.dt_shares = dt_shares;
             let mut attr_values_bytes_copied = attr_values_bytes.clone();
             let mut class_values_bytes_copied = class_values_bytes.clone();
-            let now = SystemTime::now();
-            let mut rfs_x = random_feature_selection(&attr_values_bytes_copied, &mut dt_ctx);
-            let runtime = now.elapsed().unwrap().as_millis();
-            println!("RF completes -- work time = {:5} (ms)", runtime);
+            thread_pool.execute(move || {
+                dt_ctx.party0_port = current_p0_port;
+                dt_ctx.party1_port = current_p1_port;
+                let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);
+                let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr, &dt_ctx.message_manager);
+                dt_ctx.in_stream = in_stream;
+                dt_ctx.o_stream = o_stream;
+                dt_ctx.dt_shares = read_shares(&mut dt_ctx,current_tree_index);
 
-            rfs_x.append(&mut class_values_bytes_copied);
+                let now = SystemTime::now();
+                let mut rfs_x = random_feature_selection(&attr_values_bytes_copied, &mut dt_ctx);
+                let runtime = now.elapsed().unwrap().as_millis();
+                println!("RF completes -- work time = {:5} (ms)", runtime);
 
-            let now = SystemTime::now();
-            let sampling_result = sample_with_replacement(&mut dt_ctx, &rfs_x);
-            let runtime = now.elapsed().unwrap().as_millis();
-            println!("RF completes -- work time = {:5} (ms)", runtime);
+                rfs_x.append(&mut class_values_bytes_copied);
 
-            dt_ctx.party0_port = current_p0_port;
-            dt_ctx.party1_port = current_p1_port;
+                let now = SystemTime::now();
+                let sampling_result = sample_with_replacement(&mut dt_ctx, &rfs_x);
+                let runtime = now.elapsed().unwrap().as_millis();
+                println!("RF completes -- work time = {:5} (ms)", runtime);
 
-            let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);
-            let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr, &dt_ctx.message_manager);
-            dt_ctx.in_stream = in_stream;
-            dt_ctx.o_stream = o_stream;
-            produce_dt_data(sampling_result, &mut dt_ctx);
-            let max_depth = (&dt_ctx.dt_training).max_depth;
-            let now = SystemTime::now();
-            let dt_training = decision_tree::train(&mut dt_ctx, max_depth);
-            let runtime = now.elapsed().unwrap().as_millis();
-            println!("One tree completes -- work time = {:5} (ms)", runtime);
-            if ctx.asymmetric_bit == 1 {
-                dt_ctx.result_file.write_all("\n".as_bytes());
-            }
-//            current_p0_port += 1;
-//            current_p1_port += 1;
+                dt_ctx.party0_port = current_p0_port;
+                dt_ctx.party1_port = current_p1_port;
 
+                let (internal_addr, external_addr) = get_formatted_address(dt_ctx.party_id, &dt_ctx.party0_ip, dt_ctx.party0_port, &dt_ctx.party1_ip, dt_ctx.party1_port);
+                let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr, &dt_ctx.message_manager);
+                dt_ctx.in_stream = in_stream;
+                dt_ctx.o_stream = o_stream;
+                produce_dt_data(sampling_result, &mut dt_ctx);
+                let max_depth = (&dt_ctx.dt_training).max_depth;
+                let now = SystemTime::now();
+                let mut result_file=File::create(  format!("{}{}trees_{}", &dt_ctx.output_path,dt_ctx.tree_count,current_tree_index).as_str()).unwrap();
 
+                let dt_training = decision_tree::train(&mut dt_ctx, max_depth,&mut result_file);
+                let runtime = now.elapsed().unwrap().as_millis();
+                println!("One tree completes -- work time = {:5} (ms)", runtime);
+            });
+            current_p0_port += 1;
+            current_p1_port += 1;
         }
 
         thread_pool.join();

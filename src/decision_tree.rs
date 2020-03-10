@@ -23,6 +23,7 @@ pub mod decision_tree {
     use std::ops::{Add, Mul};
     use crate::comparison::comparison::compare_bigint;
     use std::str::FromStr;
+    use std::fs::File;
 
     pub struct DecisionTreeData {
         pub attr_value_count: usize,
@@ -200,7 +201,7 @@ pub mod decision_tree {
     }
 
 
-    pub fn train(ctx: &mut ComputingParty, r: usize) -> DecisionTreeResult {
+    pub fn train(ctx: &mut ComputingParty, r: usize, result_file: &mut File) -> DecisionTreeResult {
         println!("start building model");
         ctx.thread_hierarchy.push(format!("DT_level_{}", r));
         if ctx.debug_output {
@@ -254,7 +255,7 @@ pub mod decision_tree {
             println!("Exited on base case: Recursion Level == 0");
 //            ctx.dt_results.result_list.push(format!("class={}", major_index));
             if ctx.asymmetric_bit == 1 {
-                ctx.result_file.write_all(format!("class={},", major_index).as_bytes());
+                result_file.write_all(format!("class={},", major_index).as_bytes());
             }
 //            ctx.thread_hierarchy.pop();
             return ctx.dt_results.clone();
@@ -273,12 +274,12 @@ pub mod decision_tree {
         let class_value_count = ctx.dt_data.class_value_count;
         let dataset_size = ctx.dt_data.instance_count;
 
-        let mut  major_class_index_decimal= if ctx.asymmetric_bit==1{
+        let mut major_class_index_decimal = if ctx.asymmetric_bit == 1 {
             vec![BigUint::one(); dataset_size]
-        }else{
+        } else {
             vec![BigUint::zero(); dataset_size]
         };
-        let mut major_class_trans_count = dot_product_bigint(&ctx.dt_data.class_values_big_integer[major_index].clone(),&major_class_index_decimal,ctx);
+        let mut major_class_trans_count = dot_product_bigint(&ctx.dt_data.class_values_big_integer[major_index].clone(), &major_class_index_decimal, ctx);
         let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
 
         let thread_pool = ThreadPool::new(ctx.thread_count);
@@ -354,7 +355,7 @@ pub mod decision_tree {
             println!("Exited on base case: All transactions predict same outcome");
 //            ctx.dt_results.result_list.push(format!("class={}", major_index));
             if ctx.asymmetric_bit == 1 {
-                ctx.result_file.write_all(format!("class={},", major_index).as_bytes());
+                result_file.write_all(format!("class={},", major_index).as_bytes());
             }
 
             ctx.thread_hierarchy.pop();
@@ -510,7 +511,7 @@ pub mod decision_tree {
 
         let mut gini_max_numerator = big_uint_clone(&gini_numerators[k]);
         let mut gini_max_denominator = big_uint_clone(&gini_denominators[k]);
-        let mut gini_argmax = if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero()};
+        let mut gini_argmax = if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero() };
         k += 1;
         ctx.thread_hierarchy.push("gini_argmax_computation".to_string());
         while k < attr_count {
@@ -526,12 +527,12 @@ pub mod decision_tree {
                 let mut right_operand = mult1;
 
                 new_assignments_bin[0] = compare_bigint(&left_operand, &right_operand, ctx).mod_floor(&BigUint::from_usize(BINARY_PRIME).unwrap());
-                new_assignments_bin[1] =  big_uint_clone(&new_assignments_bin[0]).add(&(if ctx.asymmetric_bit == 1 { BigUint::one() } else { BigUint::zero() })).mod_floor(&BigUint::from_usize(BINARY_PRIME).unwrap());
-                let new_assignments_bin_converted = [new_assignments_bin[0].to_u8().unwrap(),new_assignments_bin[1].to_u8().unwrap()].to_vec();
-                let new_assignments_bin_converted_big_binary = change_binary_to_bigint_field(&new_assignments_bin_converted,ctx);
+                new_assignments_bin[1] = big_uint_clone(&new_assignments_bin[0]).add(&(if ctx.asymmetric_bit == 1 { BigUint::one() } else { BigUint::zero() })).mod_floor(&BigUint::from_usize(BINARY_PRIME).unwrap());
+                let new_assignments_bin_converted = [new_assignments_bin[0].to_u8().unwrap(), new_assignments_bin[1].to_u8().unwrap()].to_vec();
+                let new_assignments_bin_converted_big_binary = change_binary_to_bigint_field(&new_assignments_bin_converted, ctx);
 
                 gini_argmax = dot_product_bigint(&new_assignments_bin_converted_big_binary, &gini_argmaxes.to_vec(), ctx);
-                println!("gini_argmax:{}",gini_argmax.to_string());
+                println!("gini_argmax:{}", gini_argmax.to_string());
                 gini_max_numerator = dot_product_bigint(&new_assignments_bin_converted_big_binary, &numerators.to_vec(), ctx);
                 gini_max_denominator = dot_product_bigint(&new_assignments_bin_converted_big_binary, &denominators.to_vec(), ctx);
             }
@@ -557,7 +558,7 @@ pub mod decision_tree {
         let mut shared_gini_argmax = shared_gini_argmax.to_usize().unwrap();
         attributes[shared_gini_argmax] = 0;
         if ctx.asymmetric_bit == 1 {
-            ctx.result_file.write_all(format!("attr={},", shared_gini_argmax).as_bytes());
+            result_file.write_all(format!("attr={},", shared_gini_argmax).as_bytes());
         }
 //        ctx.dt_results.result_list.push(format!("attr={}", shared_gini_argmax));
         ctx.dt_training.attribute_bit_vector = attributes;
@@ -573,7 +574,7 @@ pub mod decision_tree {
             for j in 0..attr_val_count {
                 let mut dt_ctx = ctx.clone();
                 dt_ctx.dt_training.subset_transaction_bit_vector = result_map.get(&j).unwrap().clone();
-                train(&mut dt_ctx, r - 1);
+                train(&mut dt_ctx, r - 1, result_file);
             }
         } else {
             ctx.thread_hierarchy.push("update_transactions".to_string());
@@ -595,7 +596,7 @@ pub mod decision_tree {
             let mut batch_multi_result_map = batch_multi_result_map.lock().unwrap();
             for j in 0..attr_val_count {
                 ctx.dt_training.subset_transaction_bit_vector = (*batch_multi_result_map).get(&j).unwrap().clone();
-                train(ctx, r - 1);
+                train(ctx, r - 1, result_file);
             }
 
             ctx.thread_hierarchy.pop();
@@ -626,7 +627,7 @@ pub mod decision_tree {
                 let bd_result = bit_decomposition(s[i], ctx, ctx.dt_training.dataset_size_bit_length as usize);
                 bit_shares.push(bd_result);
             }
-            println!("bit_shares:{:?}",bit_shares);
+            println!("bit_shares:{:?}", bit_shares);
             argmax_result = arg_max(&bit_shares, ctx);
         } else {
             let thread_pool = ThreadPool::new(ctx.thread_count);
