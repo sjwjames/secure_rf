@@ -21,7 +21,7 @@ pub mod protocol {
     use crate::comparison::comparison::comparison;
     use crate::or_xor::or_xor::or_xor;
     use crate::bit_decomposition::bit_decomposition::{batch_log_decomp, bit_decomposition_opt, bit_decomposition};
-    use crate::discretize::discretize::{xor_share_to_additive, reveal_submodule};
+    use crate::discretize::discretize::{xor_share_to_additive, reveal_submodule, batch_compare};
     use crate::constants::constants;
 
     const BATCH_SIZE_REVEAL: usize = constants::REVEAL_BATCH_SIZE;
@@ -122,6 +122,34 @@ pub mod protocol {
 
         ctx.thread_hierarchy.pop();
         println!("arg_max ends");
+        result
+    }
+
+    pub fn arg_max_ring(x: &Vec<Wrapping<u64>>, ctx: &mut ComputingParty) -> Vec<u8> {
+        let number_count = x.len();
+        // denote result shares of pairwise comparisons
+        let mut result = vec![0u8; number_count];
+        if number_count == 1 {
+            result[0] = 1;
+        } else {
+            let mut comparison_list_x = Vec::new();
+            let mut comparison_list_y = Vec::new();
+
+            for i in 0..number_count{
+                let mut y_row = Vec::new();
+                comparison_list_x.append(&mut vec![x[i];number_count-1]);
+                for j in 0..number_count{
+                    if i!=j{
+                        y_row.push(x[j]);
+                    }
+                }
+                comparison_list_y.append(&mut y_row);
+            }
+            let comparsion_result:Vec<u8> = batch_compare(&comparison_list_x,&comparison_list_y,ctx).iter().map(|x|*x as u8).collect();
+            for i in 0..number_count{
+                result[i] = parallel_multiplication(&comparsion_result[i*(number_count-1)..(i+1)*(number_count-1)].to_vec(),ctx);
+            }
+        }
         result
     }
 
@@ -482,30 +510,26 @@ pub mod protocol {
 
 
     // returns x == y ? 1 : 0 for all values in x_list, y_list
-    pub fn batch_equality(x_list : &Vec<Wrapping<u64>>,
-                          y_list : &Vec<Wrapping<u64>>,
-                          ctx    : &mut ComputingParty) -> Vec<u64> {
-
-
+    pub fn batch_equality(x_list: &Vec<Wrapping<u64>>,
+                          y_list: &Vec<Wrapping<u64>>,
+                          ctx: &mut ComputingParty) -> Vec<u64> {
         let len = x_list.len();
         let mut op1: Vec<Wrapping<u64>> = x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (x - y)).collect();
-        op1.append( &mut x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (y - x)).collect() );
+        op1.append(&mut x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (y - x)).collect());
 
-        let diff_dc  = batch_bit_extract(
+        let diff_dc = batch_bit_extract(
             &op1,
             (ctx.integer_precision + ctx.decimal_precision + 1) as usize,
-            ctx
+            ctx,
         );
 
-        (0..len).map(|i| (diff_dc[i] ^ diff_dc[i+len]) ^ (ctx.asymmetric_bit as u64))
+        (0..len).map(|i| (diff_dc[i] ^ diff_dc[i + len]) ^ (ctx.asymmetric_bit as u64))
             .collect()
-
     }
 
-    pub fn batch_bit_extract(x_additive_list : &Vec<Wrapping<u64>>,
-                             bit_pos         : usize,
-                             ctx             : &mut ComputingParty) -> Vec<u64> {
-
+    pub fn batch_bit_extract(x_additive_list: &Vec<Wrapping<u64>>,
+                             bit_pos: usize,
+                             ctx: &mut ComputingParty) -> Vec<u64> {
         assert!(0 <= bit_pos && bit_pos < 64);
         let len = x_additive_list.len();
 
@@ -523,14 +547,13 @@ pub mod protocol {
 
         let mut matrices = bit_pos;
         while matrices > 1 {
-
             let pairs = matrices / 2;
             let remainder = matrices % 2;
 
-            let mut p      = vec![0u64 ; len];
-            let mut p_next = vec![0u64 ; len];
-            let mut g      = vec![0u64 ; len];
-            let mut g_next = vec![0u64 ; len];
+            let mut p = vec![0u64; len];
+            let mut p_next = vec![0u64; len];
+            let mut g = vec![0u64; len];
+            let mut g_next = vec![0u64; len];
 
             for j in 0..len {
                 for i in 0..pairs {
@@ -554,8 +577,8 @@ pub mod protocol {
             // let matmul = batch_bitwise_and(&l_ops, &r_ops, ctx, false);
             // let matmul = utility::decompactify_bit_vector(&matmul, pairs as usize, 2*len);
 
-            let mut p_layer_next = vec![0u64 ; len];
-            let mut g_layer_next = vec![0u64 ; len];
+            let mut p_layer_next = vec![0u64; len];
+            let mut g_layer_next = vec![0u64; len];
 
             for j in 0..len {
                 for i in 0..pairs {
@@ -574,47 +597,42 @@ pub mod protocol {
             matrices = pairs + remainder;
         }
 
-        g_layer.iter().zip(&propogate).map(|(&g, &p)| 1 & (g ^ (p >> bit_pos as u64)) ).collect()
-
+        g_layer.iter().zip(&propogate).map(|(&g, &p)| 1 & (g ^ (p >> bit_pos as u64))).collect()
     }
 
-    pub fn reveal_xor(x_list : &Vec<u64>,
-                      ctx    : &mut ComputingParty) -> Vec<Wrapping<u64>> {
-
-
-        let x_additive = xor_share_to_additive( x_list, ctx, 64 );
+    pub fn reveal_xor(x_list: &Vec<u64>,
+                      ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
+        let x_additive = xor_share_to_additive(x_list, ctx, 64);
 
         reveal_wrapping(&x_additive, ctx)
     }
 
     // recombine a list of secret shares with option to map from ring 2^64 to real.
-    pub fn reveal_wrapping(x_list : &Vec<Wrapping<u64>>,
-                           ctx    : &mut ComputingParty) -> Vec<Wrapping<u64>> {
-
+    pub fn reveal_wrapping(x_list: &Vec<Wrapping<u64>>,
+                           ctx: &mut ComputingParty) -> Vec<Wrapping<u64>> {
         let len = (*x_list).len();
-        let mut x_combined = vec![ Wrapping(0u64) ; len];
+        let mut x_combined = vec![Wrapping(0u64); len];
         let mut remainder = len.clone();
         let mut index = 0;
 
         while remainder > BATCH_SIZE_REVEAL {
+            let mut x_sublist = [Wrapping(0); BATCH_SIZE_REVEAL];
+            x_sublist.clone_from_slice(&(x_list[BATCH_SIZE_REVEAL * index..BATCH_SIZE_REVEAL * (index + 1)]));
 
-            let mut x_sublist = [ Wrapping(0) ; BATCH_SIZE_REVEAL];
-            x_sublist.clone_from_slice(&(x_list[BATCH_SIZE_REVEAL*index..BATCH_SIZE_REVEAL*(index+1)]));
+            let x_combined_sublist = reveal_submodule(x_sublist, BATCH_SIZE_REVEAL, ctx, false);
 
-            let x_combined_sublist = reveal_submodule(x_sublist, BATCH_SIZE_REVEAL, ctx,false);
-
-            x_combined[BATCH_SIZE_REVEAL*index..BATCH_SIZE_REVEAL*(index+1)].clone_from_slice(&x_combined_sublist);
+            x_combined[BATCH_SIZE_REVEAL * index..BATCH_SIZE_REVEAL * (index + 1)].clone_from_slice(&x_combined_sublist);
 
             remainder -= BATCH_SIZE_REVEAL;
             index += 1;
         }
 
-        let mut x_sublist = [ Wrapping(0) ; BATCH_SIZE_REVEAL];
-        x_sublist[0..remainder].clone_from_slice(&(x_list[BATCH_SIZE_REVEAL*index..]));
+        let mut x_sublist = [Wrapping(0); BATCH_SIZE_REVEAL];
+        x_sublist[0..remainder].clone_from_slice(&(x_list[BATCH_SIZE_REVEAL * index..]));
 
-        let x_combined_sublist = reveal_submodule(x_sublist, BATCH_SIZE_REVEAL, ctx,false);
+        let x_combined_sublist = reveal_submodule(x_sublist, BATCH_SIZE_REVEAL, ctx, false);
 
-        x_combined[BATCH_SIZE_REVEAL*index..].clone_from_slice(&(x_combined_sublist[..remainder]));
+        x_combined[BATCH_SIZE_REVEAL * index..].clone_from_slice(&(x_combined_sublist[..remainder]));
 
         x_combined
     }
