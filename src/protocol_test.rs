@@ -15,7 +15,7 @@ pub mod protocol_test {
     use crate::or_xor::or_xor::{or_xor, or_xor_bigint};
     use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
     use std::time::SystemTime;
-    use crate::discretize::discretize::{reveal, discretize, binary_vector_to_ring, xor_share_to_additive};
+    use crate::discretize::discretize::{reveal, discretize, binary_vector_to_ring, xor_share_to_additive, discretize_into_ohe};
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -546,18 +546,21 @@ pub mod protocol_test {
     pub fn test_discretization(ctx: &mut ComputingParty) {
         let n = 11;
 
-        let mut values = vec![
-            Wrapping(6558502252784700000u64),
-            Wrapping(8546166971241300000u64),
-            Wrapping(16178756104899400000u64)
-
-        ];
+        let mut values = vec![ Wrapping(0u64) ; n ];
 
         if ctx.asymmetric_bit == 1 {
             values = vec![
-                Wrapping(11888241820924800000u64),
-                Wrapping(9900577102468270000u64),
-                Wrapping(2267987968810130000u64)
+                Wrapping(18446744073709550336u64),
+                Wrapping(18446744073709550592u64),
+                Wrapping(18446744073709550848u64),
+                Wrapping(18446744073709551104u64),
+                Wrapping(18446744073709551360u64),
+                Wrapping(0u64),
+                Wrapping(256u64),
+                Wrapping(512u64),
+                Wrapping(768u64),
+                Wrapping(1024u64),
+                Wrapping(1280u64)
             ];
         }
 
@@ -636,5 +639,48 @@ pub mod protocol_test {
 //        let a_received = send_u64_messages(ctx, &a);
 //        let a_combined:Vec<u64> = a.iter().zip(a_received).map(|(a,b)|(a+b).0.mod_floor(&prime)).collect();
 //        println!("a_combined:{:?}",a_combined);
+    }
+
+    pub fn test_discretization_ohe(ctx: &mut ComputingParty){
+        let mut values = vec![
+            Wrapping(18446744073709550336u64),
+            Wrapping(18446744073709550592u64),
+            Wrapping(18446744073709550848u64),
+            Wrapping(18446744073709551104u64),
+            Wrapping(18446744073709551360u64),
+            Wrapping(0u64),
+            Wrapping(256u64),
+            Wrapping(512u64),
+            Wrapping(768u64),
+            Wrapping(1024u64),
+            Wrapping(1280u64)
+        ];
+
+        if ctx.asymmetric_bit == 1 {
+            values = vec![
+                Wrapping(0u64),
+                Wrapping(0u64),
+                Wrapping(0u64),
+                Wrapping(0u64),
+                Wrapping(0u64),
+                Wrapping(0u64),
+                Wrapping(0u64),
+                Wrapping(0u64),
+                Wrapping(0u64),
+                Wrapping(0u64),
+                Wrapping(0u64)
+            ];
+        }
+        let n = 11;
+        let buckets = 5;
+        let result = discretize_into_ohe(&values,5,ctx);
+        let mut values_appended:Vec<u64> = Vec::new();
+        for j in 0..buckets{
+            let mut row:Vec<u64> = result[j].iter().map(|x|*x as u64).collect();
+            values_appended.append(&mut row);
+        }
+
+        let mut ring_values = binary_vector_to_ring(&values_appended,ctx);
+        println!("{:?}",ring_values);
     }
 }

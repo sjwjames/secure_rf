@@ -16,7 +16,7 @@ use amiquip::{Connection, Exchange, Publish, QueueDeclareOptions, ConsumerOption
 use random_forest_rust::utils::utils::{push_message_to_queue, receive_message_from_queue, Xbuffer, send_u64_messages, send_biguint_messages, mod_subtraction};
 use threadpool::ThreadPool;
 use random_forest_rust::multiplication::multiplication::multiplication_byte;
-use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication, test_batch_multiply_bigint, test_parallel_multiplication_big_integer, test_equality_big_integer, test_comparison, test_comparison_bigint, test_bit_decomposition, test_bit_decomposition_bigint, test_dot_product_bigint, test_or_xor, test_change_binary_to_decimal_field, test_argmax, test_or_xor_bigint, test_change_binary_to_bigint_field, test_dot_product_integer, test_batch_integer_equality, test_batch_bit_decomposition, test_discretization};
+use random_forest_rust::protocol_test::protocol_test::{test_multi_byte, test_batch_multiplication_byte, test_batch_multiplication_integer, test_multiplication_bigint, test_multi_thread_batch_mul_byte, test_parallel_multiplication, test_batch_multiply_bigint, test_parallel_multiplication_big_integer, test_equality_big_integer, test_comparison, test_comparison_bigint, test_bit_decomposition, test_bit_decomposition_bigint, test_dot_product_bigint, test_or_xor, test_change_binary_to_decimal_field, test_argmax, test_or_xor_bigint, test_change_binary_to_bigint_field, test_dot_product_integer, test_batch_integer_equality, test_batch_bit_decomposition, test_discretization, test_discretization_ohe};
 use rand::ThreadRng;
 use num::bigint::RandBigInt;
 use std::sync::{Arc, Mutex};
@@ -138,7 +138,7 @@ fn test_protocols() {
 //                test_equality_big_integer(&mut party_context);
 //                test_comparison(&mut party_context);
 //                test_bit_decomposition(&mut party_context);
-                test_batch_bit_decomposition(&mut party_context);
+//                test_batch_bit_decomposition(&mut party_context);
 //                test_bit_decomposition_bigint(&mut party_context);
 //                test_comparison_bigint(&mut party_context);
 //                test_dot_product_bigint(&mut party_context);
@@ -150,6 +150,7 @@ fn test_protocols() {
 //                test_dot_product_integer(&mut party_context);
 //                test_batch_integer_equality(&mut party_context);
 //                test_discretization(&mut party_context);
+                test_discretization_ohe(&mut party_context);
 //                let mut b = Vec::new();
 //                for i in 1..1000 {
 //                    b.push(BigUint::from_i32(i).unwrap());
@@ -170,8 +171,8 @@ fn test_protocols() {
 
 fn main() {
 //    test_mq();
-    run();
-//    test_protocols();
+//    run();
+    test_protocols();
 }
 
 

@@ -231,25 +231,6 @@ pub mod computing_party {
     }
 
     pub fn produce_dt_data(one_hot_encoding_data: Vec<Vec<u8>>, ctx: &mut ComputingParty) {
-//        let mut attr_values = Vec::new();
-//        let mut class_values = Vec::new();
-
-//        for i in 0..attribute_count {
-//            let mut attr_data = Vec::new();
-//            for j in 0..attr_value_count {
-//                let item_copied = one_hot_encoding_data[i * attr_value_count + j].clone();
-//                attr_data.push(item_copied);
-//            }
-//            attr_values.push(attr_data);
-//        }
-//
-//        for i in 0..class_value_count {
-//            let item_copied = one_hot_encoding_data[attr_value_count * attribute_count + i].clone();
-//            class_values.push(item_copied);
-//        }
-//
-//        dt_ctx.thread_hierarchy.push(format!("{}", current_tree_index));
-
         let attribute_count = ctx.feature_selected as usize;
         let attr_value_count = ctx.dt_data.attr_value_count;
         let class_value_count = ctx.dt_data.class_value_count;

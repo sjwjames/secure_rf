@@ -18,7 +18,7 @@ pub mod random_forest {
     use crate::or_xor::or_xor::or_xor;
     use std::time::SystemTime;
     use num::integer::*;
-    use crate::discretize::discretize::{binary_vector_to_ring, discretize};
+    use crate::discretize::discretize::{binary_vector_to_ring, discretize, discretize_into_ohe};
 
 
     pub fn random_feature_selection(attr_values: &Vec<Vec<u8>>, ctx: &mut ComputingParty) -> Vec<Vec<u8>> {
@@ -75,7 +75,7 @@ pub mod random_forest {
         let x_cols = x[0].len();
         for j in 0..x_cols {
             let mut col = Vec::new();
-            for i in 0..x_rows{
+            for i in 0..x_rows {
                 col.push(x[i][j]);
             }
             let discretized = discretize(&col, ctx.dt_data.attr_value_count, ctx);
@@ -88,27 +88,21 @@ pub mod random_forest {
             }
             ctx.dt_data.discretized_x.push(row);
         }
+    }
 
-
-//        if ctx.asymmetric_bit == 1 {
-//            ctx.dt_data.discretized_x = {
-//                [
-//                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
-//                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-//                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec(),
-//                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(0 as u64)].to_vec()
-//                ].to_vec()
-//            };
-//        } else {
-//            ctx.dt_data.discretized_x = {
-//                [
-//                    [Wrapping(1 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-//                    [Wrapping(1 as u64), Wrapping(1 as u64), Wrapping(1 as u64)].to_vec(),
-//                    [Wrapping(0 as u64), Wrapping(0 as u64), Wrapping(1 as u64)].to_vec(),
-//                    [Wrapping(0 as u64), Wrapping(1 as u64), Wrapping(0 as u64)].to_vec()
-//                ].to_vec()
-//            };
-//        }
+    pub fn discretize_data_ohe(x: &mut Vec<Vec<Wrapping<u64>>>,buckets:usize, ctx: &mut ComputingParty)->Vec<Vec<u8>>{
+        let mut x_temp = Vec::new();
+        let x_rows = x.len();
+        let x_cols = x[0].len();
+        for j in 0..x_cols {
+            let mut col = Vec::new();
+            for i in 0..x_rows {
+                col.push(x[i][j]);
+            }
+            let mut discretized = discretize_into_ohe(&col, buckets, ctx);
+            x_temp.append(&mut discretized);
+        }
+        x_temp
     }
 
     pub fn ohe_conversion(x: &Vec<Vec<Wrapping<u64>>>, ctx: &mut ComputingParty, category: usize) -> Vec<Vec<u8>> {
@@ -122,13 +116,6 @@ pub mod random_forest {
                 let mut y_row = Vec::new();
 
                 for i in 0..rows {
-//                    x_row.push(truncate_local(Wrapping((x[i][j].0 as f64 * 2f64.powf(ctx.decimal_precision as f64)) as u64),ctx.decimal_precision,ctx.asymmetric_bit));
-//                    if ctx.asymmetric_bit == 1 {
-//                        y_row.push(truncate_local(Wrapping((k as f64 * 2f64.powf(ctx.decimal_precision as f64)) as u64),ctx.decimal_precision,ctx.asymmetric_bit));
-//                    } else {
-//                        y_row.push(Wrapping(0));
-//                    }
-
                     x_row.push(x[i][j]);
                     if ctx.asymmetric_bit == 1 {
                         y_row.push(k as u64);
@@ -142,12 +129,9 @@ pub mod random_forest {
         }
 
         let equality_y = binary_vector_to_ring(&equality_y, ctx);
-        let equality_y:Vec<Wrapping<u64>> = equality_y.iter().map(|a| Wrapping(a.0 << ctx.decimal_precision as u64)).collect();
+        let equality_y: Vec<Wrapping<u64>> = equality_y.iter().map(|a| Wrapping(a.0 << ctx.decimal_precision as u64)).collect();
 
         let eq_result = batch_equality(&equality_x, &equality_y, ctx);
-//        let eq_received = send_u64_messages(ctx,&eq_result);
-//        let eq_result_revealed:Vec<u64> = eq_result.iter().zip(eq_received).map(|(a,b)|a.0^b.0).collect();
-//        println!("eq_result_revealed:{:?}",eq_result_revealed);
 
         let mut count = 0;
         let mut result = Vec::new();
@@ -178,17 +162,16 @@ pub mod random_forest {
         let mut x = load_dt_raw_data(&ctx.x_input_path);
         let mut y = load_dt_raw_data(&ctx.y_input_path);
 
+        let attr_value_count = ctx.dt_data.attr_value_count;
+        let class_value_count = ctx.dt_data.class_value_count;
+
+        discretize_into_ohe(&x,attr_value_count,ctx);
         discretize_data(&mut x, ctx);
         let runtime = now.elapsed().unwrap().as_millis();
         println!("loading & discretization completes -- work time = {:5} (ms)", runtime);
 
 //        receive_preprocessing_shares(ctx);
 
-        let attr_value_count = ctx.dt_data.attr_value_count;
-        let class_value_count = ctx.dt_data.class_value_count;
-
-        let attr_val_bit_length = ((attr_value_count as f64).log2().ceil() + 1.0) as usize;
-        let class_val_bit_length = ((class_value_count as f64).log2().ceil() + 1.0) as usize;
 
         let discretized_x = ctx.dt_data.discretized_x.clone();
         let now = SystemTime::now();
@@ -209,45 +192,15 @@ pub mod random_forest {
             }
             y_converted.push(row);
         }
-//        let mut y_temp = Vec::new();
-//        for i in 0..y.len(){
-//            y_temp.push(y[i][0]);
-//        }
-//        let mut y_converted = discretize(&y_temp,ctx.dt_data.class_value_count,ctx);
-//        let mut y_temp = Vec::new();
-//        for item in y_converted{
-//            y_temp.push([item].to_vec());
-//        }
+
         let now = SystemTime::now();
 
-        let y_converted = y_converted.iter().map(|a|[Wrapping(a[0].0<<ctx.decimal_precision as u64)].to_vec()).collect();
+        let y_converted = y_converted.iter().map(|a| [Wrapping(a[0].0 << ctx.decimal_precision as u64)].to_vec()).collect();
         let mut class_values_bytes = ohe_conversion(&y_converted, ctx, class_value_count);
         let runtime = now.elapsed().unwrap().as_millis();
         println!("OHE of classes completes -- work time = {:5} (ms)", runtime);
 
-//        println!("{:?}", ctx.dt_shares.sequential_equality_integer_index);
-//        println!("{:?}", ctx.dt_shares.sequential_additive_index);
-//        println!("{}", ctx.dt_shares.sequential_equality_index);
-//        println!("{}", ctx.dt_shares.sequential_additive_bigint_index);
-//        println!("attr_values_bytes:{:?}", attr_values_bytes[attr_value_count-1]);
-//        println!("class_values_bytes:{:?}", class_values_bytes[0]);
-
-//        let mut result_vec = Vec::new();
         for current_tree_index in 0..remainder {
-//            let dt_shares = ti_receive(
-//                ctx.ti_stream.try_clone().expect("failed to clone ti recvr"), ctx);
-//            let mut dt_ctx = ctx.clone();
-//            dt_ctx.dt_shares = dt_shares;
-//            let mut attr_values_bytes_copied = attr_values_bytes.clone();
-//            let mut class_values_bytes_copied = class_values_bytes.clone();
-
-//            thread_pool.execute(move||{
-
-//            });
-
-
-//            let dt_shares = ti_receive(
-//                ctx.ti_stream.try_clone().expect("failed to clone ti recvr"), ctx);
             let mut dt_ctx = ctx.clone();
             let mut attr_values_bytes_copied = attr_values_bytes.clone();
             let mut class_values_bytes_copied = class_values_bytes.clone();
@@ -258,7 +211,7 @@ pub mod random_forest {
                 let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr, &dt_ctx.message_manager);
                 dt_ctx.in_stream = in_stream;
                 dt_ctx.o_stream = o_stream;
-                dt_ctx.dt_shares = read_shares(&mut dt_ctx,current_tree_index);
+                dt_ctx.dt_shares = read_shares(&mut dt_ctx, current_tree_index);
 
                 let now = SystemTime::now();
                 let mut rfs_x = random_feature_selection(&attr_values_bytes_copied, &mut dt_ctx);
@@ -282,9 +235,9 @@ pub mod random_forest {
                 produce_dt_data(sampling_result, &mut dt_ctx);
                 let max_depth = (&dt_ctx.dt_training).max_depth;
                 let now = SystemTime::now();
-                let mut result_file=File::create(  format!("{}{}trees_{}", &dt_ctx.output_path,dt_ctx.tree_count,current_tree_index).as_str()).unwrap();
+                let mut result_file = File::create(format!("{}{}trees_{}", &dt_ctx.output_path, dt_ctx.tree_count, current_tree_index).as_str()).unwrap();
 
-                let dt_training = decision_tree::train(&mut dt_ctx, max_depth,&mut result_file);
+                let dt_training = decision_tree::train(&mut dt_ctx, max_depth, &mut result_file);
                 let runtime = now.elapsed().unwrap().as_millis();
                 println!("One tree completes -- work time = {:5} (ms)", runtime);
             });

@@ -3,10 +3,11 @@ pub mod discretize {
     use std::num::Wrapping;
     use crate::computing_party::computing_party::ComputingParty;
     use crate::multiplication::multiplication::batch_multiply;
-    use crate::utils::utils::{truncate_local, u64_to_byte_array, byte_array_to_u64};
+    use crate::utils::utils::{truncate_local, u64_to_byte_array, byte_array_to_u64, send_u64_messages};
     use crate::constants::constants::BUF_SIZE;
     use std::io::{Write, Read};
     use crate::constants::constants;
+    use crate::protocol::protocol::{batch_bitwise_and, batch_bit_extract, convert_integer_to_bits};
 
     const BATCH_SIZE_REVEAL: usize = constants::REVEAL_BATCH_SIZE;
 
@@ -149,14 +150,18 @@ pub mod discretize {
         (mins[0], maxs[0])
     }
 
-    pub fn batch_compare(x_list: &Vec<Wrapping<u64>>,
-                         y_list: &Vec<Wrapping<u64>>,
-                         ctx: &mut ComputingParty) -> Vec<u64> {
-        let diff_dc = batch_log_decomp(
-            &x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (x - y)).collect(),
-            (ctx.integer_precision + ctx.decimal_precision + 1) as usize, 5, ctx);
+    pub fn batch_compare(x_list : &Vec<Wrapping<u64>>,
+                         y_list : &Vec<Wrapping<u64>>,
+                         ctx    : &mut ComputingParty) -> Vec<u64> {
 
-        diff_dc.iter().map(|z| (z >> 63) ^ ctx.asymmetric_bit as u64).collect()
+        let diff_dc  = batch_bit_extract(
+            &x_list.iter().zip(y_list.iter()).map(|(&x, &y)| (x-y)).collect(),
+            (ctx.decimal_precision + ctx.integer_precision + 1) as usize,
+            ctx
+        );
+
+        diff_dc.iter().map(|&z| z ^ ctx.asymmetric_bit as u64).collect()
+
     }
 
     pub fn discretize(x_list: &Vec<Wrapping<u64>>,
@@ -394,5 +399,81 @@ pub mod discretize {
         }
 
         x_revealed
+    }
+
+    pub fn discretize_into_ohe(x_list: &Vec<Wrapping<u64>>,
+                               buckets: usize,
+                               ctx: &mut ComputingParty) -> Vec<Vec<u8>> {
+
+        let n = x_list.len();
+        let (min, max) = minmax(&x_list, ctx);
+
+        let range = max - min;
+        let mut height_markers: Vec<Wrapping<u64>> = Vec::new();
+        for i in 1..buckets {
+
+            let height_ratio = (i as f64) / (buckets as f64);
+            let height_ratio_ring = Wrapping((height_ratio * 2f64.powf(ctx.decimal_precision as f64)) as u64);
+
+            height_markers.push(
+                min + truncate_local(
+                    height_ratio_ring * range,
+                    ctx.decimal_precision,
+                    ctx.asymmetric_bit
+                ));
+        }
+
+        let mut l_operands: Vec<Wrapping<u64>> = Vec::new();
+        for i in 0..n {
+            for j in 0..(buckets - 1) {
+                l_operands.push( x_list[i] );
+            }
+        }
+
+        let mut r_operands: Vec<Wrapping<u64>> = Vec::new();
+        for i in 0..n {
+            for j in 0..(buckets - 1) {
+                r_operands.push( height_markers[j] );
+            }
+        }
+
+        let e = batch_compare( &l_operands, &r_operands, ctx );
+
+        let mut e_mat = vec![ vec![0u64 ; buckets-1] ; n];
+        for i in 0..n {
+            for j in 0..buckets-1 {
+                e_mat[i][j] = e[(buckets-1)*i + j];
+            }
+        }
+
+        let mut l_operands: Vec<u64> = Vec::new();
+        let mut r_operands: Vec<u64> = Vec::new();
+
+        for i in 0..n {
+
+            l_operands.push(ctx.asymmetric_bit as u64);
+            r_operands.push((ctx.asymmetric_bit as u64) ^ e_mat[i][0]);
+
+            for j in 0..(buckets-2) {
+
+                l_operands.push( e_mat[i][j] );
+                r_operands.push( (ctx.asymmetric_bit as u64) ^ e_mat[i][j+1] );
+            }
+
+            l_operands.push(ctx.asymmetric_bit as u64);
+            r_operands.push(e_mat[i][buckets-2]);
+        }
+
+        let f = batch_bitwise_and(&l_operands, &r_operands, ctx, false);
+        let mut x_discrete_ohe: Vec<Vec<u8>> = Vec::new();
+        for j in 0..buckets{
+            let mut ohe: Vec<u8> = Vec::new();
+            for i in 0..n{
+                ohe.push((convert_integer_to_bits(f[i*buckets + j],64)[0]) as u8);
+            }
+            x_discrete_ohe.push(ohe);
+        }
+
+        x_discrete_ohe
     }
 }

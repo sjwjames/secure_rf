@@ -35,14 +35,14 @@ integer_precision = 15
 learning_rate = 0.001
 
 #[RANDOM FOREST]
-tree_count = 100
-thread_count = 40
+tree_count = 1
+thread_count = 5
 max_depth = 1
 alpha = 8
 epsilon = 0.1
-ohe_add_shares = 1000
-ohe_binary_shares = 1000
-ohe_equality_shares = 1000
+ohe_add_shares = 1
+ohe_binary_shares = 1
+ohe_equality_shares = 1
 
 #[BREAST CANCER]
 instance_selected = 21
