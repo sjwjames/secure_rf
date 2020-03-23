@@ -607,7 +607,6 @@ pub mod decision_tree {
 
     fn find_common_class_index(ctx: &mut ComputingParty) -> Vec<u8> {
         let mut now = SystemTime::now();
-        ctx.thread_hierarchy.push("find_common_class_index".to_string());
         let mut subset_transaction_bit_vector = ctx.dt_training.subset_transaction_bit_vector.clone();
         let mut subset_decimal = change_binary_to_decimal_field(&subset_transaction_bit_vector, ctx, ctx.dt_training.dataset_size_prime);
         let mut s = Vec::new();
@@ -627,20 +626,17 @@ pub mod decision_tree {
                 let bd_result = bit_decomposition(s[i], ctx, ctx.dt_training.dataset_size_bit_length as usize);
                 bit_shares.push(bd_result);
             }
-            println!("bit_shares:{:?}", bit_shares);
             argmax_result = arg_max(&bit_shares, ctx);
         } else {
             let thread_pool = ThreadPool::new(ctx.thread_count);
             let mut dp_result_map = Arc::new(Mutex::new(HashMap::new()));
             let mut ctx_copied = ctx.clone();
 
-            ctx_copied.thread_hierarchy.push("compute_dp".to_string());
             for i in 0..ctx.dt_data.class_value_count {
                 let mut dp_result_map = Arc::clone(&dp_result_map);
                 let mut subset_decimal_cloned = subset_decimal.clone();
                 let mut class_value_transaction = ctx.dt_data.class_values.clone();
                 let mut ctx = ctx_copied.clone();
-                ctx.thread_hierarchy.push(format!("{}", i));
                 thread_pool.execute(move || {
 //                    let precision = ctx.decimal_precision;
                     let dp_result = dot_product_integer(&subset_decimal_cloned, &class_value_transaction[i], &mut ctx);
@@ -650,7 +646,6 @@ pub mod decision_tree {
             }
             thread_pool.join();
             println!("compute_dp completes in {}ms", now.elapsed().unwrap().as_millis());
-            ctx_copied.thread_hierarchy.pop();
 
             let mut dp_result_map = &*(dp_result_map.lock().unwrap());
             for i in 0..ctx.dt_data.class_value_count {
@@ -660,12 +655,10 @@ pub mod decision_tree {
             let mut ctx_copied = ctx.clone();
             let mut bd_result_map = Arc::new(Mutex::new(HashMap::new()));
 
-            ctx_copied.thread_hierarchy.push("compute_bd".to_string());
             let bit_length = ctx.dt_training.bit_length as usize;
             for i in 0..ctx.dt_data.class_value_count {
                 let mut bd_result_map = Arc::clone(&bd_result_map);
                 let mut ctx = ctx_copied.clone();
-                ctx.thread_hierarchy.push(format!("{}", i));
                 let s_copied = s[i];
                 thread_pool.execute(move || {
                     let bd_result = bit_decomposition(s_copied, &mut ctx, bit_length);
@@ -675,7 +668,6 @@ pub mod decision_tree {
             }
             thread_pool.join();
             println!("compute_bd completes in {}ms", now.elapsed().unwrap().as_millis());
-            ctx_copied.thread_hierarchy.pop();
 
             let mut bd_result_map = &*(bd_result_map.lock().unwrap());
             for i in 0..ctx.dt_data.class_value_count {
@@ -683,7 +675,6 @@ pub mod decision_tree {
             }
 
             argmax_result = arg_max(&bit_shares, ctx);
-            ctx.thread_hierarchy.pop();
         }
 
         println!("find common class index completes in {}ms", now.elapsed().unwrap().as_millis());
