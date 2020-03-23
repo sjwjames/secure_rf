@@ -18,8 +18,9 @@ pub mod computing_party {
     use threadpool::ThreadPool;
     use std::f64::consts::E;
     use self::num::Num;
-    use crate::utils::utils::{receive_u64_triple_shares, receive_u8_triple_shares, receive_u64_shares};
+    use crate::utils::utils::{receive_u64_triple_shares, receive_u8_triple_shares, receive_u64_shares, truncate_local};
     use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
+    use crate::discretize::discretize::binary_vector_to_ring;
 
 
     union Xbuffer {
@@ -32,7 +33,7 @@ pub mod computing_party {
         /* options */
         pub debug_output: bool,
         pub decimal_precision: u32,
-        pub integer_precision:u32,
+        pub integer_precision: u32,
         pub raw_tcp_communication: bool,
         /* network */
         pub party_id: u8,
@@ -135,7 +136,7 @@ pub mod computing_party {
                 message_manager: Arc::new(Mutex::new(MessageManager {
                     map: HashMap::new()
                 })),
-                integer_precision: self.integer_precision
+                integer_precision: self.integer_precision,
             }
         }
     }
@@ -235,7 +236,9 @@ pub mod computing_party {
         let attr_value_count = ctx.dt_data.attr_value_count;
         let class_value_count = ctx.dt_data.class_value_count;
         let dataset_size_prime = ctx.dt_training.dataset_size_prime;
+        let instance_count = ctx.instance_selected as usize;
         let mut attr_values_trans_vec = Vec::new();
+
         for i in 0..attribute_count {
             let mut attr_data = Vec::new();
             for j in 0..attr_value_count {
@@ -255,28 +258,49 @@ pub mod computing_party {
         ctx.dt_data.class_values_trans_vec = class_values_trans_vec.clone();
 
         let mut attr_values_bigint = Vec::new();
-        let mut attr_values_integer = Vec::new();
+//        let mut attr_values_integer = Vec::new();
+        let mut attr_list = Vec::new();
         for i in 0..attribute_count {
             let mut row = Vec::new();
-            let mut row_integer = Vec::new();
+//            let mut row_integer = Vec::new();
             for j in 0..attr_value_count {
                 row.push(change_binary_to_bigint_field(&attr_values_trans_vec[i][j], ctx));
-                row_integer.push(change_binary_to_decimal_field(&attr_values_trans_vec[i][j], ctx, dataset_size_prime));
+                attr_list.append(&mut attr_values_trans_vec[i][j].iter().map(|x| *x as u64).collect());
+//                row_integer.push(change_binary_to_decimal_field(&attr_values_trans_vec[i][j], ctx, dataset_size_prime));
             }
             attr_values_bigint.push(row);
-            attr_values_integer.push(row_integer);
+//            attr_values_integer.push(row_integer);
         }
-        ctx.dt_data.attr_values_big_integer = attr_values_bigint;
-        ctx.dt_data.attr_values = attr_values_integer;
 
+        ctx.dt_data.attr_values_big_integer = attr_values_bigint;
+        let mut attr_list_ring_list: Vec<Wrapping<u64>> = binary_vector_to_ring(&attr_list, ctx).iter().map(|x| Wrapping(x.0 << ctx.decimal_precision as u64)).collect();
+
+        for i in 0..attribute_count {
+            let mut row = Vec::new();
+            for j in 0..attr_value_count {
+                row.push(
+                    attr_list_ring_list[i * attr_value_count + j * instance_count..i * attr_value_count + (j + 1) * instance_count].to_vec()
+                );
+            }
+            ctx.dt_data.attr_values.push(row);
+        }
+
+        let mut class_list = Vec::new();
         let mut class_values_bigint = Vec::new();
-        let mut class_values_integer = Vec::new();
+//        let mut class_values_integer = Vec::new();
         for i in 0..class_value_count {
             class_values_bigint.push(change_binary_to_bigint_field(&class_values_trans_vec[i], ctx));
-            class_values_integer.push(change_binary_to_decimal_field(&class_values_trans_vec[i], ctx, dataset_size_prime));
+//            class_values_integer.push(change_binary_to_decimal_field(&class_values_trans_vec[i], ctx, dataset_size_prime));
+            class_list.append(&mut class_values_trans_vec[i].iter().map(|x| *x as u64).collect());
         }
         ctx.dt_data.class_values_big_integer = class_values_bigint;
-        ctx.dt_data.class_values = class_values_integer;
+        let mut class_list_ring_list: Vec<Wrapping<u64>> = binary_vector_to_ring(&class_list, ctx).iter().map(|x| Wrapping(x.0 << ctx.decimal_precision as u64)).collect();
+
+        for i in 0..class_value_count {
+            ctx.dt_data.class_values.push(
+                class_list_ring_list[i * instance_count..(i + 1) * instance_count].to_vec()
+            );
+        }
     }
 
 
@@ -862,11 +886,11 @@ pub mod computing_party {
 //        }
     }
 
-    pub fn read_shares(ctx: &mut ComputingParty,tree_count:usize) -> DecisionTreeShares{
-        let path = format!("{}_{}shares_tree_{}_{}.txt", &ctx.output_path,ctx.tree_count, tree_count, ctx.party_id);
+    pub fn read_shares(ctx: &mut ComputingParty, tree_count: usize) -> DecisionTreeShares {
+        let path = format!("{}_{}shares_tree_{}_{}.txt", &ctx.output_path, ctx.tree_count, tree_count, ctx.party_id);
         let file = File::open(path).unwrap();
         let reader = BufReader::new(file);
-        let mut ti_shares_message:DecisionTreeTIShareMessage = serde_json::from_reader(reader).unwrap();
+        let mut ti_shares_message: DecisionTreeTIShareMessage = serde_json::from_reader(reader).unwrap();
         //mock data
 //        let ti_shares_message: DecisionTreeTIShareMessage = serde_json::from_str(&share_message).unwrap();
 
