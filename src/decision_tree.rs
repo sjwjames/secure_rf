@@ -5,7 +5,7 @@ pub mod decision_tree {
     use std::io::{Bytes, Write, BufReader, BufRead};
     use serde::{Serialize, Deserialize, Serializer};
     use std::num::Wrapping;
-    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint, reveal_bigint_result, reveal_byte_vec_result, send_u8_messages, send_biguint_messages, send_receive_u64_matrix};
+    use crate::utils::utils::{big_uint_clone, push_message_to_queue, receive_message_from_queue, big_uint_vec_clone, serialize_biguint_vec, serialize_biguint, deserialize_biguint, reveal_bigint_result, reveal_byte_vec_result, send_u8_messages, send_biguint_messages, send_receive_u64_matrix, send_u64_messages};
     use threadpool::ThreadPool;
     use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
@@ -15,7 +15,7 @@ pub mod decision_tree {
     use std::time::{Duration, SystemTime};
     use crate::dot_product::dot_product::{dot_product, dot_product_integer, dot_product_bigint};
     use crate::bit_decomposition::bit_decomposition::bit_decomposition;
-    use crate::protocol::protocol::{arg_max, equality_big_integer, arg_max_ring};
+    use crate::protocol::protocol::{arg_max, equality_big_integer, arg_max_ring, batch_equality};
     use crate::constants::constants::BINARY_PRIME;
     use crate::message::message::{RFMessage, search_pop_message};
     use crate::multiplication::multiplication::{batch_multiply_bigint, multiplication_bigint, batch_multiplication_byte, parallel_multiplication_big_integer};
@@ -201,10 +201,43 @@ pub mod decision_tree {
         }
     }
 
+    fn same_class_stop_check(major_class_index: usize, ctx: &mut ComputingParty) -> u64 {
+        let mut subset_transaction: Vec<u64> = ctx.dt_training.subset_transaction_bit_vector.iter().map(|x| *x as u64).collect();
+        let mut subset_transaction: Vec<Wrapping<u64>> = binary_vector_to_ring(&subset_transaction, ctx).iter().map(|x| Wrapping(x.0 << ctx.decimal_precision as u64)).collect();
+
+//        let mut transactions_decimal = change_binary_to_bigint_field(&subset_transaction, ctx);
+
+        let class_value_count = ctx.dt_data.class_value_count;
+        let dataset_size = ctx.dt_data.instance_count;
+
+        let mut major_class_index_ring = if ctx.asymmetric_bit == 1 {
+            vec![Wrapping(1u64 << ctx.decimal_precision as u64); dataset_size]
+        } else {
+            vec![Wrapping(0u64); dataset_size]
+        };
+
+        let mut major_class_trans_count = dot_product(&ctx.dt_data.class_values[major_class_index].clone(), &major_class_index_ring, ctx, ctx.decimal_precision, false, false);
+
+        println!("Majority Class Transaction Count: {}", major_class_trans_count.to_string());
+
+        let mut transaction_count = BigUint::zero();
+        let list = if ctx.asymmetric_bit == 1 {
+            vec![Wrapping(1u64 << ctx.decimal_precision as u64); dataset_size]
+        } else {
+            vec![Wrapping(0u64); dataset_size]
+        };
+        let transaction_count = dot_product(&subset_transaction, &list, ctx, ctx.decimal_precision, false, false);
+        println!("Transactions in current subset: {}", transaction_count.to_string());
+        let eq_test_result = batch_equality(&[major_class_trans_count].to_vec(), &[transaction_count].to_vec(), ctx);
+
+        let received_eq_result = send_u64_messages(ctx, &[Wrapping(eq_test_result[0])].to_vec());
+        let stopping_check = received_eq_result[0].0 ^ eq_test_result[0];
+        stopping_check
+    }
+
 
     pub fn train(ctx: &mut ComputingParty, r: usize, result_file: &mut File) -> DecisionTreeResult {
         println!("start building model");
-        ctx.thread_hierarchy.push(format!("DT_level_{}", r));
         if ctx.debug_output {
 //            let current_transactions = ctx.dt_training.subset_transaction_bit_vector.clone();
 //            let revealed = reveal_byte_vec_result(&current_transactions, ctx);
@@ -238,7 +271,6 @@ pub mod decision_tree {
 
         println!("Major class {}", major_index);
         println!("Major class OHE {:?}", major_class_index_shared);
-//        ctx.thread_hierarchy.pop();
 
         // quit if reaching max depth
         if r == 0 {
@@ -247,7 +279,6 @@ pub mod decision_tree {
             if ctx.asymmetric_bit == 1 {
                 result_file.write_all(format!("class={},", major_index).as_bytes());
             }
-//            ctx.thread_hierarchy.pop();
             return ctx.dt_results.clone();
         }
 
@@ -259,59 +290,63 @@ pub mod decision_tree {
 //            result
 //        };
         let mut subset_transaction = ctx.dt_training.subset_transaction_bit_vector.clone();
-        let mut transactions_decimal = change_binary_to_bigint_field(&subset_transaction, ctx);
-
         let class_value_count = ctx.dt_data.class_value_count;
         let dataset_size = ctx.dt_data.instance_count;
-
-        let mut major_class_index_decimal = if ctx.asymmetric_bit == 1 {
-            vec![BigUint::one(); dataset_size]
-        } else {
-            vec![BigUint::zero(); dataset_size]
-        };
-        let mut major_class_trans_count = dot_product_bigint(&ctx.dt_data.class_values_big_integer[major_index].clone(), &major_class_index_decimal, ctx);
         let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
 
-        let thread_pool = ThreadPool::new(ctx.thread_count);
-
-        println!("Majority Class Transaction Count: {}", major_class_trans_count.to_string());
-
-        let mut transaction_count = BigUint::zero();
-        let list = if ctx.asymmetric_bit == 1 {
-            vec![BigUint::one(); dataset_size]
-        } else {
-            vec![BigUint::zero(); dataset_size]
-        };
-        let transaction_count = dot_product_bigint(&transactions_decimal, &list, ctx);
-        println!("Transactions in current subset: {}", transaction_count.to_string());
-
-        let eq_test_result = equality_big_integer(&transaction_count, &major_class_trans_count, ctx);
-//        let eq_test_revealed = reveal_bigint_result(&eq_test_result, ctx);
-//        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_revealed.to_string());
-
-        ctx.thread_hierarchy.push("early_stop_criteria".to_string());
-        let mut compute_result = BigUint::one();
-        let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
-
-        let mut stopping_bit_received = BigUint::zero();
-        let received_list = send_biguint_messages(ctx, &[big_uint_clone(&stopping_bit)].to_vec());
-        stopping_bit_received = big_uint_clone(&received_list[0]);
-
-
-        println!("Stopping bit received:{}", stopping_bit_received.to_string());
-        let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
-        if stopping_check.eq(&BigUint::zero()) {
+//        let mut transactions_decimal = change_binary_to_bigint_field(&subset_transaction, ctx);
+//        let mut major_class_index_decimal = if ctx.asymmetric_bit == 1 {
+//            vec![BigUint::one(); dataset_size]
+//        } else {
+//            vec![BigUint::zero(); dataset_size]
+//        };
+//        let mut major_class_trans_count = dot_product_bigint(&ctx.dt_data.class_values_big_integer[major_index].clone(), &major_class_index_decimal, ctx);
+//
+//
+//        println!("Majority Class Transaction Count: {}", major_class_trans_count.to_string());
+//
+//        let mut transaction_count = BigUint::zero();
+//        let list = if ctx.asymmetric_bit == 1 {
+//            vec![BigUint::one(); dataset_size]
+//        } else {
+//            vec![BigUint::zero(); dataset_size]
+//        };
+//        let transaction_count = dot_product_bigint(&transactions_decimal, &list, ctx);
+//        println!("Transactions in current subset: {}", transaction_count.to_string());
+//
+//        let eq_test_result = equality_big_integer(&transaction_count, &major_class_trans_count, ctx);
+////        let eq_test_revealed = reveal_bigint_result(&eq_test_result, ctx);
+////        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_revealed.to_string());
+//
+//        let mut compute_result = BigUint::one();
+//        let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
+//
+//        let mut stopping_bit_received = BigUint::zero();
+//        let received_list = send_biguint_messages(ctx, &[big_uint_clone(&stopping_bit)].to_vec());
+//        stopping_bit_received = big_uint_clone(&received_list[0]);
+//
+//
+//        println!("Stopping bit received:{}", stopping_bit_received.to_string());
+//        let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
+//        if stopping_check.eq(&BigUint::zero()) {
+//            println!("Exited on base case: All transactions predict same outcome");
+////            ctx.dt_results.result_list.push(format!("class={}", major_index));
+//            if ctx.asymmetric_bit == 1 {
+//                result_file.write_all(format!("class={},", major_index).as_bytes());
+//            }
+//
+//            return ctx.dt_results.clone();
+//        }
+        let stopping_check = same_class_stop_check(major_index, ctx);
+        if stopping_check == 1 {
             println!("Exited on base case: All transactions predict same outcome");
 //            ctx.dt_results.result_list.push(format!("class={}", major_index));
             if ctx.asymmetric_bit == 1 {
                 result_file.write_all(format!("class={},", major_index).as_bytes());
             }
 
-            ctx.thread_hierarchy.pop();
             return ctx.dt_results.clone();
         }
-        ctx.thread_hierarchy.pop();
-
         println!("Base case not reached. Continuing.");
 
         let mut class_value_trans_vector = ctx.dt_data.class_values_trans_vec.clone();
@@ -341,7 +376,6 @@ pub mod decision_tree {
         let attr_value_trans_bigint_vec = &ctx.dt_data.attr_values_big_integer;
         let alpha = &ctx.dt_training.alpha;
 
-        ctx.thread_hierarchy.push("main_computation".to_string());
         for k in 0..attr_count {
             if attributes[k] != 0 {
                 for j in 0..attr_val_count {
@@ -360,7 +394,6 @@ pub mod decision_tree {
                         let y_temp = big_uint_clone(&y[k][j]);
                         y[k][j] = y_temp.add(&dp_result).mod_floor(&bigint_prime);
                     }
-
 
 
                     y[k][j] = alpha.mul(&y[k][j]).add(if ctx.asymmetric_bit == 1 {
@@ -382,7 +415,6 @@ pub mod decision_tree {
                 gini_denominators[k] = p_multi;
 
                 gini_numerators[k] = BigUint::zero();
-                ctx.thread_hierarchy.push("gini_numerators_computation".to_string());
                 for j in 0..attr_val_count {
                     let mut y_without_j = Vec::new();
                     for l in 0..y[k].len() {
@@ -401,10 +433,8 @@ pub mod decision_tree {
                     let mut temp_gini_numerator = &gini_numerators[k];
                     gini_numerators[k] = temp_gini_numerator.add(&multi0).mod_floor(&bigint_prime);
                 }
-                ctx.thread_hierarchy.pop();
             }
         }
-        ctx.thread_hierarchy.pop();
 
         let mut k = 0;
         while attributes[k] == 0 {
@@ -415,7 +445,6 @@ pub mod decision_tree {
         let mut gini_max_denominator = big_uint_clone(&gini_denominators[k]);
         let mut gini_argmax = if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero() };
         k += 1;
-        ctx.thread_hierarchy.push("gini_argmax_computation".to_string());
         while k < attr_count {
             if attributes[k] == 1 {
                 let mut gini_argmaxes = [if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero() }, big_uint_clone(&gini_argmax)];
@@ -440,7 +469,6 @@ pub mod decision_tree {
             }
             k += 1;
         }
-        ctx.thread_hierarchy.pop();
 
         let mut argmax_received = BigUint::zero();
         let list_received = send_biguint_messages(ctx, &[big_uint_clone(&gini_argmax)].to_vec());
