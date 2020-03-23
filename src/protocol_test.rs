@@ -16,6 +16,7 @@ pub mod protocol_test {
     use crate::field_change::field_change::{change_binary_to_decimal_field, change_binary_to_bigint_field};
     use std::time::SystemTime;
     use crate::discretize::discretize::{reveal, discretize, binary_vector_to_ring, xor_share_to_additive, discretize_into_ohe};
+    use crate::random_forest::random_forest::ohe_conversion;
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -674,13 +675,21 @@ pub mod protocol_test {
         let n = 11;
         let buckets = 5;
         let result = discretize_into_ohe(&values,5,ctx);
-        let mut values_appended:Vec<u64> = Vec::new();
-        for j in 0..buckets{
-            let mut row:Vec<u64> = result[j].iter().map(|x|*x as u64).collect();
-            values_appended.append(&mut row);
+//        let mut values_appended:Vec<u64> = Vec::new();
+//        for j in 0..buckets{
+//            let mut row:Vec<u64> = result[j].iter().map(|x|*x as u64).collect();
+//            values_appended.append(&mut row);
+//        }
+//
+//        let mut ring_values = binary_vector_to_ring(&values_appended,ctx);
+        println!("direct result:{:?}",result);
+        let result = discretize(&values, buckets, ctx);
+        let mut ohe_result = Vec::new();
+        for item in result{
+            ohe_result.push([item].to_vec());
         }
+        let ohe_result = ohe_conversion(&ohe_result,ctx,buckets);
+        println!("original result:{:?}",ohe_result);
 
-        let mut ring_values = binary_vector_to_ring(&values_appended,ctx);
-        println!("{:?}",ring_values);
     }
 }
