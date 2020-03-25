@@ -275,68 +275,18 @@ pub mod decision_tree {
         // quit if reaching max depth
         if r == 0 {
             println!("Exited on base case: Recursion Level == 0");
-//            ctx.dt_results.result_list.push(format!("class={}", major_index));
             if ctx.asymmetric_bit == 1 {
                 result_file.write_all(format!("class={},", major_index).as_bytes());
             }
             return ctx.dt_results.clone();
         }
 
-//        let mut major_class_index_decimal = if ctx.asymmetric_bit == 1 {
-//            let mut result = change_binary_to_bigint_field(&major_class_index_shared, ctx);
-//            result
-//        } else {
-//            let mut result = change_binary_to_bigint_field(&vec![0u8; ctx.dt_data.class_value_count], ctx);
-//            result
-//        };
+
         let mut subset_transaction = ctx.dt_training.subset_transaction_bit_vector.clone();
         let class_value_count = ctx.dt_data.class_value_count;
         let dataset_size = ctx.dt_data.instance_count;
         let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
 
-//        let mut transactions_decimal = change_binary_to_bigint_field(&subset_transaction, ctx);
-//        let mut major_class_index_decimal = if ctx.asymmetric_bit == 1 {
-//            vec![BigUint::one(); dataset_size]
-//        } else {
-//            vec![BigUint::zero(); dataset_size]
-//        };
-//        let mut major_class_trans_count = dot_product_bigint(&ctx.dt_data.class_values_big_integer[major_index].clone(), &major_class_index_decimal, ctx);
-//
-//
-//        println!("Majority Class Transaction Count: {}", major_class_trans_count.to_string());
-//
-//        let mut transaction_count = BigUint::zero();
-//        let list = if ctx.asymmetric_bit == 1 {
-//            vec![BigUint::one(); dataset_size]
-//        } else {
-//            vec![BigUint::zero(); dataset_size]
-//        };
-//        let transaction_count = dot_product_bigint(&transactions_decimal, &list, ctx);
-//        println!("Transactions in current subset: {}", transaction_count.to_string());
-//
-//        let eq_test_result = equality_big_integer(&transaction_count, &major_class_trans_count, ctx);
-////        let eq_test_revealed = reveal_bigint_result(&eq_test_result, ctx);
-////        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_revealed.to_string());
-//
-//        let mut compute_result = BigUint::one();
-//        let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
-//
-//        let mut stopping_bit_received = BigUint::zero();
-//        let received_list = send_biguint_messages(ctx, &[big_uint_clone(&stopping_bit)].to_vec());
-//        stopping_bit_received = big_uint_clone(&received_list[0]);
-//
-//
-//        println!("Stopping bit received:{}", stopping_bit_received.to_string());
-//        let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
-//        if stopping_check.eq(&BigUint::zero()) {
-//            println!("Exited on base case: All transactions predict same outcome");
-////            ctx.dt_results.result_list.push(format!("class={}", major_index));
-//            if ctx.asymmetric_bit == 1 {
-//                result_file.write_all(format!("class={},", major_index).as_bytes());
-//            }
-//
-//            return ctx.dt_results.clone();
-//        }
         let stopping_check = same_class_stop_check(major_index, ctx);
         if stopping_check == 1 {
             println!("Exited on base case: All transactions predict same outcome");

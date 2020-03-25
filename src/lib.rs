@@ -14,3 +14,4 @@ pub mod bit_decomposition;
 pub mod message;
 pub mod protocol_test;
 pub mod discretize;
+pub mod matrix_multiplication;

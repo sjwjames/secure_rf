@@ -17,6 +17,7 @@ pub mod protocol_test {
     use std::time::SystemTime;
     use crate::discretize::discretize::{reveal, discretize, binary_vector_to_ring, xor_share_to_additive, discretize_into_ohe};
     use crate::random_forest::random_forest::ohe_conversion;
+    use crate::matrix_multiplication::matrix_multiplication::batch_vectorized_matmul;
 
     pub fn test_multi_byte(ctx: &mut ComputingParty) {
         for i in 0..2 {
@@ -547,7 +548,7 @@ pub mod protocol_test {
     pub fn test_discretization(ctx: &mut ComputingParty) {
         let n = 11;
 
-        let mut values = vec![ Wrapping(0u64) ; n ];
+        let mut values = vec![Wrapping(0u64); n];
 
         if ctx.asymmetric_bit == 1 {
             values = vec![
@@ -642,7 +643,7 @@ pub mod protocol_test {
 //        println!("a_combined:{:?}",a_combined);
     }
 
-    pub fn test_discretization_ohe(ctx: &mut ComputingParty){
+    pub fn test_discretization_ohe(ctx: &mut ComputingParty) {
         let mut values = vec![
             Wrapping(18446744073709550336u64),
             Wrapping(18446744073709550592u64),
@@ -674,7 +675,7 @@ pub mod protocol_test {
         }
         let n = 11;
         let buckets = 5;
-        let result = discretize_into_ohe(&values,5,ctx);
+        let result = discretize_into_ohe(&values, 5, ctx);
 //        let mut values_appended:Vec<u64> = Vec::new();
 //        for j in 0..buckets{
 //            let mut row:Vec<u64> = result[j].iter().map(|x|*x as u64).collect();
@@ -682,14 +683,147 @@ pub mod protocol_test {
 //        }
 //
 //        let mut ring_values = binary_vector_to_ring(&values_appended,ctx);
-        println!("direct result:{:?}",result);
+        println!("direct result:{:?}", result);
         let result = discretize(&values, buckets, ctx);
         let mut ohe_result = Vec::new();
-        for item in result{
+        for item in result {
             ohe_result.push([item].to_vec());
         }
-        let ohe_result = ohe_conversion(&ohe_result,ctx,buckets);
-        println!("original result:{:?}",ohe_result);
+        let ohe_result = ohe_conversion(&ohe_result, ctx, buckets);
+        println!("original result:{:?}", ohe_result);
+    }
 
+    pub fn test_matrix_multiplication(ctx: &mut ComputingParty) {
+        let m = 4;
+        let n = 3;
+        let r = 2;
+        let instances = 2;
+
+        let mut const_mat: Vec<Vec<Wrapping<u64>>> = vec![
+            vec![
+                Wrapping(6558502252784702342u64),
+                Wrapping(8546166971241300017u64),
+                Wrapping(16178756104899434921u64)
+            ],
+            vec![
+                Wrapping(6558502252784702342u64),
+                Wrapping(8546166971241300017u64),
+                Wrapping(16178756104899434921u64)
+            ],
+            vec![
+                Wrapping(6558502252784702342u64),
+                Wrapping(8546166971241300017u64),
+                Wrapping(16178756104899434921u64)
+            ],
+            vec![
+                Wrapping(6558502252784702342u64),
+                Wrapping(8546166971241300017u64),
+                Wrapping(16178756104899434921u64)
+            ]];
+        if ctx.asymmetric_bit == 1 {
+            const_mat = vec![
+                vec![
+                    Wrapping(11888241820924867695u64),
+                    Wrapping(9900577102468272662u64),
+                    Wrapping(2267987968810136857u64)
+                ],
+                vec![
+                    Wrapping(11888241820924867695u64),
+                    Wrapping(9900577102468272662u64),
+                    Wrapping(2267987968810136857u64)
+                ],
+                vec![
+                    Wrapping(11888241820924867695u64),
+                    Wrapping(9900577102468272662u64),
+                    Wrapping(2267987968810136857u64)
+                ],
+                vec![
+                    Wrapping(11888241820924867695u64),
+                    Wrapping(9900577102468272662u64),
+                    Wrapping(2267987968810136857u64)
+                ]
+            ];
+        }
+
+        let mut var_mat_0: Vec<Vec<Wrapping<u64>>> = vec![vec![Wrapping(1u64), Wrapping(0u64)],
+                                                          vec![Wrapping(0u64), Wrapping(1u64)],
+                                                          vec![Wrapping(1u64), Wrapping(0u64)]];
+
+        if ctx.asymmetric_bit == 1 {
+            var_mat_0 = vec![vec![Wrapping(0u64), Wrapping(0u64)],
+                             vec![Wrapping(0u64), Wrapping(1u64)],
+                             vec![Wrapping(1u64), Wrapping(1u64)]];
+        }
+
+        let mut var_mat_1: Vec<Vec<Wrapping<u64>>> = vec![vec![Wrapping(0u64), Wrapping(0u64)],
+                                                          vec![Wrapping(0u64), Wrapping(1u64)],
+                                                          vec![Wrapping(1u64), Wrapping(1u64)]];
+
+        if ctx.asymmetric_bit == 1 {
+            var_mat_1 = vec![vec![Wrapping(0u64), Wrapping(0u64)],
+                             vec![Wrapping(1u64), Wrapping(1u64)],
+                             vec![Wrapping(1u64), Wrapping(0u64)]];
+        }
+
+        let mut var_matrices = vec![var_mat_0, var_mat_1];
+
+        let mut var_list = Vec::new();
+
+        for j in 0..instances {
+            for i in 0..n {
+                var_list.append(&mut var_matrices[j][i].clone());
+            }
+        }
+        let mut var_list = var_list.iter().map(|x| x.0).collect();
+
+        let converted_var: Vec<Wrapping<u64>> = binary_vector_to_ring(&var_list, ctx);
+
+        println!("converted_var:{:?}",converted_var);
+
+        let mut var_matrices = Vec::new();
+
+        for j in 0..instances {
+            let mut matrix = Vec::new();
+            for i in 0..n {
+                let mut row = converted_var[i * 2..(i + 1) * 2].to_vec();
+                matrix.push(row);
+            }
+            var_matrices.push(matrix);
+        }
+        println!("const_mat:{:?}", const_mat);
+        println!("var_matrices:{:?}", var_matrices);
+
+        let u_matrix = vec![vec![Wrapping(0u64); n]; m]; // masks constant matrix
+
+        let mut v_matrices = vec![ // masks each variable matrix
+                                   vec![vec![Wrapping(0u64); r]; n]; instances];
+
+        let mut z_matrices = vec![ // Z_i = U x V_i
+                                   vec![vec![Wrapping(0u64); r]; m]; instances];
+
+        /* 3. Derive E matrix (one-tine masking of const matrix by U) */
+        let mut e_mat: Vec<Vec<Wrapping<u64>>> = Vec::new();
+        for i in 0..m {
+            e_mat.push(const_mat[i].iter().zip(&u_matrix[i]).map(|(&x, &u)| x - u).collect());
+        }
+
+        let outputs = batch_vectorized_matmul(
+            &const_mat,
+            &var_matrices,
+            &e_mat,
+            &mut v_matrices,
+            &mut z_matrices,
+            ctx,
+        );
+
+        /* 5. Reveal outputs */
+        for mat in &outputs {
+            println!("Output");
+            for row in mat {
+                println!("{:?}", row);
+
+//                println!("{:?}", reveal(&row, ctx, ctx.decimal_precision, false,false));
+            }
+        }
     }
 }

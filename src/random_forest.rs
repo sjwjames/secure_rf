@@ -217,9 +217,6 @@ pub mod random_forest {
 //        let mut class_values_bytes = ohe_conversion(&y_converted, ctx, class_value_count);
 //        let runtime = now.elapsed().unwrap().as_millis();
 //        println!("OHE of classes completes -- work time = {:5} (ms)", runtime);
-//
-//        println!("x:{:?}",attr_values_bytes[0]);
-//        println!("y:{:?}",class_values_bytes[0]);
 
         for current_tree_index in 0..remainder {
             let mut dt_ctx = ctx.clone();
