@@ -208,7 +208,7 @@ pub mod decision_tree {
 //        let mut transactions_decimal = change_binary_to_bigint_field(&subset_transaction, ctx);
 
         let class_value_count = ctx.dt_data.class_value_count;
-        let dataset_size = ctx.dt_data.instance_count;
+        let dataset_size = ctx.instance_selected as usize;
 
         let mut major_class_index_ring = if ctx.asymmetric_bit == 1 {
             vec![Wrapping(1u64 << ctx.decimal_precision as u64); dataset_size]
@@ -284,7 +284,7 @@ pub mod decision_tree {
 
         let mut subset_transaction = ctx.dt_training.subset_transaction_bit_vector.clone();
         let class_value_count = ctx.dt_data.class_value_count;
-        let dataset_size = ctx.dt_data.instance_count;
+        let dataset_size = ctx.instance_selected as usize;
         let mut bigint_prime = big_uint_clone(&ctx.dt_training.big_int_prime);
 
         let stopping_check = same_class_stop_check(major_index, ctx);
@@ -292,7 +292,10 @@ pub mod decision_tree {
             println!("Exited on base case: All transactions predict same outcome");
 //            ctx.dt_results.result_list.push(format!("class={}", major_index));
             if ctx.asymmetric_bit == 1 {
-                result_file.write_all(format!("class={},", major_index).as_bytes());
+                let n = (((ctx.dt_data.attr_value_count as f64).powf((ctx.dt_training.max_depth-r+1) as f64)-1.0)/(ctx.dt_data.attr_value_count as f64 - 1.0)) as usize;
+                for i in 0..n{
+                    result_file.write_all(format!("class={},", major_index).as_bytes());
+                }
             }
 
             return ctx.dt_results.clone();
