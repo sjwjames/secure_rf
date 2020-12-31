@@ -319,7 +319,6 @@ pub mod decision_tree {
 
         println!("Majority Class Transaction Count: {}", major_class_trans_count.to_string());
 
-        let mut transaction_count = BigUint::zero();
         let list = if ctx.asymmetric_bit == 1 {
             vec![BigUint::one(); dataset_size]
         } else {
@@ -327,14 +326,19 @@ pub mod decision_tree {
         };
         let transaction_count = dot_product_bigint(&transactions_decimal, &list, ctx);
         println!("Transactions in current subset: {}", transaction_count.to_string());
-
+        let big_zero = BigUint::zero();
+        let empty_set_check = equality_big_integer(&transaction_count, &big_zero, ctx);
         let eq_test_result = equality_big_integer(&transaction_count, &major_class_trans_count, ctx);
+        let early_stop_check = multiplication_bigint(&empty_set_check,&eq_test_result,ctx);
+        //check if all the instances have been used/attributes are used
+
 //        let eq_test_revealed = reveal_bigint_result(&eq_test_result, ctx);
 //        println!("MajClassTrans = SubsetTrans? (Non-zero -> not equal):{}", eq_test_revealed.to_string());
 
         ctx.thread_hierarchy.push("early_stop_criteria".to_string());
-        let mut compute_result = BigUint::one();
-        let stopping_bit = multiplication_bigint(&eq_test_result, &compute_result, ctx);
+
+        println!("Current early stop checking in current subset: {}", early_stop_check.to_string());
+        let stopping_bit = equality_big_integer(&early_stop_check, &big_zero, ctx);
 
         let mut stopping_bit_received = BigUint::zero();
         if ctx.raw_tcp_communication {
@@ -352,7 +356,7 @@ pub mod decision_tree {
         println!("Stopping bit received:{}", stopping_bit_received.to_string());
         let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
         if stopping_check.eq(&BigUint::zero()) {
-            println!("Exited on base case: All transactions predict same outcome");
+            println!("Exited on base case: All transactions predict same outcome/The set is empty");
 //            ctx.dt_results.result_list.push(format!("class={}", major_index));
             if ctx.asymmetric_bit == 1 {
                 result_file.write_all(format!("class={},", major_index).as_bytes());
@@ -512,7 +516,7 @@ pub mod decision_tree {
         let mut gini_max_numerator = big_uint_clone(&gini_numerators[k]);
         let mut gini_max_denominator = big_uint_clone(&gini_denominators[k]);
         let mut gini_argmax = if ctx.asymmetric_bit == 1 { BigUint::from(k) } else { BigUint::zero() };
-        k += 1;
+//        k += 1;
         ctx.thread_hierarchy.push("gini_argmax_computation".to_string());
         while k < attr_count {
             if attributes[k] == 1 {

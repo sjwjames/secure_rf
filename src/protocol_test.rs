@@ -371,8 +371,8 @@ pub mod protocol_test {
             let changed = change_binary_to_bigint_field(&result_bytes, ctx);
 
 
-//            let result_revealed = reveal_bigint_result(&result, ctx);
-//            println!("{}", result_revealed.to_string());
+            let result_revealed = reveal_bigint_result(&result, ctx);
+            println!("{}", result_revealed.to_string());
             for item in changed {
                 println!("{}", item.to_string());
             }
@@ -383,8 +383,8 @@ pub mod protocol_test {
             let result_bytes = result.to_bytes_le();
             println!("{:?}", result_bytes);
             let changed = change_binary_to_bigint_field(&result_bytes, ctx);
-//            let result_revealed = reveal_bigint_result(&result, ctx);
-//            println!("{}", result_revealed.to_string());
+            let result_revealed = reveal_bigint_result(&result, ctx);
+            println!("{}", result_revealed.to_string());
             for item in changed {
                 println!("{}", item.to_string());
             }
@@ -644,17 +644,17 @@ pub mod protocol_test {
 
     pub fn test_discretization_ohe(ctx: &mut ComputingParty){
         let mut values = vec![
-            Wrapping(18446744073709550336u64),
-            Wrapping(18446744073709550592u64),
-            Wrapping(18446744073709550848u64),
-            Wrapping(18446744073709551104u64),
-            Wrapping(18446744073709551360u64),
             Wrapping(0u64),
-            Wrapping(256u64),
-            Wrapping(512u64),
-            Wrapping(768u64),
-            Wrapping(1024u64),
-            Wrapping(1280u64)
+            Wrapping(1u64),
+            Wrapping(0u64),
+            Wrapping(1u64),
+            Wrapping(0u64),
+            Wrapping(1u64),
+            Wrapping(0u64),
+            Wrapping(1u64),
+            Wrapping(0u64),
+            Wrapping(1u64),
+            Wrapping(0u64)
         ];
 
         if ctx.asymmetric_bit == 1 {
@@ -673,8 +673,8 @@ pub mod protocol_test {
             ];
         }
         let n = 11;
-        let buckets = 5;
-        let result = discretize_into_ohe(&values,5,ctx);
+        let buckets = 3;
+        let result = discretize_into_ohe(&values,buckets,ctx);
 //        let mut values_appended:Vec<u64> = Vec::new();
 //        for j in 0..buckets{
 //            let mut row:Vec<u64> = result[j].iter().map(|x|*x as u64).collect();

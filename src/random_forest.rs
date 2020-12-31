@@ -184,42 +184,9 @@ pub mod random_forest {
 
         let y_converted = y_converted.iter().map(|a| [Wrapping(a[0].0 << ctx.decimal_precision as u64)].to_vec()).collect();
         let mut class_values_bytes = ohe_conversion(&y_converted, ctx, class_value_count);
-//        discretize_data(&mut x, ctx);
-//        let runtime = now.elapsed().unwrap().as_millis();
-//        println!("loading & discretization completes -- work time = {:5} (ms)", runtime);
-//
-////        receive_preprocessing_shares(ctx);
-//
-//
-//        let discretized_x = ctx.dt_data.discretized_x.clone();
-//        let now = SystemTime::now();
-//        let mut attr_values_bytes = ohe_conversion(&discretized_x, ctx, attr_value_count);
-//        let runtime = now.elapsed().unwrap().as_millis();
-//        println!("OHE of attributes completes -- work time = {:5} (ms)", runtime);
-//
-//        let mut y_temp = Vec::new();
-//        for mut row in &y {
-//            y_temp.append(&mut row.iter().map(|a| a.0).collect());
-//        }
-//        let y_temp = binary_vector_to_ring(&y_temp, ctx);
-//        let mut y_converted = Vec::new();
-//        for i in 0..y.len() {
-//            let mut row = Vec::new();
-//            for j in 0..y[0].len() {
-//                row.push(y_temp[i * y[0].len() + j]);
-//            }
-//            y_converted.push(row);
-//        }
-//
-//        let now = SystemTime::now();
-//
-//        let y_converted = y_converted.iter().map(|a| [Wrapping(a[0].0 << ctx.decimal_precision as u64)].to_vec()).collect();
-//        let mut class_values_bytes = ohe_conversion(&y_converted, ctx, class_value_count);
-//        let runtime = now.elapsed().unwrap().as_millis();
-//        println!("OHE of classes completes -- work time = {:5} (ms)", runtime);
-//
-//        println!("x:{:?}",attr_values_bytes[0]);
-//        println!("y:{:?}",class_values_bytes[0]);
+
+
+
 
         for current_tree_index in 0..remainder {
             let mut dt_ctx = ctx.clone();
@@ -236,6 +203,7 @@ pub mod random_forest {
 
                 let now = SystemTime::now();
                 let mut rfs_x = random_feature_selection(&attr_values_bytes_copied, &mut dt_ctx);
+//                let mut rfs_x = attr_values_bytes_copied;
                 let runtime = now.elapsed().unwrap().as_millis();
                 println!("RF completes -- work time = {:5} (ms)", runtime);
 
@@ -243,6 +211,7 @@ pub mod random_forest {
 
                 let now = SystemTime::now();
                 let sampling_result = sample_with_replacement(&mut dt_ctx, &rfs_x);
+//                let sampling_result = rfs_x;
                 let runtime = now.elapsed().unwrap().as_millis();
                 println!("RF completes -- work time = {:5} (ms)", runtime);
 

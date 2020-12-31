@@ -1,3 +1,15 @@
+test_mode = 1
+feature_selected = 5
+tree_count = 100
+max_depth = 1
+instance_cnt = 455
+instance_selected = 455
+feature_cnt = 30
+attr_value_cnt = 5
+output_path = "breast_cancer_results/fold1/"
+#output_path = "C:/Users/Sam/Documents/rf/settings/breast_results/fold1/"
+batch_size = 153
+
 #[role]
 
 ti = true
@@ -9,13 +21,13 @@ ti_port0  = 4000
 ti_port1  = 8000
 
 #[random forest]
-tree_count = 100
+#tree_count = 100
 tree_training_batch_size = 20
-thread_count = 5
+thread_count = 16
 
 
 #[breast Cancer]
-batch_size = 153
+#batch_size = 84
 add_shares_per_tree = 1
 add_shares_bigint_per_tree = 1
 equality_shares_per_tree = 1
@@ -26,13 +38,13 @@ ohe_equality_shares = 1
 big_int_prime = "11417981541647680000000000000000000000000000319"
 prime = 512
 bigint_bit_size = 153
-attr_value_cnt = 5
+#attr_value_cnt = 4
 class_value_cnt = 2
-feature_selected = 5
-instance_selected = 455
-instance_cnt = 455
-feature_cnt = 30
-output_path = "breast_cancer_results/fold1/"
+#feature_selected = 5
+#instance_selected = 21
+#instance_cnt = 11642
+#feature_cnt = 187
+#output_path = "C:/Users/david/Desktop/RUST_XT/rf/settings/ecg_results/"
 
 #batch_size = 84
 #add_shares_per_tree = 1000
@@ -74,24 +86,24 @@ output_path = "breast_cancer_results/fold1/"
 #output_path = "ECG/fold2/"
 
 #[random data]
-#batch_size = 38
-#add_shares_per_tree = 1
-#add_shares_bigint_per_tree = 1
-#equality_shares_per_tree = 1
-#binary_shares_per_tree = 1
-#ohe_add_shares = 1
-#ohe_binary_shares = 1
-#ohe_equality_shares = 1
-#big_int_prime = "274877906951"
-#prime = 4
-#bigint_bit_size = 38
-#attr_value_cnt = 3
+#batch_size = 34
+#add_shares_per_tree = 1000
+#add_shares_bigint_per_tree = 1000
+#equality_shares_per_tree = 1000
+#binary_shares_per_tree = 10000
+#ohe_add_shares = 1000
+#ohe_binary_shares = 1000
+#ohe_equality_shares = 1000
+#big_int_prime = "8589934592"
+#prime = 8
+#bigint_bit_size = 33
+#attr_value_cnt = 2
 #class_value_cnt = 2
-#feature_selected = 3
-#instance_selected = 4
+#feature_selected = 2
+#instance_selected = 3
 #instance_cnt = 4
 #feature_cnt = 3
-#output_path = "test_data/fold1/"
+#output_path = "breast_cancer_results/fold1/"
 
 #[BC-TCGA]
 

@@ -1,8 +1,25 @@
+test_mode = 1
+feature_selected = 5
+tree_count = 100
+max_depth = 1
+instance_count = 455
+instance_selected = 455
+attribute_count = 30
+attr_value_count = 5
+x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainX_shared_fold1_1.csv"
+y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainy_shared_fold1_1.csv"
+output_path = "breast_cancer_results/fold1/"
+#x_input_path = "C:/Users/Sam/Documents/rf/settings/breastJ/trainX_shared_fold1_1.csv"
+#y_input_path = "C:/Users/Sam/Documents/rf/settings/breastJ/trainy_shared_fold1_1.csv"
+#output_path = "C:/Users/Sam/Documents/rf/settings/breast_results/fold1/"
+bit_length = 83
+batch_size = 153
+
 #[role]
 
-ti = false 
-party_id = 0
-asymmetric_bit = 0
+ti = false
+party_id = 1
+asymmetric_bit = 1
 
 #[option]
 
@@ -16,10 +33,10 @@ ti_port0  = 4000
 ti_port1  = 8000
 
 party0_ip   = "127.0.0.1"
-party0_port = 5000
+party0_port = 1000
 
 party1_ip   = "127.0.0.1"
-party1_port = 6000
+party1_port = 2000
 
 #[message_queue]
 local_mq_ip = "127.0.0.1"
@@ -31,13 +48,13 @@ remote_mq_port = 5673
 #[LOGISTIC REGRESSION]
 
 decimal_precision = 10
-integer_precision = 15
+integer_precision = 21
 learning_rate = 0.001
 
 #[RANDOM FOREST]
-tree_count = 100
-thread_count = 5
-max_depth = 1
+#tree_count = 100
+thread_count = 1
+#max_depth = 1
 alpha = 8
 epsilon = 0.1
 ohe_add_shares = 1
@@ -45,22 +62,22 @@ ohe_binary_shares = 1
 ohe_equality_shares = 1
 
 #[BREAST CANCER]
-instance_selected = 455
-feature_selected = 5
-batch_size = 153
+#instance_selected = 21
+#feature_selected = 5
+#batch_size = 84
 tree_training_batch_size = 20
-attr_value_count = 5
+#attr_value_count = 4
 class_value_count = 2
-attribute_count = 30
-instance_count = 455
+#attribute_count = 187
+#instance_count = 11642
 prime = 512
 big_int_prime = "11417981541647680000000000000000000000000000319"
 dataset_size_prime = 32
 big_int_ti_index = 0
-bit_length = 153
-x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainX_shared_fold1_0.csv"
-y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainy_shared_fold1_0.csv"
-output_path = "breast_cancer_results/fold1/"
+#bit_length = 83
+#x_input_path = "C:/Users/david/Desktop/RUST_XT/rf/settings/ecgJ/trainX_shared_fold1_0.csv"
+#y_input_path = "C:/Users/david/Desktop/RUST_XT/rf/settings/ecgJ/trainy_shared_fold1_0.csv"
+#output_path = "C:/Users/david/Desktop/RUST_XT/rf/settings/ecg_results/"
 
 
 #instance_selected = 21
@@ -102,22 +119,23 @@ output_path = "breast_cancer_results/fold1/"
 #output_path = "ECG/fold2/"
 
 #[RANDOM DATA]
-#instance_selected = 4
-#feature_selected = 3
-#batch_size = 38
+#instance_selected = 3
+#feature_selected = 2
+#batch_size = 34
 #tree_training_batch_size = 20
-#attr_value_count = 3
+#attr_value_count = 2
 #class_value_count = 2
 #attribute_count = 3
 #instance_count = 4
+#asymmetric_bit = 0
 #prime = 4
-#big_int_prime = "274877906951"
+#big_int_prime = "8589934592"
 #dataset_size_prime = 4
 #big_int_ti_index = 0
-#bit_length = 38
-#x_input_path = "/Users/sjw/Projects/random_forest_rust/test_data/trainX2_0.csv"
-#y_input_path = "/Users/sjw/Projects/random_forest_rust/test_data/trainy2_0.csv"
-#output_path = "test_data/fold1/"
+#bit_length = 33
+#x_input_path = "/Users/sjw/Desktop/PPML/preprocess/james/shared_fold_2_train-0.csv"
+#y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy2_0.csv"
+#output_path = "breast_cancer_results/fold1/"
 
 #[GSE2034]
 

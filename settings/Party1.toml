@@ -45,19 +45,19 @@ ohe_binary_shares = 1
 ohe_equality_shares = 1
 
 #[BREAST CANCER]
-instance_selected = 21
+instance_selected = 455
 feature_selected = 5
-batch_size = 84
+batch_size = 153
 tree_training_batch_size = 20
-attr_value_count = 4
+attr_value_count = 5
 class_value_count = 2
 attribute_count = 30
 instance_count = 455
-prime = 32
-big_int_prime = "9671406556917033397649483"
+prime = 512
+big_int_prime = "11417981541647680000000000000000000000000000319"
 dataset_size_prime = 32
 big_int_ti_index = 0
-bit_length = 83
+bit_length = 153
 x_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainX_shared_fold1_1.csv"
 y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/shared/trainy_shared_fold1_1.csv"
 output_path = "breast_cancer_results/fold1/"
@@ -99,23 +99,22 @@ output_path = "breast_cancer_results/fold1/"
 #output_path = "ECG/fold2/"
 
 #[RANDOM DATA]
-#instance_selected = 3
-#feature_selected = 2
-#batch_size = 34
+#instance_selected = 4
+#feature_selected = 3
+#batch_size = 38
 #tree_training_batch_size = 20
-#attr_value_count = 2
+#attr_value_count = 3
 #class_value_count = 2
 #attribute_count = 3
 #instance_count = 4
-#asymmetric_bit = 1
-#prime = 8
-#big_int_prime = "8589934592"
-#dataset_size_prime = 8
+#prime = 4
+#big_int_prime = "274877906951"
+#dataset_size_prime = 4
 #big_int_ti_index = 0
-#bit_length = 33
-#x_input_path = "/Users/sjw/Desktop/PPML/preprocess/james/shared_fold_2_train-1.csv"
-#y_input_path = "/Users/sjw/Desktop/PPML/random forest/data/discretized_shared/breast_cancer/discretized_manually/trainy2_1.csv"
-#output_path = "breast_cancer_results/fold1/"
+#bit_length = 38
+#x_input_path = "/Users/sjw/Projects/random_forest_rust/test_data/trainX2_1.csv"
+#y_input_path = "/Users/sjw/Projects/random_forest_rust/test_data/trainy2_1.csv"
+#output_path = "test_data/fold1/"
 
 #[GSE2034]
 
