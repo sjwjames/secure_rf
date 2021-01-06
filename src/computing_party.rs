@@ -31,6 +31,7 @@ pub mod computing_party {
     pub struct ComputingParty {
         /* options */
         pub debug_output: bool,
+        pub test_mode: bool,
         pub decimal_precision: u32,
         pub integer_precision:u32,
         pub raw_tcp_communication: bool,
@@ -45,7 +46,7 @@ pub mod computing_party {
         pub party1_port: u16,
         pub in_stream: TcpStream,
         pub o_stream: TcpStream,
-//        pub ti_stream: TcpStream,
+        pub ti_stream: TcpStream,
 
         /* mq */
         pub local_mq_ip: String,
@@ -91,6 +92,7 @@ pub mod computing_party {
         fn clone(&self) -> Self {
             ComputingParty {
                 debug_output: self.debug_output,
+                test_mode: self.test_mode,
                 raw_tcp_communication: self.raw_tcp_communication,
                 decimal_precision: self.decimal_precision,
                 party_id: self.party_id,
@@ -103,7 +105,7 @@ pub mod computing_party {
                 party1_port: self.party1_port,
                 in_stream: self.in_stream.try_clone().expect("failed to clone in_stream"),
                 o_stream: self.o_stream.try_clone().expect("failed to clone o_stream"),
-//                ti_stream: self.ti_stream.try_clone().expect("failed to clone ti_stream"),
+                ti_stream: self.ti_stream.try_clone().expect("failed to clone ti_stream"),
                 local_mq_ip: self.local_mq_ip.clone(),
                 local_mq_port: self.local_mq_port,
                 remote_mq_ip: self.remote_mq_ip.clone(),
@@ -572,6 +574,13 @@ pub mod computing_party {
             }
         };
 
+        let test_mode = match settings.get_bool("test_mode") {
+            Ok(ans) => ans as bool,
+            Err(error) => {
+                panic!("Encountered a problem while parsing test_mode: {:?}", error)
+            }
+        };
+
 //        let (class_value_count, attribute_count, attr_value_count, instance_count, one_hot_encoding_matrix) = load_dt_training_file(&x_input_path);
 
         let dataset_size_bit_length = (instance_selected as f64).log2().ceil() as u64;
@@ -621,11 +630,11 @@ pub mod computing_party {
         };
 
         // TI connection
-//        let ti_socket: SocketAddr = ti_addr
-//            .parse()
-//            .expect("unable to parse ti socket address");
-//
-//        let ti_stream = try_connect(&ti_socket, &t_pfx);
+       let ti_socket: SocketAddr = ti_addr
+           .parse()
+           .expect("unable to parse ti socket address");
+
+       let ti_stream = try_connect(&ti_socket, &t_pfx);
 
         println!("{} successfully connected to ti server on port {}",
                  &t_pfx, &external_addr);
@@ -638,9 +647,9 @@ pub mod computing_party {
         in_stream.set_write_timeout(None).expect("set_write_timeout call failed");
         in_stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
-//        ti_stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
-//        ti_stream.set_write_timeout(None).expect("set_write_timeout call failed");
-//        ti_stream.set_read_timeout(None).expect("set_read_timeout call failed");
+       ti_stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
+       ti_stream.set_write_timeout(None).expect("set_write_timeout call failed");
+       ti_stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
 
 //        let dt_data = produce_dt_data(one_hot_encoding_matrix, class_value_count, attr_value_count, attribute_count, instance_count, party_id);
@@ -674,6 +683,7 @@ pub mod computing_party {
 //        let mut result_file = File::create(None).unwrap();
         ComputingParty {
             debug_output,
+            test_mode,
             raw_tcp_communication,
             decimal_precision,
             integer_precision,
@@ -687,7 +697,7 @@ pub mod computing_party {
             party1_port,
             asymmetric_bit,
             output_path,
-//            ti_stream,
+            ti_stream,
             local_mq_ip,
             local_mq_port,
             remote_mq_ip,

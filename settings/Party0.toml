@@ -7,6 +7,7 @@ asymmetric_bit = 0
 #[option]
 
 debug_output = false
+test_mode = 1
 raw_tcp_communication = true
 
 #[network]
