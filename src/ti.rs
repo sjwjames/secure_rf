@@ -57,8 +57,8 @@ pub mod ti {
         pub instance_cnt: u64,
         pub feature_cnt: u64,
         pub output_path: String,
-        pub fs_selection_file: File,
-        pub sampling_file: File,
+        //pub fs_selection_file: File,
+        //pub sampling_file: File,
     }
 
     const TI_BATCH_SIZE: usize = constants::TI_BATCH_SIZE;
@@ -101,8 +101,8 @@ pub mod ti {
                 instance_cnt: self.instance_cnt,
                 feature_cnt: self.feature_cnt,
                 output_path: self.output_path.clone(),
-                fs_selection_file: self.fs_selection_file.try_clone().unwrap(),
-                sampling_file: self.sampling_file.try_clone().unwrap(),
+                //fs_selection_file: self.fs_selection_file.try_clone().unwrap(),
+                //sampling_file: self.sampling_file.try_clone().unwrap(),
             }
         }
     }
@@ -293,8 +293,8 @@ pub mod ti {
             }
         };
 
-        let mut fs_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "fs_selection.csv").unwrap();
-        let mut sampling_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "sampling_selection.csv").unwrap();
+        //let mut fs_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "fs_selection.csv").unwrap();
+        //let mut sampling_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "sampling_selection.csv").unwrap();
 
         let rfs_field = 2.0_f64.powf((attr_value_cnt as f64).log2().ceil()) as u64;
 
@@ -331,8 +331,8 @@ pub mod ti {
             instance_cnt,
             feature_cnt,
             output_path,
-            fs_selection_file: fs_file,
-            sampling_file,
+            //fs_selection_file: fs_file,
+            //sampling_file,
         }
     }
 
@@ -534,7 +534,7 @@ pub mod ti {
         let thread_pool = ThreadPool::new(ctx.thread_count);
 
         //preprocess shares, discretization and OHE
-       generate_preprocessing_shares(ctx, &thread_pool, [&in_stream0, &in_stream1].to_vec());
+       //generate_preprocessing_shares(ctx, &thread_pool, [&in_stream0, &in_stream1].to_vec());
 
         for i in 0..ctx.tree_count {
             print!("{} [{}] generating additive shares...      ", &prefix, i);
@@ -1066,9 +1066,9 @@ pub mod ti {
             instance_selected_remain -= 1;
         }
 
-        vec_to_record.sort();
-        let mut file = ctx.sampling_file.try_clone().unwrap();
-        file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
+        //vec_to_record.sort();
+        //let mut file = ctx.sampling_file.try_clone().unwrap();
+        //file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
 
 //        for item in [112, 124, 137, 150, 213, 217, 225, 240, 266, 28, 348, 363, 371, 398, 4, 404, 415, 444, 55, 64, 89].to_vec() {
 //            instance_selected_vec[item] = 1;
@@ -1250,6 +1250,8 @@ pub mod ti {
         stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
         let mut stream = stream;
+        println!("{}", stream.local_addr().unwrap());
+        println!("{}", stream.peer_addr().unwrap());
         let mut recv_buf = [0u8; 11];
         let mut bytes_read = 0;
 
@@ -1259,7 +1261,7 @@ pub mod ti {
         }
 
         assert_eq!(b"send shares", &recv_buf);
-        //println!("confirmation received");
+        println!("confirmation received");
 
         let mut bytes_written = 0;
         while bytes_written < recv_buf.len() {

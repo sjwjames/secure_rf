@@ -187,7 +187,8 @@ pub mod random_forest {
 
         let mut RNG = vec![];
         for _i in 0 .. ctx.tree_count {
-            RNG.push(ti_receive(ctx.ti_stream.try_clone().expect("TI stream failed to clone in train"), ctx))
+            let stream = ctx.ti_stream.try_clone().expect("TI stream failed to clone in train");
+            RNG.push(ti_receive(stream, ctx))
         }
 
 

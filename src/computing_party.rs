@@ -972,6 +972,8 @@ pub mod computing_party {
         stream.set_ttl(std::u32::MAX).expect("set_ttl call failed");
         stream.set_write_timeout(None).expect("set_write_timeout call failed");
         stream.set_read_timeout(None).expect("set_read_timeout call failed");
+        println!("{}", stream.local_addr().unwrap());
+        println!("{}", stream.peer_addr().unwrap());
 
 
 //        let mut xor_shares: Vec<(u64, u64, u64)> = Vec::new();
