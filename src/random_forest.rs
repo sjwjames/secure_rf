@@ -185,6 +185,11 @@ pub mod random_forest {
         let y_converted = y_converted.iter().map(|a| [Wrapping(a[0].0 << ctx.decimal_precision as u64)].to_vec()).collect();
         let mut class_values_bytes = ohe_conversion(&y_converted, ctx, class_value_count);
 
+        let mut RNG = vec![];
+        for _i in 0 .. ctx.tree_count {
+            let stream = ctx.ti_stream.try_clone().expect("TI stream failed to clone in train");
+            RNG.push(ti_receive(stream, ctx))
+        }
 
 
 
@@ -192,6 +197,7 @@ pub mod random_forest {
             let mut dt_ctx = ctx.clone();
             let mut attr_values_bytes_copied = attr_values_bytes.clone();
             let mut class_values_bytes_copied = class_values_bytes.clone();
+            let shares = RNG[current_tree_index].clone();
             thread_pool.execute(move || {
                 dt_ctx.party0_port = current_p0_port;
                 dt_ctx.party1_port = current_p1_port;
@@ -199,7 +205,7 @@ pub mod random_forest {
                 let (in_stream, o_stream) = try_setup_socket(&internal_addr, &external_addr, &dt_ctx.message_manager);
                 dt_ctx.in_stream = in_stream;
                 dt_ctx.o_stream = o_stream;
-                dt_ctx.dt_shares = read_shares(&mut dt_ctx, current_tree_index);
+                dt_ctx.dt_shares = shares;
 
                 let now = SystemTime::now();
                 let mut rfs_x = random_feature_selection(&attr_values_bytes_copied, &mut dt_ctx);

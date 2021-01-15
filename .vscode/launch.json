@@ -1,0 +1,41 @@
+{
+        // Use IntelliSense to learn about possible attributes.
+        // Hover to view descriptions of existing attributes.
+        // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Run TI",
+                "type": "cppvsdbg",
+                "request": "launch",
+                "program": "${workspaceFolder}/target/debug/random_forest_rust.exe",
+                "args": ["settings/TI.toml"],
+                "stopAtEntry": false,
+                "cwd": "${workspaceFolder}",
+                "environment": [{"name": "RUST_BACKTRACE", "value": "full"}],
+                "externalConsole": false
+            },
+            {
+                "name": "Run Party0",
+                "type": "cppvsdbg",
+                "request": "launch",
+                "program": "${workspaceFolder}/target/debug/random_forest_rust.exe",
+                "args": ["settings/Party0.toml"],
+                "stopAtEntry": false,
+                "cwd": "${workspaceFolder}",
+                "environment": [{"name": "RUST_BACKTRACE", "value": "full"}],
+                "externalConsole": false
+            },
+            {
+                "name": "Run Party1",
+                "type": "cppvsdbg",
+                "request": "launch",
+                "program": "${workspaceFolder}/target/debug/random_forest_rust.exe",
+                "args": ["settings/Party1.toml"],
+                "stopAtEntry": false,
+                "cwd": "${workspaceFolder}",
+                "environment": [{"name": "RUST_BACKTRACE", "value": "full"}],
+                "externalConsole": false
+            }
+        ]
+    }

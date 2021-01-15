@@ -32,6 +32,7 @@ pub mod ti {
         pub ti_ip: String,
         pub ti_port0: u16,
         pub ti_port1: u16,
+        pub test_mode: bool,
         pub add_shares_per_tree: usize,
         pub add_shares_bigint_per_tree: usize,
         pub equality_shares_per_tree: usize,
@@ -76,6 +77,7 @@ pub mod ti {
                 ti_ip: self.ti_ip.clone(),
                 ti_port0: self.ti_port0,
                 ti_port1: self.ti_port1,
+                test_mode: self.test_mode,
                 add_shares_per_tree: self.add_shares_per_tree,
                 add_shares_bigint_per_tree: self.add_shares_bigint_per_tree,
                 equality_shares_per_tree: self.equality_shares_per_tree,
@@ -292,6 +294,12 @@ pub mod ti {
                 panic!("Encountered a problem while parsing ohe_binary_shares: {:?}", error)
             }
         };
+        let test_mode = match settings.get_bool("test_mode") {
+            Ok(ans) => ans as bool,
+            Err(error) => {
+                panic!("Encountered a problem while parsing test_mode: {:?}", error)
+            }
+        };
 
         let mut fs_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "fs_selection.csv").unwrap();
         let mut sampling_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "sampling_selection.csv").unwrap();
@@ -306,6 +314,7 @@ pub mod ti {
             ti_ip,
             ti_port0,
             ti_port1,
+            test_mode,
             add_shares_per_tree,
             add_shares_bigint_per_tree,
             equality_shares_per_tree,
@@ -500,41 +509,41 @@ pub mod ti {
         let prefix = "main:      ";
         let s0_pfx = "server 0:  ";
         let s1_pfx = "server 1:  ";
-//
-//        let socket0: SocketAddr = format!("{}:{}", &ctx.ti_ip, ctx.ti_port0)
-//            .parse()
-//            .expect("unable to parse internal socket address");
-//
-//        let socket1: SocketAddr = format!("{}:{}", &ctx.ti_ip, ctx.ti_port1)
-//            .parse()
-//            .expect("unable to parse external socket address");
-//
-//        let listener0 = TcpListener::bind(&socket0)
-//            .expect("unable to establish Tcp Listener");
-//
-//        let listener1 = TcpListener::bind(&socket1)
-//            .expect("unable to establish Tcp Listener");
-//
-//        println!("{} listening on port {}", &s0_pfx, listener0.local_addr().unwrap());
-//        println!("{} listening on port {}", &s1_pfx, listener1.local_addr().unwrap());
-//
-//        let in_stream0 = match listener0.accept() {
-//            Ok((stream, _addr)) => stream,
-//            Err(_) => panic!("server 0: failed to accept connection"),
-//        };
-//
-//        let in_stream1 = match listener1.accept() {
-//            Ok((stream, _addr)) => stream,
-//            Err(_) => panic!("server 1: failed to accept connection"),
-//        };
-//        println!("{} accepted connection from {}", &s0_pfx, in_stream0.peer_addr().unwrap());
-//        println!("{} accepted connection from {}", &s1_pfx, in_stream1.peer_addr().unwrap());
+
+       let socket0: SocketAddr = format!("{}:{}", &ctx.ti_ip, ctx.ti_port0)
+           .parse()
+           .expect("unable to parse internal socket address");
+
+       let socket1: SocketAddr = format!("{}:{}", &ctx.ti_ip, ctx.ti_port1)
+           .parse()
+           .expect("unable to parse external socket address");
+
+       let listener0 = TcpListener::bind(&socket0)
+           .expect("unable to establish Tcp Listener");
+
+       let listener1 = TcpListener::bind(&socket1)
+           .expect("unable to establish Tcp Listener");
+
+       println!("{} listening on port {}", &s0_pfx, listener0.local_addr().unwrap());
+       println!("{} listening on port {}", &s1_pfx, listener1.local_addr().unwrap());
+
+       let in_stream0 = match listener0.accept() {
+           Ok((stream, _addr)) => stream,
+           Err(_) => panic!("server 0: failed to accept connection"),
+       };
+
+       let in_stream1 = match listener1.accept() {
+           Ok((stream, _addr)) => stream,
+           Err(_) => panic!("server 1: failed to accept connection"),
+       };
+       println!("{} accepted connection from {}", &s0_pfx, in_stream0.peer_addr().unwrap());
+       println!("{} accepted connection from {}", &s1_pfx, in_stream1.peer_addr().unwrap());
 
 
         let thread_pool = ThreadPool::new(ctx.thread_count);
 
         //preprocess shares, discretization and OHE
-//        generate_preprocessing_shares(ctx, &thread_pool, [&in_stream0, &in_stream1].to_vec());
+       //generate_preprocessing_shares(ctx, &thread_pool, [&in_stream0, &in_stream1].to_vec());
 
         for i in 0..ctx.tree_count {
             print!("{} [{}] generating additive shares...      ", &prefix, i);
@@ -630,18 +639,38 @@ pub mod ti {
                 matrix_mul_shares: matrix_mul_share1,
                 bagging_matrix_mul_shares: bagging_matrix_mul_share1,
             };
-//            let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
-            let mut file0 = File::create(format!("{}_{}shares_tree_{}_0.txt", &ctx.output_path, ctx.tree_count, i).as_str()).unwrap();
-            let mut file1 = File::create(format!("{}_{}shares_tree_{}_1.txt", &ctx.output_path, ctx.tree_count, i).as_str()).unwrap();
 
+            let stream0 = in_stream0.try_clone().expect("server 0: failed to clone stream");
             let sender_thread0 = thread::spawn(move || {
-                write_shares_to_file(share0, &mut file0);
+                match get_confirmation(stream0.try_clone()
+                .expect("server 0: failed to clone stream")) {
+                    Ok(_) => return send_dt_shares(stream0.try_clone()
+                            .expect("server 0: failed to clone stream"), share0),
+                        Err(e) => return Err(e),
+                }
             });
+
+            let stream1 = in_stream1.try_clone().expect("server 1: failed to clone stream");
+            let sender_thread1 = thread::spawn(move || {
+                match get_confirmation(stream1.try_clone()
+                .expect("server 1: failed to clone stream")) {
+                    Ok(_) => return send_dt_shares(stream1.try_clone()
+                            .expect("server 1: failed to clone stream"), share1),
+                        Err(e) => return Err(e),
+                }
+            });
+//            let stream = in_stream0.try_clone().expect("server 0: failed to clone stream");
+            // let mut file0 = File::create(format!("{}_{}shares_tree_{}_0.txt", &ctx.output_path, ctx.tree_count, i).as_str()).unwrap();
+            // let mut file1 = File::create(format!("{}_{}shares_tree_{}_1.txt", &ctx.output_path, ctx.tree_count, i).as_str()).unwrap();
+
+            // let sender_thread0 = thread::spawn(move || {
+            //     write_shares_to_file(share0, &mut file0);
+            // });
 
 //            let stream = in_stream1.try_clone().expect("server 0: failed to clone stream");
-            let sender_thread1 = thread::spawn(move || {
-                write_shares_to_file(share1, &mut file1)
-            });
+            // let sender_thread1 = thread::spawn(move || {
+            //     write_shares_to_file(share1, &mut file1)
+            // });
 
             match sender_thread0.join() {
                 Ok(_) => println!("{} [{}] correlated randomnness sent...     complete -- work time = {:5} (ms)",
@@ -830,8 +859,9 @@ pub mod ti {
     fn generate_binary_shares(ctx: &TI, thread_pool: &ThreadPool, amount: usize) -> (Vec<(u8, u8, u8)>, Vec<(u8, u8, u8)>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
+        let new_amount = if ctx.test_mode {1} else {amount};
 
-        for i in 0..amount {
+        for i in 0..new_amount {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
@@ -898,7 +928,8 @@ pub mod ti {
     fn generate_additive_shares(ctx: &TI, thread_pool: &ThreadPool) -> (HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>, HashMap<u64, Vec<(Wrapping<u64>, Wrapping<u64>, Wrapping<u64>)>>) {
         let mut result0 = HashMap::new();
         let mut result1 = HashMap::new();
-        let (mut general0, mut general1) = additive_share_helper(ctx, thread_pool, ctx.dataset_size_prime, ctx.add_shares_per_tree);
+        let amount = if ctx.test_mode {1} else {ctx.add_shares_per_tree};
+        let (mut general0, mut general1) = additive_share_helper(ctx, thread_pool, ctx.dataset_size_prime, amount);
 //        let (mut feature0, mut feature1) = additive_share_helper(ctx, thread_pool, ctx.rfs_field);
 //        let (mut class0, mut class1) = additive_share_helper(ctx, thread_pool, ctx.bagging_field);
         result0.insert(ctx.dataset_size_prime, general0);
@@ -962,8 +993,9 @@ pub mod ti {
     fn generate_equality_integer_shares(ctx: &TI, thread_pool: &ThreadPool) -> (HashMap<u64, Vec<Wrapping<u64>>>, HashMap<u64, Vec<Wrapping<u64>>>) {
         let mut result0 = HashMap::new();
         let mut result1 = HashMap::new();
-        let (mut feature_eq0, mut feature_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.rfs_field, ctx.ohe_equality_shares as usize);
-        let (mut class_eq0, mut class_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.bagging_field, ctx.ohe_equality_shares as usize);
+        let new_amount = if ctx.test_mode {1} else {ctx.ohe_equality_shares as usize};
+        let (mut feature_eq0, mut feature_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.rfs_field, new_amount);
+        let (mut class_eq0, mut class_eq1) = equality_integer_shares_helper(ctx, thread_pool, ctx.bagging_field, new_amount);
         result0.insert(ctx.rfs_field, feature_eq0);
         result1.insert(ctx.rfs_field, feature_eq1);
 
@@ -1176,8 +1208,9 @@ pub mod ti {
     fn generate_equality_bigint_shares(ctx: &TI, thread_pool: &ThreadPool) -> (Vec<BigUint>, Vec<BigUint>) {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
+        let new_amount = if ctx.test_mode {1} else {ctx.equality_shares_per_tree};
 
-        for i in 0..ctx.equality_shares_per_tree {
+        for i in 0..new_amount {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
@@ -1212,7 +1245,9 @@ pub mod ti {
         let mut share0_arc = Arc::new(Mutex::new(HashMap::new()));
         let mut share1_arc = Arc::new(Mutex::new(HashMap::new()));
 
-        for i in 0..ctx.add_shares_bigint_per_tree {
+        let new_amount = if ctx.test_mode {1} else {ctx.add_shares_bigint_per_tree};
+
+        for i in 0..new_amount {
             let mut share0_arc_copy = Arc::clone(&share0_arc);
             let mut share1_arc_copy = Arc::clone(&share1_arc);
             let mut ctx = ctx.clone();
@@ -1247,6 +1282,8 @@ pub mod ti {
         stream.set_read_timeout(None).expect("set_read_timeout call failed");
 
         let mut stream = stream;
+        println!("{}", stream.local_addr().unwrap());
+        println!("{}", stream.peer_addr().unwrap());
         let mut recv_buf = [0u8; 11];
         let mut bytes_read = 0;
 
@@ -1256,7 +1293,7 @@ pub mod ti {
         }
 
         assert_eq!(b"send shares", &recv_buf);
-        //println!("confirmation received");
+        println!("confirmation received");
 
         let mut bytes_written = 0;
         while bytes_written < recv_buf.len() {
