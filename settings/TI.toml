@@ -9,10 +9,10 @@ ti_port0  = 4000
 ti_port1  = 8000
 
 #[random forest]
-tree_count = 100
+tree_count = 1
 tree_training_batch_size = 20
 thread_count = 5
-
+dt_mode = 1
 
 #[breast Cancer]
 batch_size = 153
@@ -28,7 +28,7 @@ prime = 512
 bigint_bit_size = 153
 attr_value_cnt = 5
 class_value_cnt = 2
-feature_selected = 5
+feature_selected = 30
 instance_selected = 455
 instance_cnt = 455
 feature_cnt = 30
@@ -74,7 +74,7 @@ output_path = "breast_cancer_results/fold1/"
 #output_path = "ECG/fold2/"
 
 #[random data]
-#batch_size = 38
+#batch_size = 26
 #add_shares_per_tree = 1
 #add_shares_bigint_per_tree = 1
 #equality_shares_per_tree = 1
@@ -82,10 +82,10 @@ output_path = "breast_cancer_results/fold1/"
 #ohe_add_shares = 1
 #ohe_binary_shares = 1
 #ohe_equality_shares = 1
-#big_int_prime = "274877906951"
+#big_int_prime = "67108879"
 #prime = 4
-#bigint_bit_size = 38
-#attr_value_cnt = 3
+#bigint_bit_size = 26
+#attr_value_cnt = 2
 #class_value_cnt = 2
 #feature_selected = 3
 #instance_selected = 4

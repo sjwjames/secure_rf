@@ -58,6 +58,7 @@ pub mod ti {
         pub output_path: String,
         pub fs_selection_file: File,
         pub sampling_file: File,
+        pub dt_mode:u64
     }
 
     const TI_BATCH_SIZE: usize = constants::TI_BATCH_SIZE;
@@ -101,6 +102,7 @@ pub mod ti {
                 output_path: self.output_path.clone(),
                 fs_selection_file: self.fs_selection_file.try_clone().unwrap(),
                 sampling_file: self.sampling_file.try_clone().unwrap(),
+                dt_mode:self.dt_mode
             }
         }
     }
@@ -284,6 +286,13 @@ pub mod ti {
             }
         };
 
+        let dt_mode = match settings.get_int("dt_mode") {
+            Ok(num) => num as u64,
+            Err(error) => {
+                panic!("Encountered a problem while parsing ohe_binary_shares: {:?}", error)
+            }
+        };
+
         let mut fs_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "fs_selection.csv").unwrap();
         let mut sampling_file = File::create(output_path.clone() + &format!("{}_", tree_count).to_string() + "sampling_selection.csv").unwrap();
 
@@ -323,6 +332,7 @@ pub mod ti {
             output_path,
             fs_selection_file: fs_file,
             sampling_file,
+            dt_mode,
         }
     }
 
@@ -973,16 +983,27 @@ pub mod ti {
         let mut feature_bit_vec = vec![0u8; ctx.feature_cnt as usize];
         let mut rng = rand::thread_rng();
         let mut vec_to_record = Vec::new();
-        while feature_selected_remain != 0 {
-            let index: usize = rng.gen_range(0, ctx.feature_cnt as usize);
-            if feature_bit_vec[index] == 0 {
-                vec_to_record.push(format!("{}", index));
-                feature_bit_vec[index] = 1;
+        if ctx.dt_mode ==1u64{
+            for i in 0..ctx.feature_selected {
+                vec_to_record.push(format!("{}", i));
+                feature_bit_vec[i as usize] = 1;
                 feature_selected_remain -= 1;
+            }
+        }else{
+            while feature_selected_remain != 0 {
+                let index: usize = rng.gen_range(0, ctx.feature_cnt as usize);
+                if feature_bit_vec[index] == 0 {
+                    vec_to_record.push(format!("{}", index));
+                    feature_bit_vec[index] = 1;
+                    feature_selected_remain -= 1;
+                }
             }
         }
 
+
+
         vec_to_record.sort();
+
         let mut file = ctx.fs_selection_file.try_clone().unwrap();
         file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
 //
@@ -1026,14 +1047,26 @@ pub mod ti {
         let mut instance_selected_vec = vec![0u32; ctx.instance_cnt as usize];
         let mut rng = rand::thread_rng();
         let mut vec_to_record = Vec::new();
-        while instance_selected_remain != 0 {
-            let index: usize = rng.gen_range(0, ctx.instance_cnt as usize);
-            instance_selected_vec[index] += 1;
-            vec_to_record.push(format!("{}", index));
-            instance_selected_remain -= 1;
+        if ctx.dt_mode==1u64{
+            for i in 0..ctx.instance_selected {
+                vec_to_record.push(format!("{}", i));
+                instance_selected_vec[i as usize] += 1;
+                instance_selected_remain -= 1;
+            }
+        }else{
+            while instance_selected_remain != 0 {
+                let index: usize = rng.gen_range(0, ctx.instance_cnt as usize);
+                instance_selected_vec[index] += 1;
+                vec_to_record.push(format!("{}", index));
+                instance_selected_remain -= 1;
+            }
         }
 
+
+
+
         vec_to_record.sort();
+
         let mut file = ctx.sampling_file.try_clone().unwrap();
         file.write_all(format!("{}\n", vec_to_record.join(",")).as_bytes());
 

@@ -35,9 +35,9 @@ integer_precision = 15
 learning_rate = 0.001
 
 #[RANDOM FOREST]
-tree_count = 100
+tree_count = 1
 thread_count = 5
-max_depth = 1
+max_depth = 2
 alpha = 8
 epsilon = 0.1
 ohe_add_shares = 1
@@ -46,7 +46,7 @@ ohe_equality_shares = 1
 
 #[BREAST CANCER]
 instance_selected = 455
-feature_selected = 5
+feature_selected = 30
 batch_size = 153
 tree_training_batch_size = 20
 attr_value_count = 5
@@ -104,19 +104,19 @@ output_path = "breast_cancer_results/fold1/"
 #[RANDOM DATA]
 #instance_selected = 4
 #feature_selected = 3
-#batch_size = 38
+#batch_size = 26
 #tree_training_batch_size = 20
-#attr_value_count = 3
+#attr_value_count = 2
 #class_value_count = 2
 #attribute_count = 3
 #instance_count = 4
 #prime = 4
-#big_int_prime = "274877906951"
+#big_int_prime = "67108879"
 #dataset_size_prime = 4
 #big_int_ti_index = 0
-#bit_length = 38
-#x_input_path = "/Users/sjw/Projects/random_forest_rust/test_data/trainX2_0.csv"
-#y_input_path = "/Users/sjw/Projects/random_forest_rust/test_data/trainy2_0.csv"
+#bit_length = 26
+#x_input_path = "/Users/sjw/Projects/random_forest_rust/test_data/trainX3_0.csv"
+#y_input_path = "/Users/sjw/Projects/random_forest_rust/test_data/trainy3_0.csv"
 #output_path = "test_data/fold1/"
 
 #[GSE2034]
