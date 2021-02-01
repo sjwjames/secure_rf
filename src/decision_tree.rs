@@ -357,7 +357,7 @@ pub mod decision_tree {
         let stopping_check = stopping_bit.add(&stopping_bit_received).mod_floor(&bigint_prime);
         if stopping_check.eq(&BigUint::zero()) {
             println!("Exited on base case: All transactions predict same outcome/The set is empty");
-//            ctx.dt_results.result_list.push(format!("class={}", major_index));
+            ctx.dt_results.result_list.push(format!("current_depth={}",ctx.dt_training.max_depth-r));
             if ctx.asymmetric_bit == 1 {
                 result_file.write_all(format!("class={},", major_index).as_bytes());
             }

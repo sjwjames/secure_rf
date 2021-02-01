@@ -186,11 +186,10 @@ pub mod random_forest {
         let mut class_values_bytes = ohe_conversion(&y_converted, ctx, class_value_count);
 
         let mut RNG = vec![];
-        for _i in 0 .. ctx.tree_count {
+        for _i in 0..ctx.tree_count {
             let stream = ctx.ti_stream.try_clone().expect("TI stream failed to clone in train");
             RNG.push(ti_receive(stream, ctx))
         }
-
 
 
         for current_tree_index in 0..remainder {
@@ -234,6 +233,7 @@ pub mod random_forest {
                 let mut result_file = File::create(format!("{}{}trees_{}", &dt_ctx.output_path, dt_ctx.tree_count, current_tree_index).as_str()).unwrap();
 
                 let dt_training = decision_tree::train(&mut dt_ctx, max_depth, &mut result_file);
+                println!("Tree depth:{}", dt_training.result_list[0]);
                 let runtime = now.elapsed().unwrap().as_millis();
                 println!("One tree completes -- work time = {:5} (ms)", runtime);
             });
