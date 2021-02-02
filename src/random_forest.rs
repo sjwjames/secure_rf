@@ -233,7 +233,7 @@ pub mod random_forest {
                 let mut result_file = File::create(format!("{}{}trees_{}", &dt_ctx.output_path, dt_ctx.tree_count, current_tree_index).as_str()).unwrap();
 
                 let dt_training = decision_tree::train(&mut dt_ctx, max_depth, &mut result_file);
-                println!("Tree depth:{}", dt_training.result_list[0]);
+//                println!("Tree depth:{}", dt_training.result_list[0]);
                 let runtime = now.elapsed().unwrap().as_millis();
                 println!("One tree completes -- work time = {:5} (ms)", runtime);
             });
